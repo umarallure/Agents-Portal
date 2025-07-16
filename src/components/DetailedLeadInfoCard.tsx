@@ -109,7 +109,7 @@ Lead Vendor: ${lead.lead_vendor || 'N/A'}
     }).format(amount);
   };
 
-  const InfoRow = ({ label, value, icon }: { label: string; value: string | number | undefined; icon?: React.ReactNode }) => (
+  const InfoRow = ({ label, value, icon }: { label: string; value: string | number | undefined | null; icon?: React.ReactNode }) => (
     <div className="flex items-start gap-2 py-1">
       {icon && <div className="mt-0.5">{icon}</div>}
       <div className="flex-1">
@@ -118,6 +118,9 @@ Lead Vendor: ${lead.lead_vendor || 'N/A'}
       </div>
     </div>
   );
+
+  // Check if this lead has detailed information (from JotForm) or basic info only
+  const hasDetailedInfo = lead.birth_state || lead.height || lead.weight || lead.tobacco_use || lead.medications;
 
   return (
     <Card className="w-full">
@@ -135,6 +138,15 @@ Lead Vendor: ${lead.lead_vendor || 'N/A'}
         </Button>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Notice for limited data */}
+        {!hasDetailedInfo && (
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-800">
+              <strong>Note:</strong> This lead has basic information only. Detailed call center information is available for leads processed from JotForm.
+            </p>
+          </div>
+        )}
+
         {/* Personal Information */}
         <div className="space-y-3">
           <h3 className="font-semibold text-lg flex items-center gap-2">
@@ -161,34 +173,38 @@ Lead Vendor: ${lead.lead_vendor || 'N/A'}
           </div>
         </div>
 
-        {/* Coverage History */}
-        <div className="space-y-3">
-          <h3 className="font-semibold text-lg">Coverage History</h3>
-          <div className="p-4 bg-yellow-50 rounded-lg space-y-2">
-            <InfoRow label="Any existing/previous coverage in last 2 years" value={lead.existing_coverage} />
-            <InfoRow label="Any previous applications" value={lead.previous_applications} />
+        {/* Coverage History - Only show if detailed info available */}
+        {hasDetailedInfo && (
+          <div className="space-y-3">
+            <h3 className="font-semibold text-lg">Coverage History</h3>
+            <div className="p-4 bg-yellow-50 rounded-lg space-y-2">
+              <InfoRow label="Any existing/previous coverage in last 2 years" value={lead.existing_coverage} />
+              <InfoRow label="Any previous applications" value={lead.previous_applications} />
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Health Information */}
-        <div className="space-y-3">
-          <h3 className="font-semibold text-lg flex items-center gap-2">
-            <Heart className="h-4 w-4" />
-            Health Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-green-50 rounded-lg">
-            <div className="space-y-2">
-              <InfoRow label="Height" value={lead.height} />
-              <InfoRow label="Weight" value={lead.weight} />
-              <InfoRow label="Doctors Name" value={lead.doctors_name} />
-              <InfoRow label="Tobacco Use" value={lead.tobacco_use} />
-            </div>
-            <div className="space-y-2">
-              <InfoRow label="Health Conditions" value={lead.health_conditions} />
-              <InfoRow label="Medications" value={lead.medications} />
+        {/* Health Information - Only show if detailed info available */}
+        {hasDetailedInfo && (
+          <div className="space-y-3">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <Heart className="h-4 w-4" />
+              Health Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-green-50 rounded-lg">
+              <div className="space-y-2">
+                <InfoRow label="Height" value={lead.height} />
+                <InfoRow label="Weight" value={lead.weight} />
+                <InfoRow label="Doctors Name" value={lead.doctors_name} />
+                <InfoRow label="Tobacco Use" value={lead.tobacco_use} />
+              </div>
+              <div className="space-y-2">
+                <InfoRow label="Health Conditions" value={lead.health_conditions} />
+                <InfoRow label="Medications" value={lead.medications} />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Insurance Details */}
         <div className="space-y-3">
@@ -209,26 +225,28 @@ Lead Vendor: ${lead.lead_vendor || 'N/A'}
           </div>
         </div>
 
-        {/* Beneficiary & Banking */}
-        <div className="space-y-3">
-          <h3 className="font-semibold text-lg flex items-center gap-2">
-            <Building className="h-4 w-4" />
-            Beneficiary & Banking Information
-          </h3>
-          <div className="p-4 bg-gray-50 rounded-lg space-y-2">
-            <InfoRow label="Beneficiary Information" value={lead.beneficiary_information} />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-              <div className="space-y-2">
-                <InfoRow label="Institution Name" value={lead.institution_name} icon={<Building className="h-4 w-4" />} />
-                <InfoRow label="Routing Number" value={lead.beneficiary_routing} />
-              </div>
-              <div className="space-y-2">
-                <InfoRow label="Account Number" value={lead.beneficiary_account} icon={<CreditCard className="h-4 w-4" />} />
-                <InfoRow label="Account Type" value={lead.account_type} />
+        {/* Beneficiary & Banking - Only show if detailed info available */}
+        {hasDetailedInfo && (
+          <div className="space-y-3">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <Building className="h-4 w-4" />
+              Beneficiary & Banking Information
+            </h3>
+            <div className="p-4 bg-gray-50 rounded-lg space-y-2">
+              <InfoRow label="Beneficiary Information" value={lead.beneficiary_information} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                <div className="space-y-2">
+                  <InfoRow label="Institution Name" value={lead.institution_name} icon={<Building className="h-4 w-4" />} />
+                  <InfoRow label="Routing Number" value={lead.beneficiary_routing} />
+                </div>
+                <div className="space-y-2">
+                  <InfoRow label="Account Number" value={lead.beneficiary_account} icon={<CreditCard className="h-4 w-4" />} />
+                  <InfoRow label="Account Type" value={lead.account_type} />
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Additional Information */}
         {lead.additional_notes && (

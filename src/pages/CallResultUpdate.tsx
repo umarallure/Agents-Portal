@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { LeadInfoCard } from "@/components/LeadInfoCard";
+import { DetailedLeadInfoCard } from "@/components/DetailedLeadInfoCard";
 import { CallResultForm } from "@/components/CallResultForm";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 
 interface Lead {
   id: string;
@@ -20,12 +21,30 @@ interface Lead {
   zip_code: string;
   date_of_birth: string;
   age: number;
+  birth_state?: string;
+  social_security: string;
+  driver_license?: string;
+  existing_coverage?: string;
+  previous_applications?: string;
+  height?: string;
+  weight?: string;
+  doctors_name?: string;
+  tobacco_use?: string;
+  health_conditions: string;
+  medications?: string;
   carrier: string;
   product_type: string;
   coverage_amount: number;
   monthly_premium: number;
   draft_date: string;
+  future_draft_date?: string;
+  beneficiary_information?: string;
+  institution_name?: string;
+  beneficiary_routing: string;
+  beneficiary_account: string;
+  account_type?: string;
   additional_notes: string;
+  lead_vendor?: string;
 }
 
 const CallResultUpdate = () => {
@@ -37,6 +56,7 @@ const CallResultUpdate = () => {
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [showDetailedView, setShowDetailedView] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -228,42 +248,79 @@ const CallResultUpdate = () => {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="outline" 
-            onClick={() => navigate("/dashboard")}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">
-              {fromCallback ? "Update Callback Result" : "Update Call Result"}
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              {fromCallback 
-                ? "Update the status and details for this callback" 
-                : "Update the status and details for this lead"
-              }
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Lead Details - Right Side */}
-          <div className="order-2 lg:order-1">
-            <LeadInfoCard lead={lead} />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="outline" 
+              onClick={() => navigate("/dashboard")}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">
+                {fromCallback ? "Update Callback Result" : "Update Call Result"}
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                {fromCallback 
+                  ? "Update the status and details for this callback" 
+                  : "Update the status and details for this lead"
+                }
+              </p>
+            </div>
           </div>
           
-          {/* Call Result Form - Left Side */}
-          <div className="order-1 lg:order-2">
+          {/* Toggle for detailed view */}
+          <Button
+            variant="outline"
+            onClick={() => setShowDetailedView(!showDetailedView)}
+            className="flex items-center gap-2"
+          >
+            {showDetailedView ? (
+              <>
+                <EyeOff className="h-4 w-4" />
+                Simple View
+              </>
+            ) : (
+              <>
+                <Eye className="h-4 w-4" />
+                Detailed View
+              </>
+            )}
+          </Button>
+        </div>
+
+        <div className={`grid gap-6 ${showDetailedView ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
+          {/* Lead Details */}
+          <div className={showDetailedView ? "order-1" : "order-2 lg:order-1"}>
+            {showDetailedView ? (
+              <DetailedLeadInfoCard lead={lead} />
+            ) : (
+              <LeadInfoCard lead={lead} />
+            )}
+          </div>
+          
+          {/* Call Result Form */}
+          {!showDetailedView && (
+            <div className="order-1 lg:order-2">
+              <CallResultForm 
+                submissionId={submissionId!} 
+                onSuccess={() => navigate(`/call-result-journey?submissionId=${submissionId}`)}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Show form below detailed view when in detailed mode */}
+        {showDetailedView && (
+          <div className="mt-6">
             <CallResultForm 
               submissionId={submissionId!} 
               onSuccess={() => navigate(`/call-result-journey?submissionId=${submissionId}`)}
             />
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
