@@ -109,8 +109,9 @@ ${lead.additional_notes}`;
         </Button>
       </CardHeader>
       <CardContent>
-        <div className="space-y-1 text-sm font-mono">
+        <div className="space-y-1 text-xl font-normal">
           <div><strong>{lead.lead_vendor || 'Lead Vendor'}:</strong> {lead.customer_full_name}</div>
+          <br />
           <div><strong>Address:</strong> {lead.street_address}, {lead.city}, {lead.state} {lead.zip_code}</div>
           <div><strong>Billing and mailing address is the same:</strong> (Y/N)</div>
           <div><strong>Date of Birth:</strong> {lead.date_of_birth}</div>
