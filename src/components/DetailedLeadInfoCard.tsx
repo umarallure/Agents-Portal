@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Copy, User, MapPin, Phone, Calendar, DollarSign, Heart, Building, CreditCard } from "lucide-react";
+import { Copy, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface DetailedLead {
@@ -49,219 +49,101 @@ export const DetailedLeadInfoCard = ({ lead }: DetailedLeadInfoCardProps) => {
   const { toast } = useToast();
 
   const copyToClipboard = () => {
-    const leadInfo = `
-Call Center Information:
-
-PERSONAL INFORMATION:
-Name: ${lead.customer_full_name}
+    const leadInfo = `${lead.lead_vendor || 'Lead Vendor'}: ${lead.customer_full_name}
 Address: ${lead.street_address}, ${lead.city}, ${lead.state} ${lead.zip_code}
-Birth State: ${lead.birth_state || 'N/A'}
+Billing and mailing address is the same: (Y/N)
 Date of Birth: ${lead.date_of_birth}
+Birth State: ${lead.birth_state || ''}
 Age: ${lead.age}
 Number: ${lead.phone_number}
+Call phone/landline:
 Social: ${lead.social_security}
-Driver License Number: ${lead.driver_license || 'N/A'}
-
-COVERAGE HISTORY:
-Any existing/previous coverage in last 2 years: ${lead.existing_coverage || 'N/A'}
-Any previous applications: ${lead.previous_applications || 'N/A'}
-
-HEALTH INFORMATION:
-Height: ${lead.height || 'N/A'}
-Weight: ${lead.weight || 'N/A'}
-Doctors Name: ${lead.doctors_name || 'N/A'}
-Tobacco Use: ${lead.tobacco_use || 'N/A'}
-Health Conditions: ${lead.health_conditions || 'N/A'}
-Medications: ${lead.medications || 'N/A'}
-
-INSURANCE DETAILS:
+Driver License Number: ${lead.driver_license || ''}
+Exp:
+Existing coverage: ${lead.existing_coverage || ''}
+Applied to life insurance last two years: ${lead.previous_applications || ''}
+Height: ${lead.height || ''}
+Weight: ${lead.weight || ''}
+Doctors Name: ${lead.doctors_name || ''}
+Tobacco Use: ${lead.tobacco_use || ''}
+Health Conditions:
+${lead.health_conditions || ''}
+Medications:
+${lead.medications || ''}
+Insurance Application Details:
 Carrier: ${lead.carrier}
 Monthly Premium: $${lead.monthly_premium}
 Coverage Amount: $${lead.coverage_amount?.toLocaleString()}
 Draft Date: ${lead.draft_date}
-First Draft: ${lead.future_draft_date || 'N/A'}
-
-BENEFICIARY & BANKING:
-Beneficiary Information: ${lead.beneficiary_information || 'N/A'}
-Institution Name: ${lead.institution_name || 'N/A'}
+First Draft: ${lead.future_draft_date || ''}
+Beneficiary Information: ${lead.beneficiary_information || ''}
+Bank Name: ${lead.institution_name || ''}
 Routing Number: ${lead.beneficiary_routing}
 Account Number: ${lead.beneficiary_account}
-Account Type: ${lead.account_type || 'N/A'}
-
+Checking/savings account: ${lead.account_type || ''}
 ADDITIONAL NOTES:
-${lead.additional_notes}
-
-Submission ID: ${lead.submission_id}
-Lead Vendor: ${lead.lead_vendor || 'N/A'}
-    `.trim();
+${lead.additional_notes}`;
 
     navigator.clipboard.writeText(leadInfo);
     toast({
       title: "Copied!",
-      description: "Complete lead information copied to clipboard",
+      description: "Lead information copied to clipboard",
     });
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+  const formatValue = (value: string | number | undefined | null) => {
+    if (value === null || value === undefined || value === '') return '';
+    return String(value);
   };
-
-  const InfoRow = ({ label, value, icon }: { label: string; value: string | number | undefined | null; icon?: React.ReactNode }) => (
-    <div className="flex items-start gap-2 py-1">
-      {icon && <div className="mt-0.5">{icon}</div>}
-      <div className="flex-1">
-        <span className="font-medium text-sm">{label}:</span>
-        <span className="ml-2 text-sm">{value || 'N/A'}</span>
-      </div>
-    </div>
-  );
-
-  // Check if this lead has detailed information (from JotForm) or basic info only
-  const hasDetailedInfo = lead.birth_state || lead.height || lead.weight || lead.tobacco_use || lead.medications;
 
   return (
     <Card className="w-full">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           <User className="h-5 w-5" />
-          Additional Info
-          
+          Additional Notes
         </CardTitle>
         <Button onClick={copyToClipboard} variant="outline" size="sm">
           <Copy className="h-4 w-4 mr-2" />
-          Copy Notes Template
+          Copy
         </Button>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Notice for limited data */}
-        {!hasDetailedInfo && (
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">
-              <strong>Note:</strong> This lead has basic information only. Detailed call center information is available for leads processed from JotForm.
-            </p>
-          </div>
-        )}
-
-        {/* Personal Information */}
-        <div className="space-y-3">
-          <h3 className="font-semibold text-lg flex items-center gap-2">
-            <User className="h-4 w-4" />
-            Personal Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
-            <div className="space-y-2">
-              <InfoRow label="Name" value={lead.customer_full_name} />
-              <InfoRow label="Birth State" value={lead.birth_state} />
-              <InfoRow label="Date of Birth" value={lead.date_of_birth} icon={<Calendar className="h-4 w-4" />} />
-              <InfoRow label="Age" value={lead.age} />
-              <InfoRow label="Social Security" value={lead.social_security} />
-              <InfoRow label="Driver License Number" value={lead.driver_license} />
-            </div>
-            <div className="space-y-2">
-              <InfoRow label="Number" value={lead.phone_number} icon={<Phone className="h-4 w-4" />} />
-              <InfoRow 
-                label="Address" 
-                value={`${lead.street_address}, ${lead.city}, ${lead.state} ${lead.zip_code}`}
-                icon={<MapPin className="h-4 w-4" />}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Coverage History - Only show if detailed info available */}
-        {hasDetailedInfo && (
-          <div className="space-y-3">
-            <h3 className="font-semibold text-lg">Coverage History</h3>
-            <div className="p-4 bg-yellow-50 rounded-lg space-y-2">
-              <InfoRow label="Any existing/previous coverage in last 2 years" value={lead.existing_coverage} />
-              <InfoRow label="Any previous applications" value={lead.previous_applications} />
-            </div>
-          </div>
-        )}
-
-        {/* Health Information - Only show if detailed info available */}
-        {hasDetailedInfo && (
-          <div className="space-y-3">
-            <h3 className="font-semibold text-lg flex items-center gap-2">
-              <Heart className="h-4 w-4" />
-              Health Information
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-green-50 rounded-lg">
-              <div className="space-y-2">
-                <InfoRow label="Height" value={lead.height} />
-                <InfoRow label="Weight" value={lead.weight} />
-                <InfoRow label="Doctors Name" value={lead.doctors_name} />
-                <InfoRow label="Tobacco Use" value={lead.tobacco_use} />
-              </div>
-              <div className="space-y-2">
-                <InfoRow label="Health Conditions" value={lead.health_conditions} />
-                <InfoRow label="Medications" value={lead.medications} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Insurance Details */}
-        <div className="space-y-3">
-          <h3 className="font-semibold text-lg flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
-            Insurance Details
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-purple-50 rounded-lg">
-            <div className="space-y-2">
-              <InfoRow label="Carrier" value={lead.carrier} />
-              <InfoRow label="Monthly Premium" value={formatCurrency(lead.monthly_premium)} />
-              <InfoRow label="Coverage Amount" value={formatCurrency(lead.coverage_amount)} />
-            </div>
-            <div className="space-y-2">
-              <InfoRow label="Draft Date" value={lead.draft_date} />
-              <InfoRow label="First Draft" value={lead.future_draft_date} />
-            </div>
-          </div>
-        </div>
-
-        {/* Beneficiary & Banking - Only show if detailed info available */}
-        {hasDetailedInfo && (
-          <div className="space-y-3">
-            <h3 className="font-semibold text-lg flex items-center gap-2">
-              <Building className="h-4 w-4" />
-              Beneficiary & Banking Information
-            </h3>
-            <div className="p-4 bg-gray-50 rounded-lg space-y-2">
-              <InfoRow label="Beneficiary Information" value={lead.beneficiary_information} />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-                <div className="space-y-2">
-                  <InfoRow label="Institution Name" value={lead.institution_name} icon={<Building className="h-4 w-4" />} />
-                  <InfoRow label="Routing Number" value={lead.beneficiary_routing} />
-                </div>
-                <div className="space-y-2">
-                  <InfoRow label="Account Number" value={lead.beneficiary_account} icon={<CreditCard className="h-4 w-4" />} />
-                  <InfoRow label="Account Type" value={lead.account_type} />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Additional Information */}
-        {lead.additional_notes && (
-          <div className="space-y-3">
-            <h3 className="font-semibold text-lg">Additional Information</h3>
-            <div className="p-4 bg-orange-50 rounded-lg">
-              <p className="text-sm whitespace-pre-wrap">{lead.additional_notes}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Lead Source */}
-        <div className="pt-4 border-t">
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>Lead Vendor: {lead.lead_vendor || 'N/A'}</span>
-            <span>Submission ID: {lead.submission_id}</span>
-          </div>
+      <CardContent>
+        <div className="space-y-1 text-sm font-mono">
+          <div><strong>{lead.lead_vendor || 'Lead Vendor'}:</strong> {lead.customer_full_name}</div>
+          <div><strong>Address:</strong> {lead.street_address}, {lead.city}, {lead.state} {lead.zip_code}</div>
+          <div><strong>Billing and mailing address is the same:</strong> (Y/N)</div>
+          <div><strong>Date of Birth:</strong> {lead.date_of_birth}</div>
+          <div><strong>Birth State:</strong> {formatValue(lead.birth_state)}</div>
+          <div><strong>Age:</strong> {lead.age}</div>
+          <div><strong>Number:</strong> {lead.phone_number}</div>
+          <div><strong>Call phone/landline:</strong></div>
+          <div><strong>Social:</strong> {lead.social_security}</div>
+          <div><strong>Driver License Number:</strong> {formatValue(lead.driver_license)}</div>
+          <div><strong>Exp:</strong></div>
+          <div><strong>Existing coverage:</strong> {formatValue(lead.existing_coverage)}</div>
+          <div><strong>Applied to life insurance last two years:</strong> {formatValue(lead.previous_applications)}</div>
+          <div><strong>Height:</strong> {formatValue(lead.height)}</div>
+          <div><strong>Weight:</strong> {formatValue(lead.weight)}</div>
+          <div><strong>Doctors Name:</strong> {formatValue(lead.doctors_name)}</div>
+          <div><strong>Tobacco Use:</strong> {formatValue(lead.tobacco_use)}</div>
+          <div><strong>Health Conditions:</strong></div>
+          <div className="ml-4">{formatValue(lead.health_conditions)}</div>
+          <div><strong>Medications:</strong></div>
+          <div className="ml-4">{formatValue(lead.medications)}</div>
+          <div><strong>Insurance Application Details:</strong></div>
+          <div><strong>Carrier:</strong> {lead.carrier}</div>
+          <div><strong>Monthly Premium:</strong> ${lead.monthly_premium}</div>
+          <div><strong>Coverage Amount:</strong> ${lead.coverage_amount?.toLocaleString()}</div>
+          <div><strong>Draft Date:</strong> {lead.draft_date}</div>
+          <div><strong>First Draft:</strong> {formatValue(lead.future_draft_date)}</div>
+          <div><strong>Beneficiary Information:</strong> {formatValue(lead.beneficiary_information)}</div>
+          <div><strong>Bank Name:</strong> {formatValue(lead.institution_name)}</div>
+          <div><strong>Routing Number:</strong> {lead.beneficiary_routing}</div>
+          <div><strong>Account Number:</strong> {lead.beneficiary_account}</div>
+          <div><strong>Checking/savings account:</strong> {formatValue(lead.account_type)}</div>
+          <div><strong>ADDITIONAL NOTES:</strong></div>
+          <div className="ml-4 whitespace-pre-wrap">{lead.additional_notes}</div>
         </div>
       </CardContent>
     </Card>
