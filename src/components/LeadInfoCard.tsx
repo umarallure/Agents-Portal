@@ -73,7 +73,7 @@ Submission ID: ${lead.submission_id}
         </CardTitle>
         <Button onClick={copyToClipboard} variant="outline" size="sm">
           <Copy className="h-4 w-4 mr-2" />
-          Copy All Info
+          Copy Basic Info
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -127,14 +127,12 @@ Lead Vendor: ${lead.lead_vendor || 'N/A'}
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           <User className="h-5 w-5" />
-          Call Center Information
-          <span className="text-sm font-normal text-muted-foreground">
-            #{lead.submission_id}
-          </span>
+          Additional Info
+          
         </CardTitle>
         <Button onClick={copyToClipboard} variant="outline" size="sm">
           <Copy className="h-4 w-4 mr-2" />
-          Copy All Info
+          Copy Notes Template
         </Button>
       </CardHeader>
       <CardContent className="space-y-6">
