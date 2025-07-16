@@ -19,7 +19,7 @@ serve(async (req) => {
       throw new Error('SLACK_BOT_TOKEN not configured');
     }
 
-    const portalUrl = `${Deno.env.get('SUPABASE_URL')?.replace('gqhcjqxcvhgwsqfqgekh.supabase.co', 'call-result-portal.lovable.app')}/call-result?submissionId=${submissionId}&formId=${formId || ''}`;
+    const portalUrl = `${Deno.env.get('SUPABASE_URL')?.replace('gqhcjqxcvhgwsqfqgekh.supabase.co', 'agents-portal-zeta.vercel.app')}/call-result-update?submissionId=${submissionId}&formId=${formId || ''}`;
 
     const slackMessage = {
       channel: '#leads', // Change to your channel

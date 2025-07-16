@@ -21,7 +21,7 @@ serve(async (req) => {
       throw new Error('SLACK_BOT_TOKEN not configured');
     }
 
-    const portalUrl = `${Deno.env.get('SUPABASE_URL')?.replace('gqhcjqxcvhgwsqfqgekh.supabase.co', 'call-result-portal.lovable.app')}/call-result?submissionId=${submissionId}`;
+    const portalUrl = `${Deno.env.get('SUPABASE_URL')?.replace('gqhcjqxcvhgwsqfqgekh.supabase.co', 'agents-portal-zeta.vercel.app')}/call-result-update?submissionId=${submissionId}`;
 
     // Check if this is a submitted application notification
     const isSubmittedApplication = callResult && callResult.application_submitted === true;

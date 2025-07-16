@@ -66,7 +66,7 @@ const Index = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Link to="/call-result">
+              <Link to="/call-result-update">
                 <Button variant="outline" className="w-full">
                   Update Call Result
                 </Button>
