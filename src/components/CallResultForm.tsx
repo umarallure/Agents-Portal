@@ -263,7 +263,6 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
           }
         } else {
           // For JotForm leads: Update existing Google Sheets row
-          console.log("Processing JotForm lead - updating existing Google Sheets row");
           
           const { error: sheetsError } = await supabase.functions.invoke('google-sheets-update', {
             body: {
@@ -296,7 +295,7 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
       // Send Slack notification for submitted applications
       if (applicationSubmitted === true) {
         try {
-          console.log("Sending Slack notification for submitted application");
+          
           
           // First, fetch the lead data for the Slack notification
           const { data: leadData, error: leadError } = await supabase
@@ -306,6 +305,20 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
             .single();
 
           if (!leadError && leadData) {
+            const callResultForSlack = {
+              application_submitted: applicationSubmitted,
+              buffer_agent: bufferAgent,
+              agent_who_took_call: agentWhoTookCall,
+              carrier: carrier,
+              product_type: productType,
+              draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
+              monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
+              face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
+              sent_to_underwriting: sentToUnderwriting,
+              lead_vendor: leadVendor
+            };
+            
+            
             const { error: slackError } = await supabase.functions.invoke('slack-notification', {
               body: {
                 submissionId: submissionId,
@@ -314,18 +327,7 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
                   phone_number: leadData.phone_number,
                   email: leadData.email
                 },
-                callResult: {
-                  application_submitted: applicationSubmitted,
-                  buffer_agent: bufferAgent,
-                  agent_who_took_call: agentWhoTookCall,
-                  carrier: carrier,
-                  product_type: productType,
-                  draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
-                  monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-                  face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
-                  sent_to_underwriting: sentToUnderwriting,
-                  lead_vendor: leadVendor
-                }
+                callResult: callResultForSlack
               }
             });
 

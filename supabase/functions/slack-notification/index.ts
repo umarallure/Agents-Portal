@@ -150,9 +150,12 @@ serve(async (req) => {
 
     // Send additional notification to lead vendor specific channel if application is submitted
     if (isSubmittedApplication && callResult.lead_vendor) {
-      const vendorChannel = leadVendorChannelMapping[callResult.lead_vendor];
+      // Clean the vendor name (trim whitespace and normalize)
+      const cleanVendorName = callResult.lead_vendor.trim();
+      const vendorChannel = leadVendorChannelMapping[cleanVendorName];
       
-      console.log(`Debug - Looking for vendor: "${callResult.lead_vendor}"`);
+      console.log(`Debug - Looking for vendor: "${cleanVendorName}"`);
+      console.log(`Debug - Available vendor keys:`, Object.keys(leadVendorChannelMapping));
       console.log(`Debug - Found channel: ${vendorChannel}`);
       
       if (vendorChannel) {
