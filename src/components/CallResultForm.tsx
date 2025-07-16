@@ -73,6 +73,30 @@ const licensedAccountOptions = [
   "N/A"
 ];
 
+const leadVendorOptions = [
+  "Ark Tech",
+  "GrowthOnline BPO",
+  "Maverick",
+  "Orbit Insurance x Om",
+  "Visa BPO",
+  "Vyn BPO",
+  "Cyberleads",
+  "Corebiz",
+  "Digicon",
+  "Ambition",
+  "Benchmark",
+  "Poahenee",
+  "Plexi",
+  "Gigabite",
+  "Everline solution",
+  "Capital Zone Comm",
+  "BroTech",
+  "Progressive BPO",
+  "Cerberus BPO",
+  "TM Global",
+  "Optimum BPO"
+];
+
 export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps) => {
   const [applicationSubmitted, setApplicationSubmitted] = useState<boolean | null>(null);
   const [status, setStatus] = useState("");
@@ -84,11 +108,11 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
   const [licensedAgentAccount, setLicensedAgentAccount] = useState("");
   const [coverageAmount, setCoverageAmount] = useState("");
   const [monthlyPremium, setMonthlyPremium] = useState("");
-  const [faceAmount, setFaceAmount] = useState("");
   const [submissionDate, setSubmissionDate] = useState<Date>();
   const [sentToUnderwriting, setSentToUnderwriting] = useState<boolean | null>(null);
   const [bufferAgent, setBufferAgent] = useState("");
   const [agentWhoTookCall, setAgentWhoTookCall] = useState("");
+  const [leadVendor, setLeadVendor] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { toast } = useToast();
@@ -124,7 +148,7 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
           licensed_agent_account: licensedAgentAccount,
           coverage_amount: coverageAmount ? parseFloat(coverageAmount) : null,
           monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-          face_amount: faceAmount ? parseFloat(faceAmount) : null,
+          face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
           submission_date: submissionDate ? format(submissionDate, "yyyy-MM-dd") : null,
         } : {})
       };
@@ -146,6 +170,26 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
           variant: "destructive",
         });
         return;
+      }
+
+      // Update lead vendor in leads table if provided and application is submitted
+      if (applicationSubmitted === true && leadVendor) {
+        try {
+          const { error: leadUpdateError } = await supabase
+            .from("leads")
+            .update({ lead_vendor: leadVendor })
+            .eq("submission_id", submissionId);
+
+          if (leadUpdateError) {
+            console.error("Error updating lead vendor:", leadUpdateError);
+            // Don't fail the entire process if lead vendor update fails
+          } else {
+            console.log("Lead vendor updated successfully");
+          }
+        } catch (leadVendorError) {
+          console.error("Lead vendor update failed:", leadVendorError);
+          // Don't fail the entire process if lead vendor update fails
+        }
       }
 
       // Update Google Sheets based on lead type
@@ -206,7 +250,7 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
                   product_type: productType,
                   draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
                   monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-                  face_amount: faceAmount ? parseFloat(faceAmount) : null,
+                  face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
                   notes: notes,
                   sent_to_underwriting: sentToUnderwriting
                 }
@@ -234,7 +278,7 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
                 product_type: productType,
                 draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
                 monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-                face_amount: faceAmount ? parseFloat(faceAmount) : null,
+                face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
                 notes: notes,
                 sent_to_underwriting: sentToUnderwriting
               }
@@ -278,7 +322,7 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
                   product_type: productType,
                   draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
                   monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-                  face_amount: faceAmount ? parseFloat(faceAmount) : null,
+                  face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
                   sent_to_underwriting: sentToUnderwriting
                 }
               }
@@ -317,11 +361,11 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
         setLicensedAgentAccount("");
         setCoverageAmount("");
         setMonthlyPremium("");
-        setFaceAmount("");
         setSubmissionDate(undefined);
         setSentToUnderwriting(null);
         setBufferAgent("");
         setAgentWhoTookCall("");
+        setLeadVendor("");
       }
 
     } catch (error) {
@@ -457,6 +501,22 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
                       {productTypeOptions.map((option) => (
                         <SelectItem key={option} value={option}>
                           {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="leadVendor">Lead Vendor</Label>
+                  <Select value={leadVendor} onValueChange={setLeadVendor}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select lead vendor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {leadVendorOptions.map((vendor) => (
+                        <SelectItem key={vendor} value={vendor}>
+                          {vendor}
                         </SelectItem>
                       ))}
                     </SelectContent>
