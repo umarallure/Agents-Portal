@@ -127,11 +127,14 @@ export type Database = {
       }
       leads: {
         Row: {
+          account_type: string | null
           additional_notes: string | null
           age: number | null
           agent: string | null
           beneficiary_account: string | null
+          beneficiary_information: string | null
           beneficiary_routing: string | null
+          birth_state: string | null
           buffer_agent: string | null
           carrier: string | null
           city: string | null
@@ -139,30 +142,42 @@ export type Database = {
           created_at: string | null
           customer_full_name: string | null
           date_of_birth: string | null
+          doctors_name: string | null
           draft_date: string | null
+          driver_license: string | null
           email: string | null
+          existing_coverage: string | null
           future_draft_date: string | null
           health_conditions: string | null
+          height: string | null
           id: string
+          institution_name: string | null
           lead_vendor: string | null
+          medications: string | null
           monthly_premium: number | null
           phone_number: string | null
+          previous_applications: string | null
           product_type: string | null
           social_security: string | null
           state: string | null
           street_address: string | null
           submission_date: string | null
           submission_id: string | null
+          tobacco_use: string | null
           updated_at: string | null
           user_id: string | null
+          weight: string | null
           zip_code: string | null
         }
         Insert: {
+          account_type?: string | null
           additional_notes?: string | null
           age?: number | null
           agent?: string | null
           beneficiary_account?: string | null
+          beneficiary_information?: string | null
           beneficiary_routing?: string | null
+          birth_state?: string | null
           buffer_agent?: string | null
           carrier?: string | null
           city?: string | null
@@ -170,30 +185,42 @@ export type Database = {
           created_at?: string | null
           customer_full_name?: string | null
           date_of_birth?: string | null
+          doctors_name?: string | null
           draft_date?: string | null
+          driver_license?: string | null
           email?: string | null
+          existing_coverage?: string | null
           future_draft_date?: string | null
           health_conditions?: string | null
+          height?: string | null
           id?: string
+          institution_name?: string | null
           lead_vendor?: string | null
+          medications?: string | null
           monthly_premium?: number | null
           phone_number?: string | null
+          previous_applications?: string | null
           product_type?: string | null
           social_security?: string | null
           state?: string | null
           street_address?: string | null
           submission_date?: string | null
           submission_id?: string | null
+          tobacco_use?: string | null
           updated_at?: string | null
           user_id?: string | null
+          weight?: string | null
           zip_code?: string | null
         }
         Update: {
+          account_type?: string | null
           additional_notes?: string | null
           age?: number | null
           agent?: string | null
           beneficiary_account?: string | null
+          beneficiary_information?: string | null
           beneficiary_routing?: string | null
+          birth_state?: string | null
           buffer_agent?: string | null
           carrier?: string | null
           city?: string | null
@@ -201,22 +228,31 @@ export type Database = {
           created_at?: string | null
           customer_full_name?: string | null
           date_of_birth?: string | null
+          doctors_name?: string | null
           draft_date?: string | null
+          driver_license?: string | null
           email?: string | null
+          existing_coverage?: string | null
           future_draft_date?: string | null
           health_conditions?: string | null
+          height?: string | null
           id?: string
+          institution_name?: string | null
           lead_vendor?: string | null
+          medications?: string | null
           monthly_premium?: number | null
           phone_number?: string | null
+          previous_applications?: string | null
           product_type?: string | null
           social_security?: string | null
           state?: string | null
           street_address?: string | null
           submission_date?: string | null
           submission_id?: string | null
+          tobacco_use?: string | null
           updated_at?: string | null
           user_id?: string | null
+          weight?: string | null
           zip_code?: string | null
         }
         Relationships: []
