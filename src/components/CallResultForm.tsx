@@ -323,7 +323,8 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
                   draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
                   monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
                   face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
-                  sent_to_underwriting: sentToUnderwriting
+                  sent_to_underwriting: sentToUnderwriting,
+                  lead_vendor: leadVendor
                 }
               }
             });
