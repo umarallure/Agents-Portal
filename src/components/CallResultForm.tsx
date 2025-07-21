@@ -317,7 +317,7 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
               monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
               face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
               sent_to_underwriting: sentToUnderwriting,
-              lead_vendor: leadVendor
+              lead_vendor: leadData.lead_vendor || leadVendor || 'N/A'
             };
             
             

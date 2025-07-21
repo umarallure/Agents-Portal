@@ -45,6 +45,15 @@ serve(async (req)=>{
     
     // Only send notifications for submitted applications
     if (isSubmittedApplication) {
+      // Determine final status based on underwriting field
+      let finalStatus = callResult.status || 'Submitted';
+      if (callResult.application_submitted === true) {
+        finalStatus = callResult.sent_to_underwriting === true ? "Underwriting" : "Submitted";
+      }
+      
+      // Add status display text
+      const statusDisplay = finalStatus === "Underwriting" ? "Sent to Underwriting" : finalStatus;
+      
       // Template for submitted applications
       slackMessage = {
         channel: '#submission-portal', // Changed from #test-zaps to #general as it's more likely to exist
@@ -60,7 +69,7 @@ serve(async (req)=>{
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: `*${callResult.buffer_agent || 'N/A'}* - *${callResult.agent_who_took_call || 'N/A'}* - *${callResult.lead_vendor || 'N/A'}* - *${leadData.customer_full_name || 'N/A'}* - *${callResult.carrier || 'N/A'}* - *${callResult.product_type || 'N/A'}* - *${callResult.draft_date || 'N/A'}* - *$${callResult.monthly_premium || 'N/A'}* - *$${callResult.face_amount || 'N/A'}*`
+              text: `*${callResult.buffer_agent || 'N/A'}* - *${callResult.agent_who_took_call || 'N/A'}* - *${callResult.lead_vendor || 'N/A'}* - *${leadData.customer_full_name || 'N/A'}* - *${callResult.carrier || 'N/A'}* - *${callResult.product_type || 'N/A'}* - *${callResult.draft_date || 'N/A'}* - *$${callResult.monthly_premium || 'N/A'}* - *$${callResult.face_amount || 'N/A'}* - *${statusDisplay}*`
             }
           }
         ]
