@@ -99,6 +99,7 @@ serve(async (req) => {
     const mapStatusToSheetValue = (userSelectedStatus: string): string => {
       const statusMap: { [key: string]: string } = {
         "Needs callback": "Needs to be Fixed",
+        "Call Never Sent":"Incomplete Transfer",
         "Not Interested": "Return to Center",
         "DQ": "DQ",
         "⁠DQ": "DQ", // Handle the special character version

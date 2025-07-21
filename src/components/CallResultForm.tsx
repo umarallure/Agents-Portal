@@ -24,6 +24,7 @@ const statusOptions = [
   "⁠DQ",
   "Future Submission Date",
   "Call Back Fix",
+  "call never sent",
   "Disconnected"
 ];
 
