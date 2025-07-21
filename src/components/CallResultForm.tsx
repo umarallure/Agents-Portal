@@ -63,6 +63,7 @@ const agentOptions = [
   "Claudia",
   "Lydia",
   "Benjamin",
+  "Erica",
   "N/A"
 ];
 
