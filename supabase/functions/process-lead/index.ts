@@ -122,7 +122,7 @@ serve(async (req) => {
       state: answers['5']?.answer?.state || '',
       zip_code: answers['5']?.answer?.postal || '',
       phone_number: answers['6']?.answer?.full || '',
-      email: extractEmail(answers['28']?.answer),
+      email: answers['7']?.answer || extractEmail(answers['28']?.answer),
       birth_state: answers['8']?.answer || '',
       date_of_birth: parseDate(answers['10']?.answer?.datetime?.split(' ')[0]),
       age: answers['9']?.answer ? parseInt(answers['9'].answer) : null,
@@ -147,7 +147,7 @@ serve(async (req) => {
       beneficiary_routing: answers['25']?.answer || '',
       beneficiary_account: answers['26']?.answer || '',
       additional_notes: answers['28']?.answer || '',
-      lead_vendor: 'JotForm',
+      lead_vendor: answers['33']?.answer || 'JotForm', // Use field 33 for lead vendor, fallback to 'JotForm'
       buffer_agent: '', // Not present in this form
       agent: answers['23']?.answer || '',
       // Remove user_id assignment - let it be null initially

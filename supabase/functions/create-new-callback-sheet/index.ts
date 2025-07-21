@@ -159,9 +159,9 @@ serve(async (req) => {
           : '', // K: Call Result
       callResult?.carrier || '', // L: Carrier
       callResult?.product_type || '', // M: Product Type
-      callResult?.draft_date || '', // N: Draft Date
-      callResult?.monthly_premium || '', // O: MP
-      callResult?.face_amount || '', // P: Face amount
+      callResult?.draft_date || 'N/A', // N: Draft Date
+      callResult?.monthly_premium != null ? callResult.monthly_premium : 'N/A', // O: MP
+      callResult?.face_amount != null ? callResult.face_amount : 'N/A', // P: Face amount
       'TRUE', // Q: From Callback?
       [
         leadData.additional_notes || '',

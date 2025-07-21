@@ -156,23 +156,23 @@ serve(async (req) => {
       },
       {
         range: `${SHEET_NAME}!L${rowIndex}`, // Carrier
-        values: [[callResult.carrier || ""]]
+        values: [[callResult.carrier || "N/A"]]
       },
       {
         range: `${SHEET_NAME}!M${rowIndex}`, // Product Type
-        values: [[callResult.product_type || ""]]
+        values: [[callResult.product_type || "N/A"]]
       },
       {
         range: `${SHEET_NAME}!N${rowIndex}`, // Draft Date
-        values: [[callResult.draft_date || ""]]
+        values: [[callResult.draft_date || "N/A"]]
       },
       {
         range: `${SHEET_NAME}!O${rowIndex}`, // MP (Monthly Premium)
-        values: [[callResult.monthly_premium || ""]]
+        values: [[callResult.monthly_premium != null ? callResult.monthly_premium : "N/A"]]
       },
       {
         range: `${SHEET_NAME}!P${rowIndex}`, // Face amount
-        values: [[callResult.face_amount || ""]]
+        values: [[callResult.face_amount != null ? callResult.face_amount : "N/A"]]
       },
       {
         range: `${SHEET_NAME}!Q${rowIndex}`, // From Callback? (keep as TRUE if already set)

@@ -19,7 +19,7 @@ const leadVendorOptions = [
   "GrowthOnline BPO",
   "Maverick",
   "Orbit Insurance x Om",
-  "Visa BPO",
+  "Vize BPO",
   "Vyn BPO",
   "Cyberleads",
   "Corebiz",
