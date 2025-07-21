@@ -18,6 +18,7 @@ serve(async (req)=>{
     // Lead vendor to Slack channel mapping
     const leadVendorChannelMapping = {
       "Ark Tech": "#orbit-team-ark-tech",
+      "Trust Link": "#orbit-team-trust-link",
       "GrowthOnline BPO": "#orbit-team-growthonics-bpo",
       "Maverick": "#orbit-team-maverick-comm",
       "Orbit Insurance x Om": "#orbit-team-omnitalk-bpo",

@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const leadVendorOptions = [
   "Ark Tech",
+  "Trust Link",
   "GrowthOnline BPO",
   "Maverick",
   "Orbit Insurance x Om",
