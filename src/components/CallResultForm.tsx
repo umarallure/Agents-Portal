@@ -77,7 +77,8 @@ const licensedAccountOptions = [
 
 const leadVendorOptions = [
   "Ark Tech",
-  "GrowthOnline BPO",
+  "Growthonics",
+  "Crafting Leads",
   "Maverick",
   "Orbit Insurance x Om",
   "Vize BPO",

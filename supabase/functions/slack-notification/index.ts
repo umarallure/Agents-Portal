@@ -19,7 +19,8 @@ serve(async (req)=>{
     const leadVendorChannelMapping = {
       "Ark Tech": "#orbit-team-ark-tech",
       "Trust Link": "#orbit-team-trust-link",
-      "GrowthOnline BPO": "#orbit-team-growthonics-bpo",
+      "Crafting Leads": "#orbit-team-crafting-leads-bpo",
+      "Growthonics": "#orbit-team-growthonics-bpo",
       "Maverick": "#orbit-team-maverick-comm",
       "Orbit Insurance x Om": "#orbit-team-omnitalk-bpo",
       "Vize BPO": "#orbit-team-vize-bpo",
