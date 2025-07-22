@@ -100,7 +100,7 @@ serve(async (req) => {
       const statusMap: { [key: string]: string } = {
         "Needs callback": "Needs to be Fixed",
         "Call Never Sent":"Incomplete Transfer",
-        "Not Interested": "Return to Center",
+        "Not Interested": "Returned To Center",
         "DQ": "DQ",
         "⁠DQ": "DQ", // Handle the special character version
         "Future Submission Date": "Needs Carrier application",
