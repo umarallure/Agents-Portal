@@ -20,7 +20,7 @@ const GOOGLE_REFRESH_TOKEN = Deno.env.get("GOOGLE_REFRESH_TOKEN");
 
 // Hardcoded spreadsheet ID and sheet name (same as your existing function)
 const SPREADSHEET_ID = "1nd1kxEj_Vwh7WIoGWcbZ1nm425irkQmvcLiuL9-4XDY";
-const SHEET_NAME = "AgentPortalSheetTesting";
+const SHEET_NAME = "MainSheet";
 
 interface LeadData {
   submission_id: string;
