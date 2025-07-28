@@ -21,6 +21,7 @@ interface Lead {
   monthly_premium: number;
   draft_date: string;
   additional_notes: string;
+  beneficiary_information: string;
 }
 
 interface LeadInfoCardProps {
@@ -89,10 +90,7 @@ Submission ID: ${lead.submission_id}
               <span>{lead.phone_number}</span>
             </div>
             
-            <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4" />
-              <span>{lead.email}</span>
-            </div>
+            
             
             <div className="flex items-start gap-2">
               <MapPin className="h-4 w-4 mt-1" />
@@ -100,6 +98,10 @@ Submission ID: ${lead.submission_id}
                 <div>{lead.street_address}</div>
                 <div>{lead.city}, {lead.state} {lead.zip_code}</div>
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              <span>{lead.beneficiary_information}</span>
             </div>
           </div>
           

@@ -113,6 +113,8 @@ ${lead.additional_notes}`;
           <div><strong>{lead.lead_vendor || 'Lead Vendor'}:</strong> {lead.customer_full_name}</div>
           <br />
           <div><strong>Address:</strong> {lead.street_address}, {lead.city}, {lead.state} {lead.zip_code}</div>
+          
+          <div><strong>Beneficiary Information:</strong> {formatValue(lead.beneficiary_information)}</div>
           <div><strong>Billing and mailing address is the same:</strong> (Y/N)</div>
           <div><strong>Date of Birth:</strong> {lead.date_of_birth}</div>
           <div><strong>Birth State:</strong> {formatValue(lead.birth_state)}</div>
@@ -138,7 +140,7 @@ ${lead.additional_notes}`;
           <div><strong>Coverage Amount:</strong> ${lead.coverage_amount?.toLocaleString()}</div>
           <div><strong>Draft Date:</strong> {lead.draft_date}</div>
           <div><strong>First Draft:</strong> {formatValue(lead.future_draft_date)}</div>
-          <div><strong>Beneficiary Information:</strong> {formatValue(lead.beneficiary_information)}</div>
+          
           <div><strong>Bank Name:</strong> {formatValue(lead.institution_name)}</div>
           <div><strong>Routing Number:</strong> {lead.beneficiary_routing}</div>
           <div><strong>Account Number:</strong> {lead.beneficiary_account}</div>
