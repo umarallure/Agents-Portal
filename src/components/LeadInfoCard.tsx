@@ -38,6 +38,7 @@ Name: ${lead.customer_full_name}
 Phone: ${lead.phone_number}
 Email: ${lead.email}
 Address: ${lead.street_address}, ${lead.city}, ${lead.state} ${lead.zip_code}
+Beneficiary Information: ${lead.beneficiary_information || ''}
 Date of Birth: ${lead.date_of_birth}
 Age: ${lead.age}
 Carrier: ${lead.carrier}

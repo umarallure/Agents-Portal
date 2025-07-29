@@ -51,6 +51,7 @@ export const DetailedLeadInfoCard = ({ lead }: DetailedLeadInfoCardProps) => {
   const copyToClipboard = () => {
     const leadInfo = `${lead.lead_vendor || 'Lead Vendor'}: ${lead.customer_full_name}
 Address: ${lead.street_address}, ${lead.city}, ${lead.state} ${lead.zip_code}
+Beneficiary Information: ${lead.beneficiary_information || ''}
 Billing and mailing address is the same: (Y/N)
 Date of Birth: ${lead.date_of_birth}
 Birth State: ${lead.birth_state || ''}
@@ -76,7 +77,6 @@ Monthly Premium: $${lead.monthly_premium}
 Coverage Amount: $${lead.coverage_amount?.toLocaleString()}
 Draft Date: ${lead.draft_date}
 First Draft: ${lead.future_draft_date || ''}
-Beneficiary Information: ${lead.beneficiary_information || ''}
 Bank Name: ${lead.institution_name || ''}
 Routing Number: ${lead.beneficiary_routing}
 Account Number: ${lead.beneficiary_account}
