@@ -121,6 +121,7 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
   const [agentWhoTookCall, setAgentWhoTookCall] = useState("");
   const [leadVendor, setLeadVendor] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [callSource, setCallSource] = useState("");
   
   const { toast } = useToast();
 
@@ -157,7 +158,8 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
           monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
           face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
           submission_date: submissionDate ? format(submissionDate, "yyyy-MM-dd") : null,
-        } : {})
+        } : {}),
+        call_source: callSource
       };
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -200,6 +202,8 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
       }
 
       // Update Google Sheets based on lead type
+      // Determine if callback is TRUE or FALSE for Google Sheets
+      const fromCallbackValue = callSource === "Agent Callback" ? "TRUE" : "FALSE";
       try {
         // Check if this is a callback lead (submission ID starts with "CB")
         const isCallbackLead = submissionId.startsWith("CB");
@@ -259,10 +263,32 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
                   monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
                   face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
                   notes: notes,
-                  sent_to_underwriting: sentToUnderwriting
+                  sent_to_underwriting: sentToUnderwriting,
+                  from_callback: fromCallbackValue,
+                  call_source: callSource
                 }
               }
             });
+            // If callSource is "Reconnected Transfer", create a new entry with current date in column E
+            if (callSource === "Reconnected Transfer") {
+              await supabase.functions.invoke('create-new-callback-sheet', {
+                body: {
+                  leadData: {
+                    ...leadData,
+                    submission_date: new Date().toLocaleDateString('en-US', {
+                      month: 'numeric',
+                      day: 'numeric',
+                      year: '2-digit'
+                    })
+                  },
+                  callResult: {
+                    ...callResultData,
+                    from_callback: "FALSE",
+                    call_source: "Reconnected Transfer"
+                  }
+                }
+              });
+            }
 
             if (sheetsError) {
               console.error("Error creating new callback entry in Google Sheets:", sheetsError);
@@ -286,7 +312,9 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
                 monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
                 face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
                 notes: notes,
-                sent_to_underwriting: sentToUnderwriting
+                sent_to_underwriting: sentToUnderwriting,
+                from_callback: fromCallbackValue,
+                call_source: callSource
               }
             }
           });
@@ -376,6 +404,7 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
         setBufferAgent("");
         setAgentWhoTookCall("");
         setLeadVendor("");
+        setCallSource("");
       }
 
     } catch (error) {
@@ -424,6 +453,20 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
             </div>
           </div>
 
+          {/* Call Source Dropdown */}
+          <div>
+            <Label htmlFor="callSource">Call Source</Label>
+            <Select value={callSource} onValueChange={setCallSource}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select call source" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="First Time Transfer">First Time Transfer</SelectItem>
+                <SelectItem value="Reconnected Transfer">Reconnected Transfer</SelectItem>
+                <SelectItem value="Agent Callback">Agent Callback</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           {/* Fields for submitted applications */}
           {showSubmittedFields && (
             <>
