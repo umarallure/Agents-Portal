@@ -39,7 +39,6 @@ serve(async (req)=>{
       "Capital Zone Comm": "#test-bpo",
       "BroTech": "#test-bpo",
       "Progressive BPO": "#orbit-team-progressive-bpo",
-      "Cerberus BPO": "#test-bpo",
       "TM Global": "#orbit-team-tm-global-bpo",
       "Optimum BPO": "#orbit-team-optimum-bpo"
     };
