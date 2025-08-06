@@ -19,7 +19,7 @@ serve(async (req)=>{
     const leadVendorChannelMapping = {
       "Ark Tech": "#orbit-team-ark-tech",
       "Quotes BPO": "#obit-team-quotes-bpo",
-      "Cerberus BPO":"#orbit-team-cerberus-bpo",
+      "Cerberus BPO":"#orbit-team-cerberus-bpo",
       "Trust Link": "#orbit-team-trust-link",
       "Crafting Leads": "#orbit-team-crafting-leads-bpo",
       "Growthonics": "#orbit-team-growthonics-bpo",
@@ -119,14 +119,28 @@ serve(async (req)=>{
       console.log(`Debug - Looking for vendor: "${callResult.lead_vendor}"`);
       console.log(`Debug - Found channel: ${vendorChannel}`);
       if (vendorChannel) {
+        // Calculate status display for vendor message
+        let vendorFinalStatus = callResult.status || 'Submitted';
+        if (callResult.application_submitted === true) {
+          vendorFinalStatus = callResult.sent_to_underwriting === true ? "Underwriting" : "Submitted";
+        }
+        const vendorStatusDisplay = vendorFinalStatus === "Underwriting" ? "Sent to Underwriting" : "No underwriting required";
+        
         const vendorSlackMessage = {
           channel: vendorChannel,
           blocks: [
             {
+              type: 'header',
+              text: {
+                type: 'plain_text',
+                text: '✅ Application Submitted!'
+              }
+            },
+            {
               type: 'section',
               text: {
                 type: 'mrkdwn',
-                text: `${leadData.customer_full_name || 'N/A'} SUBMITTED`
+                text: `*${callResult.buffer_agent || 'N/A'}* - *${callResult.agent_who_took_call || 'N/A'}* - *${callResult.lead_vendor || 'N/A'}* - *${leadData.customer_full_name || 'N/A'}* - *${callResult.carrier || 'N/A'}* - *${callResult.product_type || 'N/A'}* - *${callResult.draft_date || 'N/A'}* - *$${callResult.monthly_premium || 'N/A'}* - *$${callResult.face_amount || 'N/A'}* - *${vendorStatusDisplay}*`
               }
             }
           ]
