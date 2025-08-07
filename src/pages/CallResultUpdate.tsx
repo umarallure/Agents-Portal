@@ -281,6 +281,7 @@ const CallResultUpdate = () => {
           <div>
             <CallResultForm 
               submissionId={submissionId!} 
+              customerName={lead.customer_full_name}
               onSuccess={() => navigate(`/call-result-journey?submissionId=${submissionId}`)}
             />
           </div>

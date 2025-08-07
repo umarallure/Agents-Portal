@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface CallResultFormProps {
   submissionId: string;
+  customerName?: string;
   onSuccess?: () => void;
 }
 
@@ -104,9 +105,82 @@ const leadVendorOptions = [
   "Optimum BPO"
 ];
 
-export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps) => {
+const dqReasonOptions = [
+  "Multiple Chargebacks",
+  "Not Cognatively Functional",
+  "Transferred Many Times Without Success",
+  "TCPA",
+  "Decline All Available Carriers",
+  "Already a DQ in our System",
+  "Other"
+];
+
+const needsCallbackReasonOptions = [
+  "Banking information invalid",
+  "Existing Policy - Draft hasn't passed",
+  "Other"
+];
+
+const notInterestedReasonOptions = [
+  "Existing coverage - Not Looking for More",
+  "Other"
+];
+
+const futureSubmissionReasonOptions = [
+  "Future Submission Date - Draft Date Too Far Away",
+  "Future Submission Date - Birthday is before draft date",
+  "Other"
+];
+
+const getReasonOptions = (status: string) => {
+  switch (status) {
+    case "⁠DQ":
+      return dqReasonOptions;
+    case "Needs callback":
+      return needsCallbackReasonOptions;
+    case "Not Interested":
+      return notInterestedReasonOptions;
+    case "Future Submission Date":
+      return futureSubmissionReasonOptions;
+    default:
+      return [];
+  }
+};
+
+const getNoteText = (status: string, reason: string, clientName: string = "[Client Name]") => {
+  const statusReasonMapping: { [status: string]: { [reason: string]: string } } = {
+    "⁠DQ": {
+      "Multiple Chargebacks": `${clientName} has been DQ'd. They have caused multiple chargebacks in our agency, so we cannot submit another application for them`,
+      "Not Cognatively Functional": `${clientName} has been DQ'd. They are not mentally able to make financial decisions. We cannot submit an application for them`,
+      "Transferred Many Times Without Success": `We have spoken with ${clientName} more than 5 times and have not been able to successfully submit an application. We should move on from this caller`,
+      "TCPA": `${clientName} IS A TCPA LITIGATOR. PLEASE REMOVE FROM YOUR SYSTEM IMMEDIATELY`,
+      "Decline All Available Carriers": `${clientName} was denied through all carriers they are elligible to apply for`,
+      "Already a DQ in our System": `${clientName} is already a DQ in our system. We will not accept this caller again.`,
+      "Other": "Custom message if none of the above fit"
+    },
+    "Needs callback": {
+      "Banking information invalid": `The banking information for ${clientName} could not be validated. We need to call them back and verify a new form of payment`,
+      "Existing Policy - Draft hasn't passed": `${clientName} has an existing policy with an initial draft date that hasn't passed. We can call them [a week after entered draft date] to see if they want additional coverage`,
+      "Other": "Custom message if none of the above fit"
+    },
+    "Not Interested": {
+      "Existing coverage - Not Looking for More": `${clientName} has exsiting coverage and cannot afford additional coverage`,
+      "Other": "Custom message if none of the above fit"
+    },
+    "Future Submission Date": {
+      "Future Submission Date - Draft Date Too Far Away": `The application for ${clientName} has been filled out and signed, but we cannot submit until [Submission date] because the draft date is too far out`,
+      "Future Submission Date - Birthday is before draft date": `${clientName}'s birthday is before their initial draft, so we need to call them on [the day after client DOB] to requote and submit application`,
+      "Other": "Custom message if none of the above fit"
+    }
+  };
+  
+  return statusReasonMapping[status]?.[reason] || "";
+};
+
+export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallResultFormProps) => {
   const [applicationSubmitted, setApplicationSubmitted] = useState<boolean | null>(null);
   const [status, setStatus] = useState("");
+  const [statusReason, setStatusReason] = useState("");
   const [notes, setNotes] = useState("");
   const [carrier, setCarrier] = useState("");
   const [productType, setProductType] = useState("");
@@ -125,9 +199,46 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
   
   const { toast } = useToast();
 
+  // Reset status reason and notes when status changes or when switching application submission status
+  useEffect(() => {
+    if (!["⁠DQ", "Needs callback", "Not Interested", "Future Submission Date"].includes(status)) {
+      setStatusReason("");
+      // Only clear notes if they were auto-populated from status reasons
+      if (statusReason && statusReason !== "Other") {
+        setNotes("");
+      }
+    } else {
+      // Reset reason when status changes to ensure valid options
+      setStatusReason("");
+      setNotes("");
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (applicationSubmitted !== false) {
+      setStatusReason("");
+      setStatus("");
+      setNotes("");
+    }
+  }, [applicationSubmitted]);
+
   const showCarrierApplicationFields = status === "Needs Carrier Application";
   const showSubmittedFields = applicationSubmitted === true;
   const showNotSubmittedFields = applicationSubmitted === false;
+  const showStatusReasonDropdown = applicationSubmitted === false && ["⁠DQ", "Needs callback", "Not Interested", "Future Submission Date"].includes(status);
+  const currentReasonOptions = getReasonOptions(status);
+
+  const handleStatusReasonChange = (reason: string) => {
+    setStatusReason(reason);
+    if (reason && reason !== "Other") {
+      // Auto-populate notes with the mapped text using actual customer name
+      const clientName = customerName || "[Client Name]";
+      setNotes(getNoteText(status, reason, clientName));
+    } else if (reason === "Other") {
+      // Clear notes for custom message
+      setNotes("");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,6 +256,7 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
         application_submitted: applicationSubmitted,
         status: finalStatus,
         notes,
+        dq_reason: showStatusReasonDropdown ? statusReason : null,
         buffer_agent: bufferAgent,
         agent_who_took_call: agentWhoTookCall,
         sent_to_underwriting: sentToUnderwriting,
@@ -263,6 +375,7 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
                   monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
                   face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
                   notes: notes,
+                  dq_reason: showStatusReasonDropdown ? statusReason : null,
                   sent_to_underwriting: sentToUnderwriting,
                   from_callback: fromCallbackValue,
                   call_source: callSource
@@ -312,6 +425,7 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
                 monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
                 face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
                 notes: notes,
+                dq_reason: showStatusReasonDropdown ? statusReason : null,
                 sent_to_underwriting: sentToUnderwriting,
                 from_callback: fromCallbackValue,
                 call_source: callSource
@@ -350,7 +464,9 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
               monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
               face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
               sent_to_underwriting: sentToUnderwriting,
-              lead_vendor: leadData.lead_vendor || leadVendor || 'N/A'
+              lead_vendor: leadData.lead_vendor || leadVendor || 'N/A',
+              notes: notes,
+              dq_reason: showStatusReasonDropdown ? statusReason : null
             };
             
             
@@ -379,6 +495,55 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
         }
       }
 
+      // Send center notification for NOT submitted applications
+      if (applicationSubmitted === false) {
+        try {
+          // First, fetch the lead data for the center notification
+          const { data: leadData, error: leadError } = await supabase
+            .from("leads")
+            .select("*")
+            .eq("submission_id", submissionId)
+            .single();
+
+          if (!leadError && leadData) {
+            const callResultForCenter = {
+              application_submitted: applicationSubmitted,
+              status: finalStatus,
+              dq_reason: showStatusReasonDropdown ? statusReason : null,
+              notes: notes,
+              buffer_agent: bufferAgent,
+              agent_who_took_call: agentWhoTookCall,
+              lead_vendor: leadData.lead_vendor || leadVendor || 'N/A'
+            };
+            
+            console.log("Sending center notification for not submitted application");
+            
+            const { error: centerError } = await supabase.functions.invoke('center-notification', {
+              body: {
+                submissionId: submissionId,
+                leadData: {
+                  customer_full_name: leadData.customer_full_name,
+                  phone_number: leadData.phone_number,
+                  email: leadData.email,
+                  lead_vendor: leadData.lead_vendor
+                },
+                callResult: callResultForCenter
+              }
+            });
+
+            if (centerError) {
+              console.error("Error sending center notification:", centerError);
+              // Don't fail the entire process if center notification fails
+            } else {
+              console.log("Center notification sent successfully");
+            }
+          }
+        } catch (centerError) {
+          console.error("Center notification failed:", centerError);
+          // Don't fail the entire process if center notification fails
+        }
+      }
+
       toast({
         title: "Success",
         description: "Call result saved successfully",
@@ -391,6 +556,7 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
         // Reset form if no callback provided
         setApplicationSubmitted(null);
         setStatus("");
+        setStatusReason("");
         setNotes("");
         setCarrier("");
         setProductType("");
@@ -718,15 +884,55 @@ export const CallResultForm = ({ submissionId, onSuccess }: CallResultFormProps)
                 </Select>
               </div>
 
+              {/* Status Reason dropdown - shows for DQ, Needs Callback, Not Interested, Future Submission Date */}
+              {showStatusReasonDropdown && (
+                <div>
+                  <Label htmlFor="statusReason">
+                    {status === "⁠DQ" ? "Reason for DQ" : 
+                     status === "Needs callback" ? "Callback Reason" :
+                     status === "Not Interested" ? "Reason Not Interested" :
+                     status === "Future Submission Date" ? "Future Submission Reason" :
+                     "Reason"}
+                  </Label>
+                  <Select value={statusReason} onValueChange={handleStatusReasonChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={`Select reason for ${status.toLowerCase()}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currentReasonOptions.map((reason) => (
+                        <SelectItem key={reason} value={reason}>
+                          {reason}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div>
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea
                   id="notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Why was the application not submitted?"
+                  placeholder={showStatusReasonDropdown && statusReason && statusReason !== "Other" 
+                    ? "Note has been auto-populated. You can edit if needed." 
+                    : showStatusReasonDropdown && statusReason === "Other"
+                    ? "Please enter a custom message."
+                    : "Why was the application not submitted?"
+                  }
                   rows={3}
                 />
+                {showStatusReasonDropdown && statusReason && statusReason !== "Other" && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Note has been auto-populated based on selected reason. You can edit if needed.
+                  </p>
+                )}
+                {showStatusReasonDropdown && statusReason === "Other" && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Please enter a custom message for this reason.
+                  </p>
+                )}
               </div>
 
               {/* Additional fields for "Needs Carrier Application" */}

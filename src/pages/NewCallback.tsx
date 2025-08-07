@@ -15,8 +15,9 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const leadVendorOptions = [
+  "Test Vendor",
   "Ark Tech",
-  "Cerberus BPO",
+  "Cerberus BPO",
   "Quotes BPO",
   "Trust Link",
   "Growthonics",

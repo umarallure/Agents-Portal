@@ -120,11 +120,7 @@ serve(async (req)=>{
       console.log(`Debug - Found channel: ${vendorChannel}`);
       if (vendorChannel) {
         // Calculate status display for vendor message
-        let vendorFinalStatus = callResult.status || 'Submitted';
-        if (callResult.application_submitted === true) {
-          vendorFinalStatus = callResult.sent_to_underwriting === true ? "Underwriting" : "Submitted";
-        }
-        const vendorStatusDisplay = vendorFinalStatus === "Underwriting" ? "Sent to Underwriting" : "No underwriting required";
+        const sentToUnderwriting = callResult.sent_to_underwriting === true ? "Yes" : "No";
         
         const vendorSlackMessage = {
           channel: vendorChannel,
@@ -140,7 +136,7 @@ serve(async (req)=>{
               type: 'section',
               text: {
                 type: 'mrkdwn',
-                text: `*${callResult.buffer_agent || 'N/A'}* - *${callResult.agent_who_took_call || 'N/A'}* - *${callResult.lead_vendor || 'N/A'}* - *${leadData.customer_full_name || 'N/A'}* - *${callResult.carrier || 'N/A'}* - *${callResult.product_type || 'N/A'}* - *${callResult.draft_date || 'N/A'}* - *$${callResult.monthly_premium || 'N/A'}* - *$${callResult.face_amount || 'N/A'}* - *${vendorStatusDisplay}*`
+                text: `*${leadData.customer_full_name || 'N/A'}*\n\nCarrier: ${callResult.carrier || 'N/A'}\nProduct Type: ${callResult.product_type || 'N/A'}\nDraft Date: ${callResult.draft_date || 'N/A'}\nMonthly Premium: $${callResult.monthly_premium || 'N/A'}\nCoverage Amount: $${callResult.face_amount || 'N/A'}\nSent to Underwriting: ${sentToUnderwriting}`
               }
             }
           ]

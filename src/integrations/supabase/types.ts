@@ -47,9 +47,11 @@ export type Database = {
           agent_who_took_call: string | null
           application_submitted: boolean | null
           buffer_agent: string | null
+          call_source: string | null
           carrier: string | null
           coverage_amount: number | null
           created_at: string | null
+          dq_reason: string | null
           draft_date: string | null
           face_amount: number | null
           id: string
@@ -69,9 +71,11 @@ export type Database = {
           agent_who_took_call?: string | null
           application_submitted: boolean | null
           buffer_agent?: string | null
+          call_source?: string | null
           carrier?: string | null
           coverage_amount?: number | null
           created_at?: string | null
+          dq_reason?: string | null
           draft_date?: string | null
           face_amount?: number | null
           id?: string
@@ -91,9 +95,11 @@ export type Database = {
           agent_who_took_call?: string | null
           application_submitted?: boolean | null
           buffer_agent?: string | null
+          call_source?: string | null
           carrier?: string | null
           coverage_amount?: number | null
           created_at?: string | null
+          dq_reason?: string | null
           draft_date?: string | null
           face_amount?: number | null
           id?: string
@@ -104,7 +110,7 @@ export type Database = {
           sent_to_underwriting?: boolean | null
           status?: string | null
           submission_date?: string | null
-          submission_id: string
+          submission_id?: string
           submitting_agent?: string | null
           updated_at?: string | null
         }
