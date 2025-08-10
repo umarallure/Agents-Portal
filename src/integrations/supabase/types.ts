@@ -290,12 +290,199 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_status: {
+        Row: {
+          agent_type: string
+          created_at: string
+          current_session_id: string | null
+          id: string
+          last_activity: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_type?: string
+          created_at?: string
+          current_session_id?: string | null
+          id?: string
+          last_activity?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_type?: string
+          created_at?: string
+          current_session_id?: string | null
+          id?: string
+          last_activity?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_status_current_session_id_fkey"
+            columns: ["current_session_id"]
+            isOneToOne: false
+            referencedRelation: "verification_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_status_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      verification_items: {
+        Row: {
+          created_at: string
+          field_category: string | null
+          field_name: string
+          id: string
+          is_modified: boolean | null
+          is_verified: boolean | null
+          notes: string | null
+          original_value: string | null
+          session_id: string
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+          verified_value: string | null
+        }
+        Insert: {
+          created_at?: string
+          field_category?: string | null
+          field_name: string
+          id?: string
+          is_modified?: boolean | null
+          is_verified?: boolean | null
+          notes?: string | null
+          original_value?: string | null
+          session_id: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          verified_value?: string | null
+        }
+        Update: {
+          created_at?: string
+          field_category?: string | null
+          field_name?: string
+          id?: string
+          is_modified?: boolean | null
+          is_verified?: boolean | null
+          notes?: string | null
+          original_value?: string | null
+          session_id?: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          verified_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_items_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "verification_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_items_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      verification_sessions: {
+        Row: {
+          buffer_agent_id: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          licensed_agent_id: string | null
+          progress_percentage: number | null
+          started_at: string | null
+          status: string
+          submission_id: string
+          total_fields: number | null
+          transferred_at: string | null
+          updated_at: string
+          verified_fields: number | null
+        }
+        Insert: {
+          buffer_agent_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          licensed_agent_id?: string | null
+          progress_percentage?: number | null
+          started_at?: string | null
+          status?: string
+          submission_id: string
+          total_fields?: number | null
+          transferred_at?: string | null
+          updated_at?: string
+          verified_fields?: number | null
+        }
+        Update: {
+          buffer_agent_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          licensed_agent_id?: string | null
+          progress_percentage?: number | null
+          started_at?: string | null
+          status?: string
+          submission_id?: string
+          total_fields?: number | null
+          transferred_at?: string | null
+          updated_at?: string
+          verified_fields?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_sessions_buffer_agent_id_fkey"
+            columns: ["buffer_agent_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_sessions_licensed_agent_id_fkey"
+            columns: ["licensed_agent_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_sessions_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["submission_id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      initialize_verification_items: {
+        Args: {
+          session_id_param: string
+          submission_id_param: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

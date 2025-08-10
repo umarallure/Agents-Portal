@@ -293,6 +293,25 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         return;
       }
 
+      // Update verification session status to completed if one exists
+      try {
+        const { error: sessionUpdateError } = await supabase
+          .from('verification_sessions')
+          .update({ status: 'completed' })
+          .eq('submission_id', submissionId)
+          .in('status', ['pending', 'in_progress', 'ready_for_transfer', 'transferred']);
+
+        if (sessionUpdateError) {
+          console.error("Error updating verification session:", sessionUpdateError);
+          // Don't fail the entire process if session update fails
+        } else {
+          console.log("Verification session marked as completed");
+        }
+      } catch (sessionError) {
+        console.error("Verification session update failed:", sessionError);
+        // Don't fail the entire process if session update fails
+      }
+
       // Update lead vendor in leads table if provided and application is submitted
       if (applicationSubmitted === true && leadVendor) {
         try {

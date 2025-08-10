@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { LeadInfoCard } from "@/components/LeadInfoCard";
 import { DetailedLeadInfoCard } from "@/components/DetailedLeadInfoCard";
 import { CallResultForm } from "@/components/CallResultForm";
+import { StartVerificationModal } from "@/components/StartVerificationModal";
+import { VerificationPanel } from "@/components/VerificationPanel";
 import { Loader2, ArrowLeft } from "lucide-react";
 
 interface Lead {
@@ -56,6 +58,8 @@ const CallResultUpdate = () => {
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [verificationSessionId, setVerificationSessionId] = useState<string | null>(null);
+  const [showVerificationPanel, setShowVerificationPanel] = useState(false);
 
   const { toast } = useToast();
 
@@ -71,7 +75,39 @@ const CallResultUpdate = () => {
     }
 
     fetchLead();
+    checkExistingVerificationSession();
   }, [submissionId]);
+
+  const checkExistingVerificationSession = async () => {
+    try {
+      const { data: session, error } = await supabase
+        .from('verification_sessions')
+        .select('id, status')
+        .eq('submission_id', submissionId)
+        .in('status', ['pending', 'in_progress', 'ready_for_transfer', 'transferred', 'completed'])
+        .single();
+
+      if (session && !error) {
+        setVerificationSessionId(session.id);
+        setShowVerificationPanel(true);
+      }
+    } catch (error) {
+      // No existing session found, which is fine
+      console.log('No existing verification session found');
+    }
+  };
+
+  const handleVerificationStarted = (sessionId: string) => {
+    setVerificationSessionId(sessionId);
+    setShowVerificationPanel(true);
+  };
+
+  const handleTransferReady = () => {
+    toast({
+      title: "Verification Complete",
+      description: "Lead is now ready for Licensed Agent review",
+    });
+  };
 
   const processLeadFromJotForm = async () => {
     setProcessing(true);
@@ -248,44 +284,81 @@ const CallResultUpdate = () => {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="outline" 
-            onClick={() => navigate("/dashboard")}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">
-              {fromCallback ? "Update Callback Result" : "Update Call Result"}
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              {fromCallback 
-                ? "Update the status and details for this callback" 
-                : "Update the status and details for this lead"
-              }
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-          {/* Lead Details */}
-          <div className="space-y-6">
-            <LeadInfoCard lead={lead} />
-            <DetailedLeadInfoCard lead={lead} />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="outline" 
+              onClick={() => navigate("/dashboard")}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">
+                {fromCallback ? "Update Callback Result" : "Update Call Result"}
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                {fromCallback 
+                  ? "Update the status and details for this callback" 
+                  : "Update the status and details for this lead"
+                }
+              </p>
+            </div>
           </div>
           
-          {/* Call Result Form */}
-          <div>
-            <CallResultForm 
-              submissionId={submissionId!} 
-              customerName={lead.customer_full_name}
-              onSuccess={() => navigate(`/call-result-journey?submissionId=${submissionId}`)}
+          {/* Start Verification Button */}
+          {!showVerificationPanel && (
+            <StartVerificationModal 
+              submissionId={submissionId!}
+              onVerificationStarted={handleVerificationStarted}
             />
-          </div>
+          )}
         </div>
+
+        {showVerificationPanel && verificationSessionId ? (
+          <>
+            {/* Main Content - 50/50 Split */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              {/* Verification Panel - Left Half */}
+              <div>
+                <VerificationPanel 
+                  sessionId={verificationSessionId}
+                  onTransferReady={handleTransferReady}
+                />
+              </div>
+              
+              {/* Call Result Form - Right Half */}
+              <div>
+                <CallResultForm 
+                  submissionId={submissionId!} 
+                  customerName={lead.customer_full_name}
+                  onSuccess={() => navigate(`/call-result-journey?submissionId=${submissionId}`)}
+                />
+              </div>
+            </div>
+            
+            {/* Additional Notes - Bottom Collapsible */}
+            <DetailedLeadInfoCard lead={lead} />
+          </>
+        ) : (
+          /* Original layout when no verification panel */
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+            {/* Lead Details */}
+            <div className="space-y-6">
+              <DetailedLeadInfoCard lead={lead} />
+            </div>
+            
+            {/* Call Result Form */}
+            <div>
+              <CallResultForm 
+                submissionId={submissionId!} 
+                customerName={lead.customer_full_name}
+                onSuccess={() => navigate(`/call-result-journey?submissionId=${submissionId}`)}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -7,12 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Filter, LogOut, Phone, User, DollarSign } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calendar, Filter, LogOut, Phone, User, DollarSign, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { VerificationDashboard } from '@/components/VerificationDashboard';
 
 type Lead = Database['public']['Tables']['leads']['Row'];
 type CallResult = Database['public']['Tables']['call_results']['Row'];
@@ -293,65 +295,79 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Leads List */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Your Submissions ({filteredLeads.length})</h2>
-          </div>
+        {/* Main Content with Tabs */}
+        <Tabs defaultValue="leads" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="leads">Your Leads</TabsTrigger>
+            <TabsTrigger value="verification">Verification Dashboard</TabsTrigger>
+          </TabsList>
 
-          {filteredLeads.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <p className="text-muted-foreground">No leads found matching your filters.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredLeads.map((lead) => (
-              <Card key={lead.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-3">
-                        <h3 className="text-lg font-semibold">{lead.customer_full_name}</h3>
-                        <Badge className={getStatusColor(getLeadStatus(lead))}>
-                          {getLeadStatus(lead)}
-                        </Badge>
+          <TabsContent value="leads" className="space-y-4">
+            {/* Leads List */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold">Your Submissions ({filteredLeads.length})</h2>
+              </div>
+
+              {filteredLeads.length === 0 ? (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <p className="text-muted-foreground">No leads found matching your filters.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                filteredLeads.map((lead) => (
+                  <Card key={lead.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-3">
+                            <h3 className="text-lg font-semibold">{lead.customer_full_name}</h3>
+                            <Badge className={getStatusColor(getLeadStatus(lead))}>
+                              {getLeadStatus(lead)}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
+                            <div>
+                              <span className="font-medium">Phone:</span> {lead.phone_number || 'N/A'}
+                            </div>
+                            <div>
+                              <span className="font-medium">Coverage:</span> ${lead.coverage_amount?.toLocaleString() || 'N/A'}
+                            </div>
+                            <div>
+                              <span className="font-medium">Premium:</span> ${lead.monthly_premium?.toLocaleString() || 'N/A'}
+                            </div>
+                            <div>
+                              <span className="font-medium">Date:</span>{' '}
+                              {lead.created_at ? format(new Date(lead.created_at), 'MMM dd, yyyy') : 'N/A'}
+                            </div>
+                          </div>
+                          {lead.call_results.length > 0 && lead.call_results[0].notes && (
+                            <div className="mt-2">
+                              <span className="font-medium text-sm">Notes:</span>{' '}
+                              <span className="text-sm text-muted-foreground">{lead.call_results[0].notes}</span>
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/call-result-update?submissionId=${lead.submission_id}`)}
+                        >
+                          {lead.call_results.length > 0 ? 'View/Edit' : 'Update Result'}
+                        </Button>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
-                        <div>
-                          <span className="font-medium">Phone:</span> {lead.phone_number || 'N/A'}
-                        </div>
-                        <div>
-                          <span className="font-medium">Coverage:</span> ${lead.coverage_amount?.toLocaleString() || 'N/A'}
-                        </div>
-                        <div>
-                          <span className="font-medium">Premium:</span> ${lead.monthly_premium?.toLocaleString() || 'N/A'}
-                        </div>
-                        <div>
-                          <span className="font-medium">Date:</span>{' '}
-                          {lead.created_at ? format(new Date(lead.created_at), 'MMM dd, yyyy') : 'N/A'}
-                        </div>
-                      </div>
-                      {lead.call_results.length > 0 && lead.call_results[0].notes && (
-                        <div className="mt-2">
-                          <span className="font-medium text-sm">Notes:</span>{' '}
-                          <span className="text-sm text-muted-foreground">{lead.call_results[0].notes}</span>
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/call-result-update?submissionId=${lead.submission_id}`)}
-                    >
-                      {lead.call_results.length > 0 ? 'View/Edit' : 'Update Result'}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="verification">
+            <VerificationDashboard />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

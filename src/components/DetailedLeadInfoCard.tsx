@@ -1,7 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Copy, User } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Copy, User, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 interface DetailedLead {
   id: string;
@@ -47,6 +49,7 @@ interface DetailedLeadInfoCardProps {
 
 export const DetailedLeadInfoCard = ({ lead }: DetailedLeadInfoCardProps) => {
   const { toast } = useToast();
+  const [isOpen, setIsOpen] = useState(false);
 
   const copyToClipboard = () => {
     const leadInfo = `${lead.lead_vendor || 'Lead Vendor'}: ${lead.customer_full_name}
@@ -98,57 +101,69 @@ ${lead.additional_notes}`;
 
   return (
     <Card className="w-full">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
-          <User className="h-5 w-5" />
-          Additional Notes
-        </CardTitle>
-        <Button onClick={copyToClipboard} variant="outline" size="sm">
-          <Copy className="h-4 w-4 mr-2" />
-          Copy
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-1 text-xl font-normal">
-          <div><strong>{lead.lead_vendor || 'Lead Vendor'}:</strong> {lead.customer_full_name}</div>
-          <br />
-          <div><strong>Address:</strong> {lead.street_address}, {lead.city}, {lead.state} {lead.zip_code}</div>
-          
-          <div><strong>Beneficiary Information:</strong> {formatValue(lead.beneficiary_information)}</div>
-          <div><strong>Billing and mailing address is the same:</strong> (Y/N)</div>
-          <div><strong>Date of Birth:</strong> {lead.date_of_birth}</div>
-          <div><strong>Birth State:</strong> {formatValue(lead.birth_state)}</div>
-          <div><strong>Age:</strong> {lead.age}</div>
-          <div><strong>Number:</strong> {lead.phone_number}</div>
-          <div><strong>Call phone/landline:</strong></div>
-          <div><strong>Social:</strong> {lead.social_security}</div>
-          <div><strong>Driver License Number:</strong> {formatValue(lead.driver_license)}</div>
-          <div><strong>Exp:</strong></div>
-          <div><strong>Existing coverage:</strong> {formatValue(lead.existing_coverage)}</div>
-          <div><strong>Applied to life insurance last two years:</strong> {formatValue(lead.previous_applications)}</div>
-          <div><strong>Height:</strong> {formatValue(lead.height)}</div>
-          <div><strong>Weight:</strong> {formatValue(lead.weight)}</div>
-          <div><strong>Doctors Name:</strong> {formatValue(lead.doctors_name)}</div>
-          <div><strong>Tobacco Use:</strong> {formatValue(lead.tobacco_use)}</div>
-          <div><strong>Health Conditions:</strong></div>
-          <div className="ml-4">{formatValue(lead.health_conditions)}</div>
-          <div><strong>Medications:</strong></div>
-          <div className="ml-4">{formatValue(lead.medications)}</div>
-          <div><strong>Insurance Application Details:</strong></div>
-          <div><strong>Carrier:</strong> {lead.carrier}</div>
-          <div><strong>Monthly Premium:</strong> ${lead.monthly_premium}</div>
-          <div><strong>Coverage Amount:</strong> ${lead.coverage_amount?.toLocaleString()}</div>
-          <div><strong>Draft Date:</strong> {lead.draft_date}</div>
-          <div><strong>First Draft:</strong> {formatValue(lead.future_draft_date)}</div>
-          
-          <div><strong>Bank Name:</strong> {formatValue(lead.institution_name)}</div>
-          <div><strong>Routing Number:</strong> {lead.beneficiary_routing}</div>
-          <div><strong>Account Number:</strong> {lead.beneficiary_account}</div>
-          <div><strong>Checking/savings account:</strong> {formatValue(lead.account_type)}</div>
-          <div><strong>ADDITIONAL NOTES:</strong></div>
-          <div className="ml-4 whitespace-pre-wrap">{lead.additional_notes}</div>
-        </div>
-      </CardContent>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <CardHeader className="flex flex-row items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors">
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Additional Notes & Lead Details
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button onClick={(e) => {
+                e.stopPropagation();
+                copyToClipboard();
+              }} variant="outline" size="sm">
+                <Copy className="h-4 w-4 mr-2" />
+                Copy
+              </Button>
+              <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </div>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent>
+            <div className="space-y-1 text-xl font-normal">
+              <div><strong>{lead.lead_vendor || 'Lead Vendor'}:</strong> {lead.customer_full_name}</div>
+              <br />
+              <div><strong>Address:</strong> {lead.street_address}, {lead.city}, {lead.state} {lead.zip_code}</div>
+              
+              <div><strong>Beneficiary Information:</strong> {formatValue(lead.beneficiary_information)}</div>
+              <div><strong>Billing and mailing address is the same:</strong> (Y/N)</div>
+              <div><strong>Date of Birth:</strong> {lead.date_of_birth}</div>
+              <div><strong>Birth State:</strong> {formatValue(lead.birth_state)}</div>
+              <div><strong>Age:</strong> {lead.age}</div>
+              <div><strong>Number:</strong> {lead.phone_number}</div>
+              <div><strong>Call phone/landline:</strong></div>
+              <div><strong>Social:</strong> {lead.social_security}</div>
+              <div><strong>Driver License Number:</strong> {formatValue(lead.driver_license)}</div>
+              <div><strong>Exp:</strong></div>
+              <div><strong>Existing coverage:</strong> {formatValue(lead.existing_coverage)}</div>
+              <div><strong>Applied to life insurance last two years:</strong> {formatValue(lead.previous_applications)}</div>
+              <div><strong>Height:</strong> {formatValue(lead.height)}</div>
+              <div><strong>Weight:</strong> {formatValue(lead.weight)}</div>
+              <div><strong>Doctors Name:</strong> {formatValue(lead.doctors_name)}</div>
+              <div><strong>Tobacco Use:</strong> {formatValue(lead.tobacco_use)}</div>
+              <div><strong>Health Conditions:</strong></div>
+              <div className="ml-4">{formatValue(lead.health_conditions)}</div>
+              <div><strong>Medications:</strong></div>
+              <div className="ml-4">{formatValue(lead.medications)}</div>
+              <div><strong>Insurance Application Details:</strong></div>
+              <div><strong>Carrier:</strong> {lead.carrier}</div>
+              <div><strong>Monthly Premium:</strong> ${lead.monthly_premium}</div>
+              <div><strong>Coverage Amount:</strong> ${lead.coverage_amount?.toLocaleString()}</div>
+              <div><strong>Draft Date:</strong> {lead.draft_date}</div>
+              <div><strong>First Draft:</strong> {formatValue(lead.future_draft_date)}</div>
+              
+              <div><strong>Bank Name:</strong> {formatValue(lead.institution_name)}</div>
+              <div><strong>Routing Number:</strong> {lead.beneficiary_routing}</div>
+              <div><strong>Account Number:</strong> {lead.beneficiary_account}</div>
+              <div><strong>Checking/savings account:</strong> {formatValue(lead.account_type)}</div>
+              <div><strong>ADDITIONAL NOTES:</strong></div>
+              <div className="ml-4 whitespace-pre-wrap bg-muted p-3 rounded-md">{lead.additional_notes}</div>
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 };
