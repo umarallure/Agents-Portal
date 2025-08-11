@@ -134,7 +134,9 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
     switch (status) {
       case 'pending': return 'bg-gray-500';
       case 'in_progress': return 'bg-blue-500';
+      case 'claimed': return 'bg-purple-500';
       case 'ready_for_transfer': return 'bg-green-500';
+      case 'transferred': return 'bg-orange-500';
       case 'completed': return 'bg-emerald-500';
       default: return 'bg-gray-500';
     }
@@ -309,6 +311,26 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
               <span className="text-sm text-muted-foreground">
                 {session.licensed_agent_id ? 'LA is working on verification' : 'LA can claim this transfer'}
               </span>
+            </div>
+          ) : session.status === 'claimed' ? (
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                LA Direct Call
+              </Badge>
+              <span className="text-sm text-muted-foreground">
+                Licensed agent is handling verification
+              </span>
+              <Button 
+                onClick={() => updateSessionStatus('completed')} 
+                className="flex items-center gap-2 ml-4"
+                variant={currentProgress === 100 ? "default" : "outline"}
+              >
+                <CheckCircle className="h-4 w-4" />
+                Complete Verification
+                {currentProgress < 100 && (
+                  <span className="text-xs ml-1">({currentProgress}% verified)</span>
+                )}
+              </Button>
             </div>
           ) : session.licensed_agent_id ? (
             <div className="flex items-center gap-2">
