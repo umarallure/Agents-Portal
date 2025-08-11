@@ -1,4 +1,62 @@
 import { useState, useEffect } from "react";
+// Custom field order for display
+const customFieldOrder = [
+  "lead_vendor", // Corebiz: William G Moore
+  "street_address",
+  "beneficiary_information",
+  "billing_and_mailing_address_is_the_same",
+  "date_of_birth",
+  "birth_state",
+  "age",
+  "phone_number",
+  "call_phone_landline",
+  "social_security",
+  "driver_license",
+  "exp",
+  "existing_coverage",
+  "applied_to_life_insurance_last_two_years",
+  "height", // 5.2
+  "weight", // 160
+  "doctors_name", // Dr. Daniel Pham, MD
+  "tobacco_use", // NO
+  "health_conditions", // nil
+  "medications", // nil
+  "insurance_application_details", // Insurance Application Details (if exists)
+  "carrier", // AMAM
+  "monthly_premium", // $63.37
+  "coverage_amount", // $5,000
+  "draft_date", // 8th of aug
+  "first_draft", // First Draft (if exists)
+  "institution_name", // Bank of Oklahoma
+  "beneficiary_routing", // Routing Number: 103900036
+  "beneficiary_account", // Account Number: 103900036
+  "account_type", // Checking
+
+   // Address: 8700 NE 16th St
+  "city", // Oklahoma City
+  "state", // OK
+  "zip_code", // 73110
+   // Son Garland Moore ( 09 08 1985)
+   // Billing and mailing address is the same: (Y/N)
+   // 1948-05-26
+   // NE
+   // 77
+   // (405) 423-4272
+   // Call phone/landline (if exists)
+   // 447489617
+   // Driver License Number: nil
+   // Exp: (if exists)
+   // nil
+   // nil
+  
+  
+  
+  
+  
+
+  
+  "additional_notes" // ADDITIONAL NOTES
+];
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ColoredProgress } from "@/components/ui/colored-progress";
 import { Badge } from "@/components/ui/badge";
@@ -148,12 +206,15 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
     return <CheckCircle className="h-4 w-4 text-green-500" />;
   };
 
-  const groupedItems = (verificationItems || []).reduce((acc, item) => {
-    const category = item.field_category || 'other';
-    if (!acc[category]) acc[category] = [];
-    acc[category].push(item);
-    return acc;
-  }, {} as Record<string, VerificationItem[]>);
+  // Sort items by custom order, then group by category for display
+  const sortedItems = (verificationItems || []).slice().sort((a, b) => {
+    const aIdx = customFieldOrder.indexOf(a.field_name);
+    const bIdx = customFieldOrder.indexOf(b.field_name);
+    if (aIdx === -1 && bIdx === -1) return 0;
+    if (aIdx === -1) return 1;
+    if (bIdx === -1) return -1;
+    return aIdx - bIdx;
+  });
 
   const formatFieldName = (fieldName: string) => {
     return fieldName.split('_').map(word => 
@@ -190,14 +251,6 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">Verification Panel</CardTitle>
           <div className="flex items-center gap-2">
-            <Button 
-              onClick={refetch} 
-              variant="outline" 
-              size="sm"
-              className="text-xs"
-            >
-              Refresh
-            </Button>
             <Badge className={getStatusBadgeColor(session.status)}>
               {session.status.replace('_', ' ').toUpperCase()}
             </Badge>
@@ -249,37 +302,29 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
         </div>
       </CardHeader>
 
+
       <CardContent className="space-y-4 flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 400px)', minHeight: '500px' }}>
-        {Object.entries(groupedItems).map(([category, categoryItems]) => (
-          <div key={category}>
-            <h4 className="font-semibold text-sm mb-2 capitalize">
-              {category.replace('_', ' ')} Information
-            </h4>
-            <div className="space-y-3">
-              {categoryItems.map((item) => (
-                <div key={item.id} className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    {getFieldIcon(item)}
-                    <Label className="text-xs font-medium">
-                      {formatFieldName(item.field_name)}
-                    </Label>
-                    <Checkbox
-                      checked={item.is_verified}
-                      onCheckedChange={(checked) => 
-                        handleCheckboxChange(item.id, checked as boolean)
-                      }
-                      className="ml-auto"
-                    />
-                  </div>
-                  <Input
-                    value={inputValues[item.id] || ''}
-                    onChange={(e) => handleFieldValueChange(item.id, e.target.value)}
-                    placeholder={`Enter ${formatFieldName(item.field_name).toLowerCase()}`}
-                    className="text-xs"
-                  />
-                </div>
-              ))}
+        {sortedItems.map((item) => (
+          <div key={item.id} className="space-y-2">
+            <div className="flex items-center gap-2">
+              {getFieldIcon(item)}
+              <Label className="text-xs font-medium">
+                {formatFieldName(item.field_name)}
+              </Label>
+              <Checkbox
+                checked={item.is_verified}
+                onCheckedChange={(checked) => 
+                  handleCheckboxChange(item.id, checked as boolean)
+                }
+                className="ml-auto"
+              />
             </div>
+            <Input
+              value={inputValues[item.id] || ''}
+              onChange={(e) => handleFieldValueChange(item.id, e.target.value)}
+              placeholder={`Enter ${formatFieldName(item.field_name).toLowerCase()}`}
+              className="text-xs"
+            />
             <Separator className="mt-4" />
           </div>
         ))}
