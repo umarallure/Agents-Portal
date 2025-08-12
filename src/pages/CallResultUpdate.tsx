@@ -112,8 +112,10 @@ const CallResultUpdate = () => {
   const processLeadFromJotForm = async () => {
     setProcessing(true);
     try {
+      // Get center from the URL search params
+      const center = searchParams.get("center");
       const response = await supabase.functions.invoke('process-lead', {
-        body: { submissionId, formId }
+        body: { submissionId, formId, center }
       });
 
       if (response.error) {

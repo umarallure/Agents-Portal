@@ -13,7 +13,11 @@ serve(async (req)=>{
   }
   try {
     const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-    const { submissionId, formId } = await req.json();
+  // Get 'center' from URL parameters or request body
+  const url = new URL(req.url);
+  let center = url.searchParams.get('center');
+  const { submissionId, formId, center: bodyCenter } = await req.json();
+  if (!center && bodyCenter) center = bodyCenter;
     if (!submissionId) {
       throw new Error('Missing submissionId');
     }
@@ -128,7 +132,7 @@ serve(async (req)=>{
       beneficiary_routing: answers['25']?.answer || '',
       beneficiary_account: answers['26']?.answer || '',
       additional_notes: answers['28']?.answer || '',
-      lead_vendor: answers['33']?.answer || 'JotForm',
+      lead_vendor: center || null,
       buffer_agent: '',
       agent: answers['23']?.answer || ''
     };
