@@ -335,55 +335,57 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         }
       }
 
-      // Update Google Sheets based on lead type
-      // Determine if callback is TRUE or FALSE for Google Sheets
-      const fromCallbackValue = callSource === "Agent Callback" ? "TRUE" : "FALSE";
+      // Update Google Sheets based on Call Source selection
       try {
-        // Check if this is a callback lead (submission ID starts with "CB")
-        const isCallbackLead = submissionId.startsWith("CB");
-        
-        if (isCallbackLead) {
-          // For new callback leads: Create a new Google Sheets entry
-          console.log("Processing callback lead - creating new Google Sheets entry");
-          
-          // First, fetch the lead data from the database
-          const { data: leadData, error: leadError } = await supabase
-            .from("leads")
-            .select("*")
-            .eq("submission_id", submissionId)
-            .single();
+        const todayDate = new Date().toLocaleDateString('en-US', {
+          month: 'numeric',
+          day: 'numeric',
+          year: '2-digit'
+        });
+        // Fetch lead data for sheet functions
+        const { data: leadData, error: leadError } = await supabase
+          .from("leads")
+          .select("*")
+          .eq("submission_id", submissionId)
+          .single();
 
-          if (leadError) {
-            console.error("Error fetching lead data:", leadError);
-            // Continue without Google Sheets update if lead data fetch fails
-          } else {
-            // Call the create-new-callback-sheet function with both lead and call result data
+        if (leadError || !leadData) {
+          console.error("Error fetching lead data:", leadError);
+        } else {
+          if (callSource === "First Time Transfer") {
+            // Update existing entry in daily deal flow
+            const { error: sheetsError } = await supabase.functions.invoke('google-sheets-update', {
+              body: {
+                submissionId: submissionId,
+                callResult: {
+                  application_submitted: applicationSubmitted,
+                  status: finalStatus,
+                  buffer_agent: bufferAgent,
+                  agent_who_took_call: agentWhoTookCall,
+                  licensed_agent_account: licensedAgentAccount,
+                  carrier: carrier,
+                  product_type: productType,
+                  draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
+                  monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
+                  face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
+                  notes: notes,
+                  dq_reason: showStatusReasonDropdown ? statusReason : null,
+                  sent_to_underwriting: sentToUnderwriting,
+                  from_callback: callSource === "Agent Callback" ? "TRUE" : "FALSE",
+                  call_source: callSource
+                }
+              }
+            });
+            if (sheetsError) {
+              console.error("Error updating Google Sheets:", sheetsError);
+            }
+          } else if (callSource === "Reconnected Transfer" || callSource === "Agent Callback") {
+            // Create new entry in daily deal flow with today's date
             const { error: sheetsError } = await supabase.functions.invoke('create-new-callback-sheet', {
               body: {
                 leadData: {
-                  submission_id: leadData.submission_id,
-                  submission_date: leadData.created_at ? new Date(leadData.created_at).toLocaleDateString('en-US', {
-                    month: 'numeric',
-                    day: 'numeric',
-                    year: '2-digit'
-                  }) : new Date().toLocaleDateString('en-US', {
-                    month: 'numeric',
-                    day: 'numeric',
-                    year: '2-digit'
-                  }),
-                  customer_full_name: leadData.customer_full_name,
-                  phone_number: leadData.phone_number,
-                  email: leadData.email,
-                  street_address: leadData.street_address,
-                  city: leadData.city,
-                  state: leadData.state,
-                  zip_code: leadData.zip_code,
-                  date_of_birth: leadData.date_of_birth,
-                  age: leadData.age,
-                  social_security: leadData.social_security,
-                  health_conditions: leadData.health_conditions,
-                  lead_vendor: leadData.lead_vendor,
-                  additional_notes: leadData.additional_notes
+                  ...leadData,
+                  submission_date: todayDate
                 },
                 callResult: {
                   application_submitted: applicationSubmitted,
@@ -395,68 +397,18 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                   product_type: productType,
                   draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
                   monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-                  face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
+                  face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
                   notes: notes,
                   dq_reason: showStatusReasonDropdown ? statusReason : null,
                   sent_to_underwriting: sentToUnderwriting,
-                  from_callback: fromCallbackValue,
+                  from_callback: callSource === "Agent Callback" ? "TRUE" : "FALSE",
                   call_source: callSource
                 }
               }
             });
-            // If callSource is "Reconnected Transfer", create a new entry with current date in column E
-            if (callSource === "Reconnected Transfer") {
-              await supabase.functions.invoke('create-new-callback-sheet', {
-                body: {
-                  leadData: {
-                    ...leadData,
-                    submission_date: new Date().toLocaleDateString('en-US', {
-                      month: 'numeric',
-                      day: 'numeric',
-                      year: '2-digit'
-                    })
-                  },
-                  callResult: {
-                    ...callResultData,
-                    from_callback: "FALSE",
-                    call_source: "Reconnected Transfer"
-                  }
-                }
-              });
-            }
-
             if (sheetsError) {
-              console.error("Error creating new callback entry in Google Sheets:", sheetsError);
+              console.error("Error creating new Google Sheets entry:", sheetsError);
             }
-          }
-        } else {
-          // For JotForm leads: Update existing Google Sheets row
-          
-          const { error: sheetsError } = await supabase.functions.invoke('google-sheets-update', {
-            body: {
-              submissionId: submissionId,
-              callResult: {
-                application_submitted: applicationSubmitted,
-                status: finalStatus,
-                buffer_agent: bufferAgent,
-                agent_who_took_call: agentWhoTookCall,
-                licensed_agent_account: licensedAgentAccount,
-                carrier: carrier,
-                product_type: productType,
-                draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
-                monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-                face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
-                notes: notes,
-                dq_reason: showStatusReasonDropdown ? statusReason : null,
-                sent_to_underwriting: sentToUnderwriting,
-                from_callback: fromCallbackValue,
-                call_source: callSource
-              }
-            }
-          });
-
-          if (sheetsError) {
-            console.error("Error updating existing Google Sheets row:", sheetsError);
           }
         }
       } catch (sheetsError) {

@@ -71,7 +71,7 @@ serve(async (req)=>{
       const statusMap = {
         "Needs callback": "Needs to be Fixed",
         "Call Never Sent": "Incomplete Transfer",
-        "Not Interested": "Returned To Center",
+        "Not Interested": "Returned to Center",
         "DQ": "DQ",
         "⁠DQ": "DQ",
         "Future Submission Date": "Needs Carrier application",
@@ -188,7 +188,7 @@ serve(async (req)=>{
         range: `${SHEET_NAME}!Q${rowIndex}`,
         values: [
           [
-            rows[rowIndex - 1][16] || "TRUE"
+            rows[rowIndex - 1][16] || "FALSE"
           ]
         ]
       },
