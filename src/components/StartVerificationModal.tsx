@@ -169,24 +169,52 @@ export const StartVerificationModal = ({ submissionId, onVerificationStarted }: 
         throw new Error("User not authenticated");
       }
 
+      // Fetch lead info for notification
+      let leadData = {};
+      const { data: lead, error: leadError } = await supabase
+        .from('leads')
+        .select('lead_vendor, customer_full_name')
+        .eq('submission_id', submissionId)
+        .single();
+      if (!leadError && lead) {
+        leadData = {
+          lead_vendor: lead.lead_vendor,
+          customer_full_name: lead.customer_full_name
+        };
+      }
+
       let sessionData;
+      let notificationPayload = {};
 
       if (agentType === 'buffer') {
         // Traditional buffer agent workflow
         sessionData = {
           submission_id: submissionId,
           buffer_agent_id: selectedAgent,
-          status: 'in_progress' as const,
+          status: 'in_progress',
           started_at: new Date().toISOString()
+        };
+        notificationPayload = {
+          type: 'verification_started',
+          submissionId,
+          agentType: 'buffer',
+          bufferAgentName: bufferAgents.find(a => a.id === selectedAgent)?.display_name || 'Buffer Agent',
+          leadData
         };
       } else {
         // Direct LA workflow - agent takes call directly and claims it
         sessionData = {
           submission_id: submissionId,
           licensed_agent_id: selectedLA,
-          status: 'claimed' as const,
-          started_at: new Date().toISOString(),
-          claimed_at: new Date().toISOString()
+          status: 'in_progress',
+          started_at: new Date().toISOString()
+        };
+        notificationPayload = {
+          type: 'verification_started',
+          submissionId,
+          agentType: 'licensed',
+          licensedAgentName: licensedAgents.find(a => a.id === selectedLA)?.display_name || 'Licensed Agent',
+          leadData
         };
       }
 
@@ -228,6 +256,11 @@ export const StartVerificationModal = ({ submissionId, onVerificationStarted }: 
       if (statusError) {
         console.warn('Failed to update agent status:', statusError);
       }
+
+      // Send notification to center when verification starts
+      await supabase.functions.invoke('center-transfer-notification', {
+        body: notificationPayload
+      });
 
       toast({
         title: "Success",

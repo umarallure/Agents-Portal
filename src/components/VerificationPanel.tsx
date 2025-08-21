@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { Copy } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 // Custom field order for display
 const customFieldOrder = [
   "lead_vendor", // Corebiz: William G Moore
@@ -75,6 +78,34 @@ interface VerificationPanelProps {
 }
 
 export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPanelProps) => {
+  // Helper to get lead data from verificationItems
+  const getLeadData = () => {
+    const leadData: Record<string, string> = {};
+    if (verificationItems) {
+      verificationItems.forEach(item => {
+        if (['lead_vendor', 'customer_full_name'].includes(item.field_name)) {
+          leadData[item.field_name] = inputValues[item.id] || item.original_value || '';
+        }
+      });
+    }
+    return leadData;
+  };
+  const { toast } = useToast();
+
+  // Copy notes logic
+  const copyNotesToClipboard = () => {
+    if (!verificationItems) return;
+    const notesText = verificationItems.map(item => {
+      const label = formatFieldName(item.field_name);
+      const value = inputValues[item.id] || 'N/A';
+      return `${label}: ${value}`;
+    }).join('\n');
+    navigator.clipboard.writeText(notesText);
+    toast({
+      title: "Copied!",
+      description: "Verification notes copied to clipboard",
+    });
+  };
   const [elapsedTime, setElapsedTime] = useState("00:00");
   const [notes, setNotes] = useState("");
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
@@ -254,11 +285,15 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
             <Badge className={getStatusBadgeColor(session.status)}>
               {session.status.replace('_', ' ').toUpperCase()}
             </Badge>
+            {/* Copy Notes Button */}
+            <Button onClick={copyNotesToClipboard} variant="outline" size="sm">
+              <Copy className="h-4 w-4 mr-2" />
+              Copy Edited Notes
+            </Button>
           </div>
         </div>
-        
         {/* Session Info */}
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2 text-sm mt-4">
           <div className="flex items-center gap-2">
             <User className="h-4 w-4" />
             <span>Agent: {session.buffer_agent_id || 'Unknown'}</span>
@@ -268,9 +303,8 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
             <span>Time: {elapsedTime}</span>
           </div>
         </div>
-
-        {/* Progress Bar */}
-        <div className="space-y-2">
+        {/* Small Progress Bar (original) */}
+        <div className="space-y-2 mt-4">
           <div className="flex justify-between text-sm">
             <span>Progress</span>
             <span className={`font-semibold ${
@@ -301,7 +335,6 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
           </p>
         </div>
       </CardHeader>
-
 
       <CardContent className="space-y-4 flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 400px)', minHeight: '500px' }}>
         {sortedItems.map((item) => (
@@ -342,74 +375,127 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
         </div>
       </CardContent>
 
-      {/* Footer */}
-      <div className="p-4 border-t flex-shrink-0">
-        <div className="flex justify-between items-center">
-          <p className="text-sm text-muted-foreground">
-            {session.verified_fields} of {session.total_fields} fields verified ({session.progress_percentage}%)
-          </p>
-          {session.status === 'transferred' ? (
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-purple-100 text-purple-800">
-                {session.licensed_agent_id ? 'Claimed by LA' : 'Transferred to LA'}
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                {session.licensed_agent_id ? 'LA is working on verification' : 'LA can claim this transfer'}
-              </span>
-            </div>
-          ) : session.status === 'claimed' ? (
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-purple-100 text-purple-800">
-                LA Direct Call
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                Licensed agent is handling verification
-              </span>
-              <Button 
-                onClick={() => updateSessionStatus('completed')} 
-                className="flex items-center gap-2 ml-4"
-                variant={currentProgress === 100 ? "default" : "outline"}
-              >
-                <CheckCircle className="h-4 w-4" />
-                Complete Verification
-                {currentProgress < 100 && (
-                  <span className="text-xs ml-1">({currentProgress}% verified)</span>
-                )}
-              </Button>
-            </div>
-          ) : session.licensed_agent_id ? (
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                Claimed by LA
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                LA is working on verification
-              </span>
-            </div>
-          ) : session.status === 'completed' ? (
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">
-                Verification Complete
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                Call result has been saved
-              </span>
-            </div>
-          ) : (
-            <Button 
-              onClick={handleTransferToLA} 
-              className="flex items-center gap-2"
-              variant={session.progress_percentage === 100 ? "default" : "outline"}
-            >
-              <ArrowRight className="h-4 w-4" />
-              Transfer to LA
-              {session.progress_percentage < 100 && (
-                <span className="text-xs ml-1">({session.progress_percentage}% verified)</span>
-              )}
-            </Button>
-          )}
+        {/* Footer */}
+        <div className="p-4 border-t flex-shrink-0">
+          <div className="flex justify-end gap-3">
+            {/* Buffer Agent Buttons */}
+            {session.buffer_agent_id && !session.licensed_agent_id && (
+              <>
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    await updateSessionStatus('call_dropped');
+                    const leadData = getLeadData();
+                    // Send notification to center
+                    await supabase.functions.invoke('center-transfer-notification', {
+                      body: {
+                        type: 'call_dropped',
+                        submissionId: session.submission_id,
+                        leadData
+                      }
+                    });
+                    alert(`Call with ${leadData.customer_full_name || 'client'} dropped. Need to reconnect.`);
+                    toast({
+                      title: 'Call Dropped',
+                      description: `Call with ${leadData.customer_full_name || 'client'} dropped. Need to reconnect.`
+                    });
+                    refetch();
+                  }}
+                >
+                  Call Dropped
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={async () => {
+                    await updateSessionStatus('buffer_done');
+                    toast({
+                      title: 'Call Done',
+                      description: 'Buffer agent is now free from the call.'
+                    });
+                    refetch();
+                  }}
+                >
+                  Call Done
+                </Button>
+                <Button
+                  variant="default"
+                  onClick={async () => {
+                    await updateSessionStatus('transferred');
+                    // Send notification to center when LA claims the call
+                    const leadData = getLeadData();
+                    // You may need to pass bufferAgentName and licensedAgentName from props/context
+                    await supabase.functions.invoke('center-transfer-notification', {
+                      body: {
+                        type: 'transfer_to_la',
+                        submissionId: session.submission_id,
+                        leadData,
+                        bufferAgentName: session.buffer_agent_name || 'Buffer Agent',
+                        licensedAgentName: session.licensed_agent_name || 'Licensed Agent'
+                      }
+                    });
+                    onTransferReady?.();
+                    refetch();
+                  }}
+                >
+                  Transfer to LA
+                </Button>
+              </>
+            )}
+            {/* Licensed Agent Buttons */}
+            {session.licensed_agent_id && (
+              <>
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    await updateSessionStatus('call_dropped');
+                    const leadData = getLeadData();
+                    await supabase.functions.invoke('center-transfer-notification', {
+                      body: {
+                        type: 'call_dropped',
+                        submissionId: session.submission_id,
+                        leadData
+                      }
+                    });
+                    alert(`Call with ${leadData.customer_full_name || 'client'} dropped. Need to reconnect.`);
+                    toast({
+                      title: 'Call Dropped',
+                      description: `Call with ${leadData.customer_full_name || 'client'} dropped. Need to reconnect.`
+                    });
+                    refetch();
+                  }}
+                >
+                  Call Dropped
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={async () => {
+                    await updateSessionStatus('la_done');
+                    toast({
+                      title: 'Call Done',
+                      description: 'Licensed agent is now free from the call.'
+                    });
+                    refetch();
+                  }}
+                >
+                  Call Done
+                </Button>
+                <Button
+                  variant="default"
+                  onClick={async () => {
+                    await updateSessionStatus('ready_for_transfer');
+                    toast({
+                      title: 'Transfer',
+                      description: 'Session is now available for other licensed agents to claim.'
+                    });
+                    refetch();
+                  }}
+                >
+                  Transfer to Other Licensed Agent
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-      </div>
     </Card>
   );
 };

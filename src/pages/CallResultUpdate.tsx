@@ -10,6 +10,7 @@ import { CallResultForm } from "@/components/CallResultForm";
 import { StartVerificationModal } from "@/components/StartVerificationModal";
 import { VerificationPanel } from "@/components/VerificationPanel";
 import { Loader2, ArrowLeft } from "lucide-react";
+import { TopVerificationProgress } from "@/components/TopVerificationProgress";
 
 interface Lead {
   id: string;
@@ -286,35 +287,38 @@ const CallResultUpdate = () => {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button 
-              variant="outline" 
-              onClick={() => navigate("/dashboard")}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Dashboard
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">
-                {fromCallback ? "Update Callback Result" : "Update Call Result"}
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                {fromCallback 
-                  ? "Update the status and details for this callback" 
-                  : "Update the status and details for this lead"
-                }
-              </p>
-            </div>
+        <div className="flex items-center gap-4 w-full">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate("/dashboard")}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-3xl font-bold whitespace-nowrap">
+              {fromCallback ? "Update Callback Result" : "Update Call Result"}
+            </h1>
+            <p className="text-muted-foreground mt-1 truncate">
+              {fromCallback 
+                ? "Update the status and details for this callback" 
+                : "Update the status and details for this lead"
+              }
+            </p>
           </div>
-          
-          {/* Start Verification Button */}
-          {!showVerificationPanel && (
-            <StartVerificationModal 
-              submissionId={submissionId!}
-              onVerificationStarted={handleVerificationStarted}
-            />
+          {/* Top right: show StartVerificationModal if no session, else show progress bar */}
+          {!showVerificationPanel || !verificationSessionId ? (
+            <div className="flex-shrink-0">
+              <StartVerificationModal 
+                submissionId={submissionId!}
+                onVerificationStarted={handleVerificationStarted}
+              />
+            </div>
+          ) : (
+            <div className="w-[420px] max-w-[50vw]">
+              <TopVerificationProgress submissionId={submissionId!} verificationSessionId={verificationSessionId} />
+            </div>
           )}
         </div>
 

@@ -190,6 +190,7 @@ export const VerificationDashboard = () => {
       case 'ready_for_transfer': return 'bg-green-100 text-green-800';
       case 'transferred': return 'bg-purple-100 text-purple-800';
       case 'completed': return 'bg-emerald-100 text-emerald-800';
+      case 'call_dropped': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -281,6 +282,7 @@ export const VerificationDashboard = () => {
                 <SelectItem value="ready_for_transfer">Ready for Transfer</SelectItem>
                 <SelectItem value="transferred">Transferred</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="call_dropped">Call Dropped</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -352,7 +354,7 @@ export const VerificationDashboard = () => {
                   </TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(session.status)}>
-                      {session.status.replace('_', ' ').toUpperCase()}
+                      {session.status === 'call_dropped' ? 'Call Dropped' : session.status.replace('_', ' ').toUpperCase()}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -363,17 +365,15 @@ export const VerificationDashboard = () => {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => viewSession(session.submission_id)}
-                        className="flex items-center gap-2"
-                      >
-                        <Eye className="h-4 w-4" />
-                        View
-                      </Button>
-                      
-                      {session.status === 'transferred' && !session.licensed_agent_id && (
+                      {session.status === 'call_dropped' ? (
+                        <Button
+                          variant="outline"
+                          onClick={() => claimTransfer(session.id, session.submission_id)}
+                          className="text-red-600 border-red-600"
+                        >
+                          Claim Dropped Call
+                        </Button>
+                      ) : session.status === 'transferred' && !session.licensed_agent_id ? (
                         <Button
                           variant="default"
                           size="sm"
@@ -382,6 +382,13 @@ export const VerificationDashboard = () => {
                         >
                           <UserCheck className="h-4 w-4" />
                           Claim Transfer
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          onClick={() => viewSession(session.submission_id)}
+                        >
+                          View
                         </Button>
                       )}
                     </div>
