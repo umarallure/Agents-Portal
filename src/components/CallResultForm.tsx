@@ -31,6 +31,7 @@ const statusOptions = [
 
 const carrierOptions = [
   "Liberty",
+  "SBLI",
   "Corebridge",
   "MOH",
   "Transamerica",
@@ -78,6 +79,7 @@ const licensedAccountOptions = [
   "Claudia",
   "Lydia",
   "Benjamin",
+  "Erica",
   "N/A"
 ];
 
