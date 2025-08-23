@@ -10,6 +10,8 @@ import { Eye, Clock, User, Filter, Search, RefreshCw, UserCheck } from "lucide-r
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { ClaimDroppedCallModal } from "./ClaimDroppedCallModal";
+import { ClaimLicensedAgentModal } from "./ClaimLicensedAgentModal";
 
 interface VerificationSession {
   id: string;
@@ -34,6 +36,8 @@ interface VerificationSession {
 }
 
 export const VerificationDashboard = () => {
+  // Modal type state
+  const [modalType, setModalType] = useState<'dropped' | 'licensed' | null>(null);
   const [sessions, setSessions] = useState<VerificationSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -117,6 +121,7 @@ export const VerificationDashboard = () => {
       setLoading(false);
       if (isManualRefresh) {
         setRefreshing(false);
+          const [fetchingAgents, setFetchingAgents] = useState(false);
       }
     }
   };
@@ -125,49 +130,137 @@ export const VerificationDashboard = () => {
     fetchVerificationSessions(true);
   };
 
-  const claimTransfer = async (sessionId: string, submissionId: string) => {
+  // Modal state for claiming dropped call
+  const [claimModalOpen, setClaimModalOpen] = useState(false);
+  const [claimSessionId, setClaimSessionId] = useState<string | null>(null);
+  const [claimSubmissionId, setClaimSubmissionId] = useState<string | null>(null);
+  const [claimAgentType, setClaimAgentType] = useState<'buffer' | 'licensed'>('buffer');
+  const [claimBufferAgent, setClaimBufferAgent] = useState<string>("");
+  const [claimLicensedAgent, setClaimLicensedAgent] = useState<string>("");
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [claimLead, setClaimLead] = useState<any>(null);
+  const [bufferAgents, setBufferAgents] = useState<any[]>([]);
+  const [licensedAgents, setLicensedAgents] = useState<any[]>([]);
+  const [fetchingAgents, setFetchingAgents] = useState(false);
+
+  // Modal open logic
+  // Open correct modal type
+  const openClaimModal = async (sessionId: string, submissionId: string, agentTypeOverride?: 'licensed') => {
+    setClaimSessionId(sessionId);
+    setClaimSubmissionId(submissionId);
+    setClaimModalOpen(true);
+    // Fetch lead info
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('lead_vendor, customer_full_name')
+      .eq('submission_id', submissionId)
+      .single();
+    setClaimLead(lead);
+    if (agentTypeOverride === 'licensed') {
+      setModalType('licensed');
+      setClaimAgentType('licensed');
+      setClaimLicensedAgent("");
+      fetchAgents('licensed');
+    } else {
+      setModalType('dropped');
+      setClaimAgentType('buffer');
+      setClaimBufferAgent("");
+      setClaimLicensedAgent("");
+      fetchAgents('buffer');
+    }
+  };
+
+  // Fetch agents for dropdowns
+  const fetchAgents = async (type: 'buffer' | 'licensed') => {
+    setFetchingAgents(true);
     try {
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
+      const { data: agentStatus } = await supabase
+        .from('agent_status')
+        .select('user_id')
+        .eq('agent_type', type);
+      const ids = agentStatus?.map(a => a.user_id) || [];
+      let profiles = [];
+      if (ids.length > 0) {
+        const { data: fetchedProfiles } = await supabase
+          .from('profiles')
+          .select('user_id, display_name')
+          .in('user_id', ids);
+        profiles = fetchedProfiles || [];
+      }
+      if (type === 'buffer') setBufferAgents(profiles);
+      else setLicensedAgents(profiles);
+    } catch (error) {
+      // Optionally handle error
+    } finally {
+      setFetchingAgents(false);
+    }
+  };
+
+  // Handle workflow type change
+  const handleAgentTypeChange = (type: 'buffer' | 'licensed') => {
+    setClaimAgentType(type);
+    setClaimBufferAgent("");
+    setClaimLicensedAgent("");
+    fetchAgents(type);
+  };
+
+  const handleClaimDroppedCall = async () => {
+    setClaimLoading(true);
+    try {
+      let agentId = claimAgentType === 'buffer' ? claimBufferAgent : claimLicensedAgent;
+      if (!agentId) {
         toast({
           title: "Error",
-          description: "Unable to get current user information",
+          description: `Please select a ${claimAgentType === 'buffer' ? 'buffer' : 'licensed'} agent`,
           variant: "destructive",
         });
+        setClaimLoading(false);
         return;
       }
-
-      // Update the verification session with the current user as licensed agent
-      const { error: updateError } = await supabase
-        .from('verification_sessions')
-        .update({ 
-          licensed_agent_id: user.id,
-          status: 'in_progress' // Change status to in_progress when claimed
-        })
-        .eq('id', sessionId);
-
-      if (updateError) {
-        throw updateError;
+      // Update verification session
+      const updateFields: any = {
+        status: 'in_progress'
+      };
+      if (claimAgentType === 'buffer') {
+        updateFields.buffer_agent_id = agentId;
+        updateFields.licensed_agent_id = null;
+      } else {
+        updateFields.licensed_agent_id = agentId;
       }
+      await supabase
+        .from('verification_sessions')
+        .update(updateFields)
+        .eq('id', claimSessionId);
 
-      toast({
-        title: "Transfer Claimed",
-        description: "You have successfully claimed this transfer. Opening verification panel...",
+      // Send notification
+      await supabase.functions.invoke('center-transfer-notification', {
+        body: {
+          type: 'reconnected',
+          submissionId: claimSubmissionId,
+          agentType: claimAgentType,
+          agentName: claimAgentType === 'buffer'
+            ? bufferAgents.find(a => a.user_id === agentId)?.display_name || 'Buffer Agent'
+            : licensedAgents.find(a => a.user_id === agentId)?.display_name || 'Licensed Agent',
+          leadData: claimLead
+        }
       });
 
-      // Refresh the dashboard to show updated data
+      toast({
+        title: "Call Reconnected",
+        description: `${claimAgentType === 'buffer'
+          ? bufferAgents.find(a => a.user_id === agentId)?.display_name
+          : licensedAgents.find(a => a.user_id === agentId)?.display_name} is reconnected with ${claimLead?.customer_full_name}`,
+      });
+
+      setClaimModalOpen(false);
+      setClaimLoading(false);
       fetchVerificationSessions();
-
-      // Navigate to the call result update page to open verification panel
-      navigate(`/call-result-update?submissionId=${submissionId}`);
-
+      navigate(`/call-result-update?submissionId=${claimSubmissionId}`);
     } catch (error) {
-      console.error('Error claiming transfer:', error);
+      setClaimLoading(false);
       toast({
         title: "Error",
-        description: "Failed to claim transfer",
+        description: "Failed to claim dropped call",
         variant: "destructive",
       });
     }
@@ -233,8 +326,35 @@ export const VerificationDashboard = () => {
       </div>
     );
   }
-
   return (
+    <>
+    {/* Claim Dropped Call Modal */}
+    <ClaimDroppedCallModal
+      open={claimModalOpen && modalType === 'dropped'}
+      loading={claimLoading}
+      agentType={claimAgentType}
+      bufferAgents={bufferAgents}
+      licensedAgents={licensedAgents}
+      fetchingAgents={fetchingAgents}
+      claimBufferAgent={claimBufferAgent}
+      claimLicensedAgent={claimLicensedAgent}
+      onAgentTypeChange={handleAgentTypeChange}
+      onBufferAgentChange={setClaimBufferAgent}
+      onLicensedAgentChange={setClaimLicensedAgent}
+      onCancel={() => setClaimModalOpen(false)}
+      onClaim={handleClaimDroppedCall}
+    />
+    {/* Claim Licensed Agent Modal */}
+    <ClaimLicensedAgentModal
+      open={claimModalOpen && modalType === 'licensed'}
+      loading={claimLoading}
+      licensedAgents={licensedAgents}
+      fetchingAgents={fetchingAgents}
+      claimLicensedAgent={claimLicensedAgent}
+      onLicensedAgentChange={setClaimLicensedAgent}
+      onCancel={() => setClaimModalOpen(false)}
+      onClaim={handleClaimDroppedCall}
+    />
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
@@ -365,30 +485,31 @@ export const VerificationDashboard = () => {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      {session.status === 'call_dropped' ? (
+                      {session.status === 'call_dropped' && (
                         <Button
                           variant="outline"
-                          onClick={() => claimTransfer(session.id, session.submission_id)}
+                          onClick={() => openClaimModal(session.id, session.submission_id)}
                           className="text-red-600 border-red-600"
                         >
                           Claim Dropped Call
                         </Button>
-                      ) : session.status === 'transferred' && !session.licensed_agent_id ? (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => claimTransfer(session.id, session.submission_id)}
-                          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
-                        >
-                          <UserCheck className="h-4 w-4" />
-                          Claim Transfer
-                        </Button>
-                      ) : (
+                      )}
+                      {(session.status === 'transferred' && (!session.licensed_agent_id || session.licensed_agent_id === '')) && (
                         <Button
                           variant="outline"
-                          onClick={() => viewSession(session.submission_id)}
+                          onClick={() => openClaimModal(session.id, session.submission_id, 'licensed')}
+                          className="text-purple-600 border-purple-600"
                         >
-                          View
+                          Claim as Licensed Agent
+                        </Button>
+                      )}
+                      {session.status === 'ready_for_transfer' && (
+                        <Button
+                          variant="outline"
+                          onClick={() => openClaimModal(session.id, session.submission_id, 'licensed')}
+                          className="text-purple-600 border-purple-600"
+                        >
+                          Claim as Licensed Agent
                         </Button>
                       )}
                     </div>
@@ -406,5 +527,6 @@ export const VerificationDashboard = () => {
         </CardContent>
       </Card>
     </div>
+    </>
   );
-};
+}

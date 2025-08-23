@@ -80,15 +80,27 @@ serve(async (req)=>{
     if (type === 'call_dropped') {
       slackText = `:red_circle: Call with *${leadData.customer_full_name || 'Unknown Customer'}* dropped. Need to reconnect.`;
     } else if (type === 'transfer_to_la') {
-      slackText = `:arrow_right: *${bufferAgentName || 'Buffer Agent'}* transferred the call to *${licensedAgentName || 'Licensed Agent'}*.`;
+      slackText = `:arrow_right: *${bufferAgentName || 'Buffer Agent'}* has transferred *${leadData.customer_full_name || 'Unknown Customer'}* to *${licensedAgentName || 'Licensed Agent'}*.`;
     } else if (type === 'verification_started') {
       // Debug log for verification_started
-      console.log('[DEBUG] Verification started payload:', { type, submissionId, leadData, bufferAgentName, licensedAgentName });
-      if (leadData?.customer_full_name) {
-        slackText = `:white_check_mark: Verification started for *${leadData.customer_full_name}* by ${bufferAgentName ? `Buffer Agent: *${bufferAgentName}*` : licensedAgentName ? `Licensed Agent: *${licensedAgentName}*` : 'Agent'}`;
+      console.log('[DEBUG] Verification started payload:', {
+        type,
+        submissionId,
+        leadData,
+        bufferAgentName,
+        licensedAgentName
+      });
+      if (bufferAgentName && leadData?.customer_full_name) {
+        slackText = `:white_check_mark: *${bufferAgentName}* is connected to *${leadData.customer_full_name}*`;
+      } else if (licensedAgentName && leadData?.customer_full_name) {
+        slackText = `:white_check_mark: *${licensedAgentName}* is connected to *${leadData.customer_full_name}*`;
       } else {
-        slackText = `:white_check_mark: Verification started by ${bufferAgentName ? `Buffer Agent: *${bufferAgentName}*` : licensedAgentName ? `Licensed Agent: *${licensedAgentName}*` : 'Agent'}`;
+        slackText = `:white_check_mark: Agent is connected to *${leadData?.customer_full_name || 'Unknown Customer'}*`;
       }
+    } else if (type === 'reconnected') {
+      // Notification for agent claim and reconnect after dropped call
+      const agentName = bufferAgentName || licensedAgentName || 'Agent';
+      slackText = `:green_circle: *${agentName}* is reconnected with *${leadData?.customer_full_name || 'Unknown Customer'}*`;
     } else {
       slackText = 'Notification.';
     }
