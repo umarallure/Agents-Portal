@@ -1,26 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
-
 const SLACK_BOT_TOKEN = Deno.env.get('SLACK_BOT_TOKEN');
-
-serve(async (req) => {
+serve(async (req)=>{
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: corsHeaders
     });
   }
-
   try {
     const { submissionId, leadData, callResult } = await req.json();
-
     if (!SLACK_BOT_TOKEN) {
       throw new Error('SLACK_BOT_TOKEN not configured');
     }
-
     // Center mapping for different lead vendors
     const leadVendorCenterMapping = {
       "Ark Tech": "#orbit-team-ark-tech",
@@ -49,12 +43,11 @@ serve(async (req) => {
       "Cutting Edge": "#test-bpo",
       "Next Era": "#test-bpo",
       "Rock BPO": "#orbit-team-rock-bpo",
-      "Avenue Consultancy": "#orbit-team-avenue-consultancy"
+      "Avenue Consultancy": "#orbit-team-avenue-consultancy",
+      "Crown Connect BPO": "#orbit-team-crown-connect-bpo"
     };
-
     // Only send notifications for NOT submitted applications
     const isNotSubmitted = callResult && callResult.application_submitted === false;
-    
     if (!isNotSubmitted) {
       console.log('Skipping center notification - only for not submitted applications');
       return new Response(JSON.stringify({
@@ -67,13 +60,10 @@ serve(async (req) => {
         }
       });
     }
-
     console.log('Debug - callResult data:', JSON.stringify(callResult, null, 2));
     console.log('Debug - leadData:', JSON.stringify(leadData, null, 2));
-
     // Get the lead vendor from callResult or leadData
     const leadVendor = callResult?.lead_vendor || leadData?.lead_vendor;
-    
     if (!leadVendor) {
       console.log('No lead vendor found, cannot determine center channel');
       return new Response(JSON.stringify({
@@ -86,9 +76,7 @@ serve(async (req) => {
         }
       });
     }
-
     const centerChannel = leadVendorCenterMapping[leadVendor];
-    
     if (!centerChannel) {
       console.log(`No center channel mapping found for lead vendor: "${leadVendor}"`);
       return new Response(JSON.stringify({
@@ -101,7 +89,6 @@ serve(async (req) => {
         }
       });
     }
-
     // Create the notification message with notes and reason
     const statusText = callResult.status || 'Not Submitted';
     const reasonText = callResult.dq_reason || 'No specific reason provided';
@@ -109,10 +96,9 @@ serve(async (req) => {
     const customerName = leadData.customer_full_name || 'Unknown Customer';
     const phoneNumber = leadData.phone_number || 'No phone number';
     const email = leadData.email || 'No email';
-
     // Format the message with status emoji
-    let statusEmoji = '❌';
-    switch (callResult.status) {
+    let statusEmoji = '✅';
+    switch(callResult.status){
       case '⁠DQ':
         statusEmoji = '🚫';
         break;
@@ -126,9 +112,8 @@ serve(async (req) => {
         statusEmoji = '📅';
         break;
       default:
-        statusEmoji = '❌';
+        statusEmoji = '✅';
     }
-
     const centerSlackMessage = {
       channel: centerChannel,
       blocks: [
@@ -136,14 +121,14 @@ serve(async (req) => {
           type: 'header',
           text: {
             type: 'plain_text',
-            text: `${statusEmoji} Application Not Submitted - ${statusText}`
+            text: `${statusEmoji} - ${statusText}`
           }
         },
         {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `*Customer:* ${customerName}\n*Phone:* ${phoneNumber}\n*Email:* ${email}\n*Submission ID:* ${submissionId}`
+            text: `*Customer Name:* ${customerName}`
           }
         },
         {
@@ -171,9 +156,7 @@ serve(async (req) => {
         }
       ]
     };
-
     console.log(`Sending center notification to ${centerChannel} for vendor ${leadVendor}`);
-
     const slackResponse = await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
       headers: {
@@ -182,11 +165,8 @@ serve(async (req) => {
       },
       body: JSON.stringify(centerSlackMessage)
     });
-
     const slackResult = await slackResponse.json();
-    
     console.log(`Center Slack API Response for ${centerChannel}:`, JSON.stringify(slackResult, null, 2));
-    
     if (!slackResult.ok) {
       console.error(`Slack API error: ${slackResult.error}`);
       if (slackResult.error === 'channel_not_found') {
@@ -205,9 +185,7 @@ serve(async (req) => {
         throw new Error(`Slack API error: ${slackResult.error}`);
       }
     }
-
     console.log(`Center notification sent to ${centerChannel} successfully`);
-
     return new Response(JSON.stringify({
       success: true,
       messageTs: slackResult.ts,
@@ -221,7 +199,6 @@ serve(async (req) => {
         'Content-Type': 'application/json'
       }
     });
-
   } catch (error) {
     console.error('Error in center-notification:', error);
     return new Response(JSON.stringify({

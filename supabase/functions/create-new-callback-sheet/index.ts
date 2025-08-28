@@ -10,15 +10,33 @@ const formatDate = (date)=>{
   const year = date.getFullYear().toString().slice(-2);
   return `${month}/${day}/${year}`;
 };
-// Google OAuth credentials (same as your existing function)
+// Convert column index → letter (1=A, 26=Z, 27=AA)
+function numberToColumnLetter(n) {
+  let s = "";
+  while(n > 0){
+    let m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - m) / 26);
+  }
+  return s;
+}
+// Normalize a row to a fixed length
+function normalizeRow(row, length) {
+  const r = [
+    ...row
+  ];
+  while(r.length < length)r.push('');
+  if (r.length > length) r.splice(length);
+  return r;
+}
+// Google OAuth credentials
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID");
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET");
 const GOOGLE_REFRESH_TOKEN = Deno.env.get("GOOGLE_REFRESH_TOKEN");
-// Hardcoded spreadsheet ID and sheet name (same as your existing function)
+// Spreadsheet config
 const SPREADSHEET_ID = "1nd1kxEj_Vwh7WIoGWcbZ1nm425irkQmvcLiuL9-4XDY";
 const SHEET_NAME = "MainSheet";
 serve(async (req)=>{
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: corsHeaders
@@ -68,13 +86,7 @@ serve(async (req)=>{
     }
     const tokenData = await tokenResponse.json();
     const accessToken = tokenData.access_token;
-    // Prepare the row data for Google Sheets
-    // Map to your exact sheet structure (24 columns A-X):
-    // A: Found in Carrier?, B: Updated in GHL?, C: Client Phone Number, D: Lead Vender, E: Date, F: INSURED NAME, 
-    // G: Buffer Agent, H: Agent, I: Licensed agent account, J: Status, K: Call Result, L: Carrier, 
-    // M: Product Type, N: Draft Date, O: MP, P: Face amount, Q: From Callback?, R: Notes, 
-    // S: Policy Number, T: Carrier Audit, U: ProductTypeCarrier, V: Level Or GI, W: LeadCode, X: SubmissionId
-    // Status mapping function
+    // Status mapping
     const mapStatusToSheetValue = (userSelectedStatus)=>{
       const statusMap = {
         "Needs callback": "Needs to be Fixed",
@@ -89,16 +101,16 @@ serve(async (req)=>{
       };
       return statusMap[userSelectedStatus] || userSelectedStatus;
     };
-    // Determine status based on call result data
-    let finalStatus = 'New Callback'; // Default for new callbacks
+    // Determine status
+    let finalStatus = 'New Callback';
     if (callResult) {
       if (callResult.application_submitted === true) {
-        finalStatus = 'Pending Approval'; // Will be "Underwriting" or "Submitted"
+        finalStatus = 'Pending Approval';
       } else if (callResult.application_submitted === false) {
-        // Map the user-selected status to the sheet value
         finalStatus = mapStatusToSheetValue(callResult.status || 'Not Submitted');
       }
     }
+    // New row
     const newRowData = [
       callResult?.carrier ? 'TRUE' : 'FALSE',
       'FALSE',
@@ -117,38 +129,15 @@ serve(async (req)=>{
       callResult?.monthly_premium != null ? callResult.monthly_premium : 'N/A',
       callResult?.face_amount != null ? callResult.face_amount : 'N/A',
       'TRUE',
-      [
-        leadData.additional_notes || '',
-        callResult?.notes || '',
-        leadData.email ? `Email: ${leadData.email}` : '',
-        leadData.street_address ? `Address: ${leadData.street_address}` : '',
-        leadData.city && leadData.state ? `${leadData.city}, ${leadData.state}` : '',
-        leadData.zip_code ? `ZIP: ${leadData.zip_code}` : '',
-        leadData.date_of_birth ? `DOB: ${leadData.date_of_birth}` : '',
-        leadData.age ? `Age: ${leadData.age}` : '',
-        leadData.social_security ? `SSN: ${leadData.social_security}` : '',
-        leadData.health_conditions ? `Health: ${leadData.health_conditions}` : ''
-      ].filter(Boolean).join(' | '),
+      callResult?.notes || '',
       '',
       '',
       '',
       '',
       '',
-      leadData.submission_id || '' // X: SubmissionId
+      leadData.submission_id || ''
     ];
-    // Debug: Log array length to ensure it's exactly 24 elements
-    console.log(`newRowData length: ${newRowData.length}`);
-    if (newRowData.length !== 24) {
-      console.warn(`Expected 24 columns but got ${newRowData.length}. This may cause column alignment issues.`);
-    }
-    // Ensure we have exactly 24 elements (trim or pad if necessary)
-    while(newRowData.length < 24){
-      newRowData.push('');
-    }
-    if (newRowData.length > 24) {
-      newRowData.splice(24);
-    }
-    // Step 2: Read current sheet data
+    // Step 2: Read current sheet
     const readResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`
@@ -162,14 +151,20 @@ serve(async (req)=>{
     const existingRows = readData.values || [];
     const headerRow = existingRows[0] || [];
     const dataRows = existingRows.slice(1) || [];
-    // Insert new row at the top of data (position 2, after header)
+    // Dynamic width
+    const totalColumns = headerRow.length;
+    const lastColLetter = numberToColumnLetter(totalColumns);
+    // Normalize rows
+    const fixedHeaderRow = normalizeRow(headerRow, totalColumns);
+    const fixedNewRow = normalizeRow(newRowData, totalColumns);
+    const fixedDataRows = dataRows.map((r)=>normalizeRow(r, totalColumns));
     const updatedData = [
-      headerRow,
-      newRowData,
-      ...dataRows
+      fixedHeaderRow,
+      fixedNewRow,
+      ...fixedDataRows
     ];
-    // Step 3: Update the entire sheet with new data (limit to columns A-X)
-    const updateResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A:X?valueInputOption=RAW`, {
+    // Step 3: Update
+    const updateResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A:${lastColLetter}?valueInputOption=RAW`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",

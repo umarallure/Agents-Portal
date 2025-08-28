@@ -6,7 +6,7 @@ import { ColoredProgress } from "@/components/ui/colored-progress";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eye, Clock, User, Filter, Search, RefreshCw, UserCheck } from "lucide-react";
+import { Eye, Clock, User, Filter, Search, RefreshCw, UserCheck, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -43,6 +43,12 @@ export const VerificationDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [activePage, setActivePage] = useState(1);
+  const [incompletePage, setIncompletePage] = useState(1);
+  const [completedPage, setCompletedPage] = useState(1);
+  const [incompleteCollapsed, setIncompleteCollapsed] = useState(false);
+  const [completedCollapsed, setCompletedCollapsed] = useState(false);
+  const [itemsPerPage] = useState(10);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -276,6 +282,21 @@ export const VerificationDashboard = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Categorize sessions
+  const categorizeSessions = () => {
+    const activeStatuses = ['in_progress', 'pending', 'ready_for_transfer', 'transferred'];
+    const incompleteStatuses = ['call_dropped'];
+    const completedStatuses = ['buffer_done', 'la_done', 'completed'];
+
+    return {
+      active: filteredSessions.filter(session => activeStatuses.includes(session.status)),
+      incomplete: filteredSessions.filter(session => incompleteStatuses.includes(session.status)),
+      completed: filteredSessions.filter(session => completedStatuses.includes(session.status))
+    };
+  };
+
+  const { active, incomplete, completed } = categorizeSessions();
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-gray-100 text-gray-800';
@@ -313,8 +334,240 @@ export const VerificationDashboard = () => {
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
   };
 
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+  };
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+  };
+
   const viewSession = (submissionId: string) => {
     navigate(`/call-result-update?submissionId=${submissionId}`);
+  };
+
+  // Reusable Session Table Component
+  const SessionTable = ({ 
+    sessions, 
+    title, 
+    emptyMessage, 
+    currentPage, 
+    onPageChange,
+    collapsible = false,
+    collapsed = false,
+    onToggleCollapse
+  }: { 
+    sessions: VerificationSession[], 
+    title: string, 
+    emptyMessage: string,
+    currentPage: number,
+    onPageChange: (page: number) => void,
+    collapsible?: boolean,
+    collapsed?: boolean,
+    onToggleCollapse?: () => void
+  }) => {
+    const paginatedSessions = sessions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const totalPages = Math.ceil(sessions.length / itemsPerPage);
+
+    const handlePageChange = (page: number) => {
+      onPageChange(page);
+    };
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {collapsible && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onToggleCollapse}
+                  className="p-1 h-6 w-6"
+                >
+                  {collapsed ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronUp className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+              <span>{title} ({sessions.length})</span>
+            </div>
+            {totalPages > 1 && !collapsed && (
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </div>
+            )}
+          </CardTitle>
+        </CardHeader>
+        {!collapsed && (
+          <CardContent>
+            {paginatedSessions.length > 0 ? (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Buffer Agent</TableHead>
+                      <TableHead>LA Agent</TableHead>
+                      <TableHead>Progress</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedSessions.map((session) => (
+                      <TableRow key={session.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{session.leads?.customer_full_name}</div>
+                            <div className="text-sm text-muted-foreground">{session.leads?.phone_number}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            <span>{session.buffer_agent_profile?.display_name || 'Unassigned'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            <span>{session.licensed_agent_profile?.display_name || 'Not Assigned'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className={`font-semibold ${getProgressTextColor(session.progress_percentage)}`}>
+                                {session.progress_percentage}%
+                              </span>
+                              <span className="text-muted-foreground">
+                                {session.verified_fields}/{session.total_fields}
+                              </span>
+                            </div>
+                            <ColoredProgress 
+                              value={session.progress_percentage} 
+                              className="h-3 transition-all duration-500"
+                            />
+                            <div className={`text-xs font-medium px-2 py-1 rounded-full text-center ${
+                              session.progress_percentage >= 76 ? 'bg-green-100 text-green-800' :
+                              session.progress_percentage >= 51 ? 'bg-yellow-100 text-yellow-800' :
+                              session.progress_percentage >= 26 ? 'bg-orange-100 text-orange-800' : 
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {getProgressLabel(session.progress_percentage)}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(session.status)}>
+                            {session.status === 'call_dropped' ? 'Call Dropped' : session.status.replace('_', ' ').toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4" />
+                            <span className="text-sm">{formatTimeAgo(session.started_at)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {session.status === 'call_dropped' && (
+                              <Button
+                                variant="outline"
+                                onClick={() => openClaimModal(session.id, session.submission_id)}
+                                className="text-red-600 border-red-600"
+                              >
+                                Claim Dropped Call
+                              </Button>
+                            )}
+                            {(session.status === 'transferred' && (!session.licensed_agent_id || session.licensed_agent_id === '')) && (
+                              <Button
+                                variant="outline"
+                                onClick={() => openClaimModal(session.id, session.submission_id, 'licensed')}
+                                className="text-purple-600 border-purple-600"
+                              >
+                                Claim as Licensed Agent
+                              </Button>
+                            )}
+                            {session.status === 'ready_for_transfer' && (
+                              <Button
+                                variant="outline"
+                                onClick={() => openClaimModal(session.id, session.submission_id, 'licensed')}
+                                className="text-purple-600 border-purple-600"
+                              >
+                                Claim as Licensed Agent
+                              </Button>
+                            )}
+                            {/* Show button for completed sessions */}
+                            {(session.status === 'buffer_done' || session.status === 'la_done' || session.status === 'completed') && (
+                              <Button
+                                variant="outline"
+                                onClick={() => viewSession(session.submission_id)}
+                                className="text-blue-600 border-blue-600"
+                              >
+                                Show Session
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, sessions.length)} of {sessions.length} entries
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handlePageChange(page)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                {emptyMessage}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+    );
   };
 
   if (loading) {
@@ -359,17 +612,31 @@ export const VerificationDashboard = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Verification Dashboard</h1>
-          <p className="text-muted-foreground">Monitor real-time verification progress (Auto-refreshes every 5 seconds)</p>
+          <p className="text-muted-foreground">Monitor verification sessions across different stages (Auto-refreshes every 5 seconds)</p>
         </div>
-        <Button 
-          onClick={handleManualRefresh}
-          variant="outline"
-          disabled={refreshing}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Refreshing...' : 'Refresh'}
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            <span className="text-sm">Active ({active.length})</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+            <span className="text-sm">Incomplete ({incomplete.length})</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+            <span className="text-sm">Completed ({completed.length})</span>
+          </div>
+          <Button 
+            onClick={handleManualRefresh}
+            variant="outline"
+            disabled={refreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -385,12 +652,12 @@ export const VerificationDashboard = () => {
                 <Input
                   placeholder="Search by customer name or submission ID..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-10"
                 />
               </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
               <SelectTrigger className="w-48">
                 <Filter className="mr-2 h-4 w-4" />
                 <SelectValue placeholder="Filter by status" />
@@ -409,123 +676,38 @@ export const VerificationDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Sessions Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Verification Sessions ({filteredSessions.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Customer</TableHead>
-                <TableHead>Buffer Agent</TableHead>
-                <TableHead>LA Agent</TableHead>
-                <TableHead>Progress</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredSessions.map((session) => (
-                <TableRow key={session.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{session.leads?.customer_full_name}</div>
-                      <div className="text-sm text-muted-foreground">{session.leads?.phone_number}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      <span>{session.buffer_agent_profile?.display_name || 'Unassigned'}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      <span>{session.licensed_agent_profile?.display_name || 'Not Assigned'}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className={`font-semibold ${getProgressTextColor(session.progress_percentage)}`}>
-                          {session.progress_percentage}%
-                        </span>
-                        <span className="text-muted-foreground">
-                          {session.verified_fields}/{session.total_fields}
-                        </span>
-                      </div>
-                      <ColoredProgress 
-                        value={session.progress_percentage} 
-                        className="h-3 transition-all duration-500"
-                      />
-                      <div className={`text-xs font-medium px-2 py-1 rounded-full text-center ${
-                        session.progress_percentage >= 76 ? 'bg-green-100 text-green-800' :
-                        session.progress_percentage >= 51 ? 'bg-yellow-100 text-yellow-800' :
-                        session.progress_percentage >= 26 ? 'bg-orange-100 text-orange-800' : 
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {getProgressLabel(session.progress_percentage)}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(session.status)}>
-                      {session.status === 'call_dropped' ? 'Call Dropped' : session.status.replace('_', ' ').toUpperCase()}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <span className="text-sm">{formatTimeAgo(session.started_at)}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {session.status === 'call_dropped' && (
-                        <Button
-                          variant="outline"
-                          onClick={() => openClaimModal(session.id, session.submission_id)}
-                          className="text-red-600 border-red-600"
-                        >
-                          Claim Dropped Call
-                        </Button>
-                      )}
-                      {(session.status === 'transferred' && (!session.licensed_agent_id || session.licensed_agent_id === '')) && (
-                        <Button
-                          variant="outline"
-                          onClick={() => openClaimModal(session.id, session.submission_id, 'licensed')}
-                          className="text-purple-600 border-purple-600"
-                        >
-                          Claim as Licensed Agent
-                        </Button>
-                      )}
-                      {session.status === 'ready_for_transfer' && (
-                        <Button
-                          variant="outline"
-                          onClick={() => openClaimModal(session.id, session.submission_id, 'licensed')}
-                          className="text-purple-600 border-purple-600"
-                        >
-                          Claim as Licensed Agent
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          
-          {filteredSessions.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              No verification sessions found
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Currently Active Sessions */}
+      <SessionTable
+        sessions={active}
+        title="Currently Active"
+        emptyMessage="No active verification sessions"
+        currentPage={activePage}
+        onPageChange={setActivePage}
+      />
+
+      {/* Incomplete/Dropped Calls */}
+      <SessionTable
+        sessions={incomplete}
+        title="Incomplete Calls/Dropped Calls"
+        emptyMessage="No incomplete or dropped calls"
+        currentPage={incompletePage}
+        onPageChange={setIncompletePage}
+        collapsible={true}
+        collapsed={incompleteCollapsed}
+        onToggleCollapse={() => setIncompleteCollapsed(!incompleteCollapsed)}
+      />
+
+      {/* Completed Calls */}
+      <SessionTable
+        sessions={completed}
+        title="Completed Calls"
+        emptyMessage="No completed verification sessions"
+        currentPage={completedPage}
+        onPageChange={setCompletedPage}
+        collapsible={true}
+        collapsed={completedCollapsed}
+        onToggleCollapse={() => setCompletedCollapsed(!completedCollapsed)}
+      />
     </div>
     </>
   );

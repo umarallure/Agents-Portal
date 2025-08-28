@@ -2,62 +2,50 @@ import { useState, useEffect } from "react";
 import { Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-// Custom field order for display
+// Custom field order for display - matches DetailedLeadInfoCard sequence
 const customFieldOrder = [
-  "lead_vendor", // Corebiz: William G Moore
+  "lead_vendor", // Lead Vendor: William G Moore
+  "customer_full_name", // Customer full name (combined with lead_vendor in display)
   "street_address",
   "beneficiary_information",
   "billing_and_mailing_address_is_the_same",
-  "date_of_birth",
-  "birth_state",
+  "date_of_birth", // Address: 8700 NE 16th St
   "age",
   "phone_number",
-  "call_phone_landline",
   "social_security",
   "driver_license",
-  "exp",
-  "existing_coverage",
-  "applied_to_life_insurance_last_two_years",
-  "height", // 5.2
-  "weight", // 160
-  "doctors_name", // Dr. Daniel Pham, MD
-  "tobacco_use", // NO
-  "health_conditions", // nil
-  "medications", // nil
-  "insurance_application_details", // Insurance Application Details (if exists)
-  "carrier", // AMAM
-  "monthly_premium", // $63.37
-  "coverage_amount", // $5,000
-  "draft_date", // 8th of aug
-  "first_draft", // First Draft (if exists)
-  "institution_name", // Bank of Oklahoma
+  "exp", // Exp
+  "existing_coverage", // Existing coverage
+  "applied_to_life_insurance_last_two_years", // Applied to life insurance last two years
+  "height", // Height: 5.2
+  "weight", // Weight: 160
+  "doctors_name", // Doctors Name: Dr. Daniel Pham, MD
+  "tobacco_use", // Tobacco Use: NO
+  "health_conditions", // Health Conditions
+  "medications", // Medications
+  "insurance_application_details", // Insurance Application Details
+  "carrier", // Carrier: AMAM
+  "monthly_premium", // Monthly Premium: $63.37
+  "coverage_amount", // Coverage Amount: $5,000
+  "draft_date", // Draft Date: 8th of aug
+  "first_draft", // First Draft
+  "institution_name", // Bank Name: Bank of Oklahoma
   "beneficiary_routing", // Routing Number: 103900036
   "beneficiary_account", // Account Number: 103900036
-  "account_type", // Checking
-
-   // Address: 8700 NE 16th St
+  "account_type",
   "city", // Oklahoma City
   "state", // OK
   "zip_code", // 73110
-   // Son Garland Moore ( 09 08 1985)
+   // Beneficiary Information
    // Billing and mailing address is the same: (Y/N)
-   // 1948-05-26
-   // NE
-   // 77
-   // (405) 423-4272
-   // Call phone/landline (if exists)
-   // 447489617
-   // Driver License Number: nil
-   // Exp: (if exists)
-   // nil
-   // nil
-  
-  
-  
-  
-  
-
-  
+   // Date of Birth: 1948-05-26
+  "birth_state", // Birth State: NE
+   // Age: 77
+   // Number: (405) 423-4272
+  "call_phone_landline", // Call phone/landline
+   // Social: 447489617
+   // Driver License Number
+   // Checking/savings account
   "additional_notes" // ADDITIONAL NOTES
 ];
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,18 +80,59 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
   };
   const { toast } = useToast();
 
-  // Copy notes logic
+  // Copy notes logic - matches DetailedLeadInfoCard format
   const copyNotesToClipboard = () => {
     if (!verificationItems) return;
-    const notesText = verificationItems.map(item => {
-      const label = formatFieldName(item.field_name);
-      const value = inputValues[item.id] || 'N/A';
-      return `${label}: ${value}`;
-    }).join('\n');
+
+    // Create a map of field values for easy lookup
+    const fieldValues: Record<string, string> = {};
+    verificationItems.forEach(item => {
+      fieldValues[item.field_name] = inputValues[item.id] || item.original_value || 'N/A';
+    });
+
+    // Format notes in the exact sequence from DetailedLeadInfoCard
+    const notesText = [
+      `lead_vendor:${fieldValues.lead_vendor || 'N/A'}`,
+      `customer_full_name:${fieldValues.customer_full_name || 'N/A'}`,
+      `Address: ${fieldValues.street_address || ''} ${fieldValues.city || ''}, ${fieldValues.state || ''} ${fieldValues.zip_code || ''}`,
+      `Beneficiary Information: ${fieldValues.beneficiary_information || 'N/A'}`,
+      `Billing and mailing address is the same: (Y/N)`,
+      `Date of Birth: ${fieldValues.date_of_birth || 'N/A'}`,
+      `Birth State: ${fieldValues.birth_state || 'N/A'}`,
+      `Age: ${fieldValues.age || 'N/A'}`,
+      `Number: ${fieldValues.phone_number || 'N/A'}`,
+      `Call phone/landline: ${fieldValues.call_phone_landline || ''}`,
+      `Social: ${fieldValues.social_security || 'N/A'}`,
+      `Driver License Number: ${fieldValues.driver_license || ''}`,
+      `Exp: ${fieldValues.exp || ''}`,
+      `Existing coverage: ${fieldValues.existing_coverage || 'N/A'}`,
+      `Applied to life insurance last two years: ${fieldValues.applied_to_life_insurance_last_two_years || 'N/A'}`,
+      `Height: ${fieldValues.height || 'N/A'}`,
+      `Weight: ${fieldValues.weight || 'N/A'}`,
+      `Doctors Name: ${fieldValues.doctors_name || 'N/A'}`,
+      `Tobacco Use: ${fieldValues.tobacco_use || 'N/A'}`,
+      `Health Conditions:`,
+      `${fieldValues.health_conditions || 'N/A'}`,
+      `Medications:`,
+      `${fieldValues.medications || 'N/A'}`,
+      `Insurance Application Details:`,
+      `Carrier: ${fieldValues.carrier || 'N/A'}`,
+      `Monthly Premium: $${fieldValues.monthly_premium || 'N/A'}`,
+      `Coverage Amount: $${fieldValues.coverage_amount || 'N/A'}`,
+      `Draft Date: ${fieldValues.draft_date || 'N/A'}`,
+      `First Draft: ${fieldValues.first_draft || 'N/A'}`,
+      `Bank Name: ${fieldValues.institution_name || 'N/A'}`,
+      `Routing Number: ${fieldValues.beneficiary_routing || 'N/A'}`,
+      `Account Number: ${fieldValues.beneficiary_account || 'N/A'}`,
+      `Checking/savings account: ${fieldValues.account_type || ''}`,
+      `ADDITIONAL NOTES:`,
+      `${fieldValues.additional_notes || 'N/A'}`
+    ].join('\n');
+
     navigator.clipboard.writeText(notesText);
     toast({
       title: "Copied!",
-      description: "Verification notes copied to clipboard",
+      description: "Lead information copied to clipboard in standard format",
     });
   };
   const [elapsedTime, setElapsedTime] = useState("00:00");
@@ -429,8 +458,8 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
                         type: 'transfer_to_la',
                         submissionId: session.submission_id,
                         leadData,
-                        bufferAgentName: session.buffer_agent_name || 'Buffer Agent',
-                        licensedAgentName: session.licensed_agent_name || 'Licensed Agent'
+                        bufferAgentName: 'Buffer Agent',
+                        licensedAgentName: 'Licensed Agent'
                       }
                     });
                     onTransferReady?.();

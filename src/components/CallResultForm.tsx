@@ -806,6 +806,18 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                   </div>
                 )}
               </div>
+
+              {/* Notes for Submitted Applications */}
+              <div>
+                <Label htmlFor="notesSubmitted">Notes</Label>
+                <Textarea
+                  id="notesSubmitted"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add any additional notes about the submitted application..."
+                  rows={3}
+                />
+              </div>
             </div>
             </>
           )}

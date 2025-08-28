@@ -43,12 +43,11 @@ serve(async (req)=>{
       "Cutting Edge": "#test-bpo",
       "Next Era": "#test-bpo",
       "Rock BPO": "#orbit-team-rock-bpo",
-      "Avenue Consultancy": "#orbit-team-avenue-consultancy"
+      "Avenue Consultancy": "#orbit-team-avenue-consultancy",
+      "Crown Connect BPO": "#orbit-team-crown-connect-bpo"
     };
-    
     const isSubmittedApplication = callResult && callResult.application_submitted === true;
     let slackMessage;
-    
     // Only send notifications for submitted applications
     if (isSubmittedApplication) {
       // Determine final status based on underwriting field
@@ -56,13 +55,11 @@ serve(async (req)=>{
       if (callResult.application_submitted === true) {
         finalStatus = callResult.sent_to_underwriting === true ? "Underwriting" : "Submitted";
       }
-      
       // Add status display text
       const statusDisplay = finalStatus === "Underwriting" ? "Sent to Underwriting" : finalStatus;
-      
       // Template for submitted applications
       slackMessage = {
-        channel: '#submission-portal', // Changed from #test-zaps to #general as it's more likely to exist
+        channel: '#submission-portal',
         blocks: [
           {
             type: 'header',
@@ -85,7 +82,9 @@ serve(async (req)=>{
       console.log('Skipping notification - only submitted applications trigger Slack messages');
     }
     // Only send Slack message if we have one (for submitted applications)
-    let slackResult: any = { ok: false };
+    let slackResult = {
+      ok: false
+    };
     if (slackMessage) {
       const slackResponse = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
@@ -96,15 +95,13 @@ serve(async (req)=>{
         body: JSON.stringify(slackMessage)
       });
       slackResult = await slackResponse.json();
-      
       console.log('Slack API Response:', JSON.stringify(slackResult, null, 2));
-      
       if (!slackResult.ok) {
         console.error(`Slack API error: ${slackResult.error}`);
         // If the main channel fails, try with a direct message instead
         if (slackResult.error === 'channel_not_found') {
           console.log('Channel not found, skipping main notification');
-          // Don't throw error, just log and continue
+        // Don't throw error, just log and continue
         } else {
           throw new Error(`Slack API error: ${slackResult.error}`);
         }
@@ -124,7 +121,6 @@ serve(async (req)=>{
       if (vendorChannel) {
         // Calculate status display for vendor message
         const sentToUnderwriting = callResult.sent_to_underwriting === true ? "Yes" : "No";
-        
         const vendorSlackMessage = {
           channel: vendorChannel,
           blocks: [
@@ -144,7 +140,6 @@ serve(async (req)=>{
             }
           ]
         };
-        
         try {
           const vendorSlackResponse = await fetch('https://slack.com/api/chat.postMessage', {
             method: 'POST',
@@ -155,9 +150,7 @@ serve(async (req)=>{
             body: JSON.stringify(vendorSlackMessage)
           });
           const vendorSlackResult = await vendorSlackResponse.json();
-          
           console.log(`Vendor Slack API Response for ${vendorChannel}:`, JSON.stringify(vendorSlackResult, null, 2));
-          
           if (vendorSlackResult.ok) {
             console.log(`Vendor notification sent to ${vendorChannel} successfully`);
           } else {

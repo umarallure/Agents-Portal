@@ -71,13 +71,13 @@ serve(async (req)=>{
       const statusMap = {
         "Needs callback": "Needs to be Fixed",
         "Call Never Sent": "Incomplete Transfer",
-        "Not Interested": "Returned to Center",
-        "DQ": "DQ",
-        "⁠DQ": "DQ",
-        "Future Submission Date": "Needs Carrier application",
-        "Call Back Fix": "NO STAGE CHANGE",
-        "Disconnected": "Incomplete transfer",
-        "Disconnected - Never Retransferred": "Incomplete transfer"
+        "Not Interested": "Returned To Center",
+        "DQ": "DQ'd Can't be sold",
+        "⁠DQ": "DQ'd Can't be sold",
+        "Future Submission Date": "Needs Carrier Application",
+        "Call Back Fix": "Call Back Fix",
+        "Disconnected": "Incomplete Transfer",
+        "Disconnected - Never Retransferred": "Incomplete Transfer"
       };
       return statusMap[userSelectedStatus] || userSelectedStatus;
     };
