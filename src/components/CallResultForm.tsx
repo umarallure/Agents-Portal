@@ -79,6 +79,7 @@ const agentOptions = [
 const licensedAccountOptions = [
   "Claudia",
   "Lydia",
+  "Isaac",
   "Juan",
   "Benjamin",
   "Erica",
