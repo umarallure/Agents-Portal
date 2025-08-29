@@ -106,6 +106,7 @@ const leadVendorOptions = [
 "Optimum BPO",
 "Ethos BPO",
 "Trust Link",
+"Crown Connect BPO",
 "Quotes BPO",
 "Zupax Marketing",
 "Argon Communications",
