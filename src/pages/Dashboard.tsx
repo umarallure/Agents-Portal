@@ -33,6 +33,8 @@ const Dashboard = () => {
   const [dateFilter, setDateFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [nameFilter, setNameFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -48,6 +50,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     applyFilters();
+    setCurrentPage(1); // Reset to first page when filters change
   }, [leads, dateFilter, statusFilter, nameFilter]);
 
   const fetchLeads = async () => {
@@ -147,6 +150,27 @@ const Dashboard = () => {
     await signOut();
     navigate('/auth');
   };
+
+  // Pagination functions
+  const getPaginatedLeads = () => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredLeads.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = () => {
+    return Math.ceil(filteredLeads.length / itemsPerPage);
+  };
+
+  const handlePageChange = (page: number) => {
+  const total = getTotalPages();
+  if (page < 1) page = 1;
+  if (page > total) page = total;
+  setCurrentPage(page);
+  };
+
+  const paginatedLeads = getPaginatedLeads();
+  const totalPages = getTotalPages();
 
   if (loading || isLoading) {
     return (
@@ -317,6 +341,11 @@ const Dashboard = () => {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Your Submissions ({filteredLeads.length})</h2>
+                {totalPages > 1 && (
+                  <div className="text-sm text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                  </div>
+                )}
               </div>
 
               {filteredLeads.length === 0 ? (
@@ -326,50 +355,124 @@ const Dashboard = () => {
                   </CardContent>
                 </Card>
               ) : (
-                filteredLeads.map((lead) => (
-                  <Card key={lead.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start">
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-3">
-                            <h3 className="text-lg font-semibold">{lead.customer_full_name}</h3>
-                            <Badge className={getStatusColor(getLeadStatus(lead))}>
-                              {getLeadStatus(lead)}
-                            </Badge>
+                <>
+                  {paginatedLeads.map((lead) => (
+                    <Card key={lead.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-6">
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-2">
+                            <div className="flex items-center space-x-3">
+                              <h3 className="text-lg font-semibold">{lead.customer_full_name}</h3>
+                              <Badge className={getStatusColor(getLeadStatus(lead))}>
+                                {getLeadStatus(lead)}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
+                              <div>
+                                <span className="font-medium">Phone:</span> {lead.phone_number || 'N/A'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Coverage:</span> ${lead.coverage_amount?.toLocaleString() || 'N/A'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Premium:</span> ${lead.monthly_premium?.toLocaleString() || 'N/A'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Date:</span>{' '}
+                                {lead.created_at ? format(new Date(lead.created_at), 'MMM dd, yyyy') : 'N/A'}
+                              </div>
+                            </div>
+                            {lead.call_results.length > 0 && lead.call_results[0].notes && (
+                              <div className="mt-2">
+                                <span className="font-medium text-sm">Notes:</span>{' '}
+                                <span className="text-sm text-muted-foreground">{lead.call_results[0].notes}</span>
+                              </div>
+                            )}
                           </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
-                            <div>
-                              <span className="font-medium">Phone:</span> {lead.phone_number || 'N/A'}
-                            </div>
-                            <div>
-                              <span className="font-medium">Coverage:</span> ${lead.coverage_amount?.toLocaleString() || 'N/A'}
-                            </div>
-                            <div>
-                              <span className="font-medium">Premium:</span> ${lead.monthly_premium?.toLocaleString() || 'N/A'}
-                            </div>
-                            <div>
-                              <span className="font-medium">Date:</span>{' '}
-                              {lead.created_at ? format(new Date(lead.created_at), 'MMM dd, yyyy') : 'N/A'}
-                            </div>
-                          </div>
-                          {lead.call_results.length > 0 && lead.call_results[0].notes && (
-                            <div className="mt-2">
-                              <span className="font-medium text-sm">Notes:</span>{' '}
-                              <span className="text-sm text-muted-foreground">{lead.call_results[0].notes}</span>
-                            </div>
-                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(`/call-result-update?submissionId=${lead.submission_id}`)}
+                          >
+                            {lead.call_results.length > 0 ? 'View/Edit' : 'Update Result'}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-6">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredLeads.length)} of {filteredLeads.length} entries
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        <div className="flex items-center gap-1">
+                          {/* Compact page list: show first, last, current +/- neighbors with ellipses */}
+                          {(() => {
+                            const maxButtons = 7; // total buttons to show including first/last
+                            const total = totalPages;
+                            const current = currentPage;
+                            const pages: Array<number | string> = [];
+
+                            if (total <= maxButtons) {
+                              for (let i = 1; i <= total; i++) pages.push(i);
+                            } else {
+                              const side = 1; // neighbors on each side of current
+                              const left = Math.max(2, current - side);
+                              const right = Math.min(total - 1, current + side);
+
+                              pages.push(1);
+                              if (left > 2) pages.push('left-ellipsis');
+
+                              for (let p = left; p <= right; p++) pages.push(p);
+
+                              if (right < total - 1) pages.push('right-ellipsis');
+                              pages.push(total);
+                            }
+
+                            return pages.map((p, idx) => {
+                              if (typeof p === 'string') {
+                                return (
+                                  <span key={p + idx} className="px-2 text-sm text-muted-foreground">…</span>
+                                );
+                              }
+
+                              return (
+                                <Button
+                                  key={p}
+                                  variant={current === p ? 'default' : 'outline'}
+                                  size="sm"
+                                  onClick={() => handlePageChange(Number(p))}
+                                  className="w-8 h-8 p-0"
+                                >
+                                  {p}
+                                </Button>
+                              );
+                            });
+                          })()}
                         </div>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate(`/call-result-update?submissionId=${lead.submission_id}`)}
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage === totalPages}
                         >
-                          {lead.call_results.length > 0 ? 'View/Edit' : 'Update Result'}
+                          Next
                         </Button>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </TabsContent>
