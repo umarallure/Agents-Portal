@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Filter, LogOut, Phone, User, DollarSign, CheckCircle, BarChart3 } from 'lucide-react';
+import { Calendar, Filter, LogOut, Phone, User, DollarSign, CheckCircle, BarChart3, Eye, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
@@ -18,9 +18,11 @@ import { VerificationDashboard } from '@/components/VerificationDashboard';
 
 type Lead = Database['public']['Tables']['leads']['Row'];
 type CallResult = Database['public']['Tables']['call_results']['Row'];
+type VerificationSession = Database['public']['Tables']['verification_sessions']['Row'];
 
 interface LeadWithCallResult extends Lead {
   call_results: CallResult[];
+  verification_sessions?: VerificationSession[];
 }
 
 const Dashboard = () => {
@@ -55,40 +57,53 @@ const Dashboard = () => {
 
   const fetchLeads = async () => {
     try {
-      // First, get all leads with their call results
-      const { data: allLeads, error: leadsError } = await supabase
+      // First, get all leads
+      const { data: leadsData, error: leadsError } = await supabase
         .from('leads')
-        .select(`
-          *,
-          call_results (*)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (leadsError) throw leadsError;
 
-      if (!allLeads) {
+      if (!leadsData) {
         setLeads([]);
         setIsLoading(false);
         return;
       }
 
-      // Filter leads to show:
-      // 1. Leads that have call results from the current user
-      // 2. Leads that don't have any call results yet (available for all users)
-      const userRelevantLeads = allLeads.filter(lead => {
-        const hasCallResults = lead.call_results && lead.call_results.length > 0;
-        
-        if (!hasCallResults) {
-          // Show leads without call results to all users
-          return true;
-        }
-        
-        // Show leads that have call results from the current user
-        return lead.call_results.some(result => result.agent_id === user?.id);
-      });
+      // Get call results for all leads
+      const submissionIds = leadsData.map(lead => lead.submission_id).filter(Boolean);
+      const { data: callResultsData, error: callResultsError } = await supabase
+        .from('call_results')
+        .select('*')
+        .in('submission_id', submissionIds)
+        .order('created_at', { ascending: false });
 
-      console.log('Filtered leads for user:', userRelevantLeads);
-      setLeads(userRelevantLeads || []);
+      if (callResultsError) {
+        console.error('Error fetching call results:', callResultsError);
+      }
+
+      // Get verification sessions for all leads
+      const { data: verificationData, error: verificationError } = await supabase
+        .from('verification_sessions')
+        .select('*')
+        .in('submission_id', submissionIds)
+        .order('created_at', { ascending: false });
+
+      if (verificationError) {
+        console.error('Error fetching verification sessions:', verificationError);
+      }
+
+      // Combine the data
+      const leadsWithData = leadsData.map(lead => ({
+        ...lead,
+        call_results: callResultsData?.filter(cr => cr.submission_id === lead.submission_id) || [],
+        verification_sessions: verificationData?.filter(vs => vs.submission_id === lead.submission_id) || []
+      }));
+
+      // Show all leads (no user-based filtering)
+      console.log('All leads with data:', leadsWithData);
+      setLeads(leadsWithData || []);
     } catch (error) {
       console.error('Error fetching leads:', error);
       toast({
@@ -112,12 +127,19 @@ const Dashboard = () => {
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter(lead => {
+        if (!lead.call_results || lead.call_results.length === 0) {
+          return statusFilter === 'no-result';
+        }
+        
+        const latestResult = lead.call_results[0];
+        const isSubmitted = Boolean(latestResult.application_submitted);
+        
         if (statusFilter === 'submitted') {
-          return lead.call_results.some(result => result.application_submitted);
+          return isSubmitted;
         } else if (statusFilter === 'not-submitted') {
-          return lead.call_results.some(result => !result.application_submitted);
+          return !isSubmitted;
         } else if (statusFilter === 'no-result') {
-          return lead.call_results.length === 0;
+          return false; // Already handled above
         }
         return true;
       });
@@ -133,16 +155,24 @@ const Dashboard = () => {
   };
 
   const getLeadStatus = (lead: LeadWithCallResult) => {
-    if (lead.call_results.length === 0) return 'No Result';
+    if (!lead.call_results || lead.call_results.length === 0) return 'No Result';
     const latestResult = lead.call_results[0];
-    return latestResult.application_submitted ? 'Submitted' : latestResult.status || 'Not Submitted';
+    
+    // Handle application_submitted being boolean or string
+    const isSubmitted = Boolean(latestResult.application_submitted);
+    
+    if (isSubmitted) {
+      return 'Submitted';
+    }
+    
+    return latestResult.status || 'Not Submitted';
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Submitted': return 'bg-success text-success-foreground';
       case 'No Result': return 'bg-muted text-muted-foreground';
-      default: return 'bg-warning text-warning-foreground';
+      default: return 'bg-red-500 text-white';
     }
   };
 
@@ -278,7 +308,11 @@ const Dashboard = () => {
                 <span className="text-sm text-muted-foreground">Submitted</span>
               </div>
               <p className="text-2xl font-bold">
-                {leads.filter(l => l.call_results.some(r => r.application_submitted)).length}
+                {leads.filter(l => {
+                  if (!l.call_results || l.call_results.length === 0) return false;
+                  const latestResult = l.call_results[0];
+                  return Boolean(latestResult.application_submitted);
+                }).length}
               </p>
             </CardContent>
           </Card>
@@ -360,13 +394,15 @@ const Dashboard = () => {
                     <Card key={lead.id} className="hover:shadow-md transition-shadow">
                       <CardContent className="p-6">
                         <div className="flex justify-between items-start">
-                          <div className="space-y-2">
+                          <div className="space-y-3 flex-1">
                             <div className="flex items-center space-x-3">
                               <h3 className="text-lg font-semibold">{lead.customer_full_name}</h3>
                               <Badge className={getStatusColor(getLeadStatus(lead))}>
                                 {getLeadStatus(lead)}
                               </Badge>
                             </div>
+                            
+                            {/* Basic Lead Info */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
                               <div>
                                 <span className="font-medium">Phone:</span> {lead.phone_number || 'N/A'}
@@ -382,20 +418,112 @@ const Dashboard = () => {
                                 {lead.created_at ? format(new Date(lead.created_at), 'MMM dd, yyyy') : 'N/A'}
                               </div>
                             </div>
-                            {lead.call_results.length > 0 && lead.call_results[0].notes && (
-                              <div className="mt-2">
-                                <span className="font-medium text-sm">Notes:</span>{' '}
-                                <span className="text-sm text-muted-foreground">{lead.call_results[0].notes}</span>
+
+                            {/* Call Result Details */}
+                            {lead.call_results.length > 0 && (
+                              <div className="border-t pt-3">
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-1 text-sm">
+                                  {lead.call_results[0].carrier && (
+                                    <div>
+                                      <span className="font-medium">Carrier:</span> {lead.call_results[0].carrier}
+                                    </div>
+                                  )}
+                                  {lead.call_results[0].product_type && (
+                                    <div>
+                                      <span className="font-medium">Product:</span> {lead.call_results[0].product_type}
+                                    </div>
+                                  )}
+                                  {lead.call_results[0].buffer_agent && (
+                                    <div>
+                                      <span className="font-medium">Buffer Agent:</span> {lead.call_results[0].buffer_agent}
+                                    </div>
+                                  )}
+                                  {lead.call_results[0].agent_who_took_call && (
+                                    <div>
+                                      <span className="font-medium">Agent:</span> {lead.call_results[0].agent_who_took_call}
+                                    </div>
+                                  )}
+                                  {lead.call_results[0].licensed_agent_account && (
+                                    <div>
+                                      <span className="font-medium">Licensed Agent:</span> {lead.call_results[0].licensed_agent_account}
+                                    </div>
+                                  )}
+                                  {lead.call_results[0].status && (
+                                    <div>
+                                      <span className="font-medium">Status:</span> {lead.call_results[0].status}
+                                    </div>
+                                  )}
+                                  {lead.call_results[0].submission_date && (
+                                    <div>
+                                      <span className="font-medium">Submitted:</span> {format(new Date(lead.call_results[0].submission_date), 'MMM dd, yyyy')}
+                                    </div>
+                                  )}
+                                  {lead.call_results[0].sent_to_underwriting !== null && (
+                                    <div>
+                                      <span className="font-medium">Underwriting:</span> {lead.call_results[0].sent_to_underwriting ? 'Yes' : 'No'}
+                                    </div>
+                                  )}
+                                </div>
+                                {lead.call_results[0].notes && (
+                                  <div className="mt-2">
+                                    <span className="font-medium text-sm">Notes:</span>{' '}
+                                    <span className="text-sm text-muted-foreground">{lead.call_results[0].notes}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Verification Session Info */}
+                            {lead.verification_sessions && lead.verification_sessions.length > 0 && (
+                              <div className="border-t pt-3">
+                                <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                                  <Clock className="h-4 w-4" />
+                                  Verification Session:
+                                </h4>
+                                <div className="flex items-center gap-4 text-sm">
+                                  <Badge 
+                                    className={`${
+                                      lead.verification_sessions[0].status === 'completed' ? 'bg-green-100 text-green-800' :
+                                      lead.verification_sessions[0].status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                      lead.verification_sessions[0].status === 'ready_for_transfer' ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}
+                                  >
+                                    {lead.verification_sessions[0].status.replace('_', ' ').toUpperCase()}
+                                  </Badge>
+                                  {lead.verification_sessions[0].progress_percentage !== null && (
+                                    <span className="text-muted-foreground">
+                                      {lead.verification_sessions[0].progress_percentage}% Complete
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/call-result-update?submissionId=${lead.submission_id}`)}
-                          >
-                            {lead.call_results.length > 0 ? 'View/Edit' : 'Update Result'}
-                          </Button>
+                          
+                          {/* Action Buttons */}
+                          <div className="flex flex-col gap-2 ml-4">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigate(`/call-result-update?submissionId=${lead.submission_id}`)}
+                            >
+                              {lead.call_results.length > 0 ? 'View/Edit' : 'Update Result'}
+                            </Button>
+                            
+                            {lead.verification_sessions && lead.verification_sessions.length > 0 && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => navigate(`/call-result-update?submissionId=${lead.submission_id}`)}
+                                className="flex items-center gap-2"
+                              >
+                                <Eye className="h-4 w-4" />
+                                View Session
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>

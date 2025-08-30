@@ -211,28 +211,54 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
   
   const { toast } = useToast();
 
-  // Reset status reason and notes when status changes or when switching application submission status
+  // Load existing call result data
   useEffect(() => {
-    if (!["⁠DQ", "Needs callback", "Not Interested", "Future Submission Date"].includes(status)) {
-      setStatusReason("");
-      // Only clear notes if they were auto-populated from status reasons
-      if (statusReason && statusReason !== "Other") {
-        setNotes("");
-      }
-    } else {
-      // Reset reason when status changes to ensure valid options
-      setStatusReason("");
-      setNotes("");
-    }
-  }, [status]);
+    const loadExistingCallResult = async () => {
+      if (!submissionId) return;
 
-  useEffect(() => {
-    if (applicationSubmitted !== false) {
-      setStatusReason("");
-      setStatus("");
-      setNotes("");
-    }
-  }, [applicationSubmitted]);
+      try {
+        const { data: existingResult, error } = await supabase
+          .from('call_results')
+          .select('*')
+          .eq('submission_id', submissionId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (existingResult && !error) {
+          console.log('Loading existing call result:', existingResult);
+          // Populate form with existing data
+          setApplicationSubmitted(Boolean(existingResult.application_submitted));
+          setStatus(existingResult.status || '');
+          setNotes(existingResult.notes || '');
+          setCarrier(existingResult.carrier || '');
+          setProductType(existingResult.product_type || '');
+          setDraftDate(existingResult.draft_date ? new Date(existingResult.draft_date) : undefined);
+          setSubmittingAgent(existingResult.submitting_agent || '');
+          setLicensedAgentAccount(existingResult.licensed_agent_account || '');
+          setCoverageAmount(existingResult.coverage_amount ? existingResult.coverage_amount.toString() : '');
+          setMonthlyPremium(existingResult.monthly_premium ? existingResult.monthly_premium.toString() : '');
+          setSubmissionDate(existingResult.submission_date ? new Date(existingResult.submission_date) : undefined);
+          setSentToUnderwriting(Boolean(existingResult.sent_to_underwriting));
+          setBufferAgent(existingResult.buffer_agent || '');
+          setAgentWhoTookCall(existingResult.agent_who_took_call || '');
+          setLeadVendor(existingResult.lead_vendor || '');
+          setCallSource(existingResult.call_source || '');
+          
+          // Set status reason if it exists
+          if (existingResult.dq_reason) {
+            setStatusReason(existingResult.dq_reason);
+          }
+        } else {
+          console.log('No existing call result found for submission:', submissionId);
+        }
+      } catch (error) {
+        console.log('No existing call result found (expected for new entries)');
+      }
+    };
+
+    loadExistingCallResult();
+  }, [submissionId]);
 
   const showCarrierApplicationFields = status === "Needs Carrier Application";
   const showSubmittedFields = applicationSubmitted === true;
@@ -283,20 +309,41 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
           submission_date: submissionDate ? format(submissionDate, "yyyy-MM-dd") : null,
         } : {}),
-        call_source: callSource
+        call_source: callSource,
+        lead_vendor: leadVendor
       };
 
       const { data: { user } } = await supabase.auth.getUser();
       
-      const { error } = await supabase
-        .from("call_results")
-        .insert({
-          ...callResultData,
-          agent_id: user?.id
-        });
+      // Check if we already have a call result for this submission
+      const { data: existingResult } = await supabase
+        .from('call_results')
+        .select('id')
+        .eq('submission_id', submissionId)
+        .single();
 
-      if (error) {
-        console.error("Error saving call result:", error);
+      let result;
+      if (existingResult) {
+        // Update existing record
+        result = await supabase
+          .from("call_results")
+          .update({
+            ...callResultData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('submission_id', submissionId);
+      } else {
+        // Insert new record
+        result = await supabase
+          .from("call_results")
+          .insert({
+            ...callResultData,
+            agent_id: user?.id
+          });
+      }
+
+      if (result.error) {
+        console.error("Error saving call result:", result.error);
         toast({
           title: "Error",
           description: "Failed to save call result",
@@ -529,31 +576,33 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
 
       toast({
         title: "Success",
-        description: "Call result saved successfully",
+        description: existingResult ? "Call result updated successfully" : "Call result saved successfully",
       });
 
       // Call onSuccess callback to navigate to journey page
       if (onSuccess) {
         onSuccess();
       } else {
-        // Reset form if no callback provided
-        setApplicationSubmitted(null);
-        setStatus("");
-        setStatusReason("");
-        setNotes("");
-        setCarrier("");
-        setProductType("");
-        setDraftDate(undefined);
-        setSubmittingAgent("");
-        setLicensedAgentAccount("");
-        setCoverageAmount("");
-        setMonthlyPremium("");
-        setSubmissionDate(undefined);
-        setSentToUnderwriting(null);
-        setBufferAgent("");
-        setAgentWhoTookCall("");
-        setLeadVendor("");
-        setCallSource("");
+        // Reset form if no callback provided (only for new entries)
+        if (!existingResult) {
+          setApplicationSubmitted(null);
+          setStatus("");
+          setStatusReason("");
+          setNotes("");
+          setCarrier("");
+          setProductType("");
+          setDraftDate(undefined);
+          setSubmittingAgent("");
+          setLicensedAgentAccount("");
+          setCoverageAmount("");
+          setMonthlyPremium("");
+          setSubmissionDate(undefined);
+          setSentToUnderwriting(null);
+          setBufferAgent("");
+          setAgentWhoTookCall("");
+          setLeadVendor("");
+          setCallSource("");
+        }
       }
 
     } catch (error) {
