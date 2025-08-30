@@ -252,8 +252,42 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         } else {
           console.log('No existing call result found for submission:', submissionId);
         }
+
+        // Always try to fetch lead_vendor from leads table if not already set
+        if (!existingResult?.lead_vendor) {
+          try {
+            const { data: leadData, error: leadError } = await supabase
+              .from('leads')
+              .select('lead_vendor')
+              .eq('submission_id', submissionId)
+              .single();
+
+            if (leadData && !leadError && leadData.lead_vendor) {
+              console.log('Loading lead_vendor from leads table:', leadData.lead_vendor);
+              setLeadVendor(leadData.lead_vendor);
+            }
+          } catch (leadError) {
+            console.log('Could not fetch lead_vendor from leads table:', leadError);
+          }
+        }
       } catch (error) {
         console.log('No existing call result found (expected for new entries)');
+        
+        // Try to fetch lead_vendor from leads table for new entries
+        try {
+          const { data: leadData, error: leadError } = await supabase
+            .from('leads')
+            .select('lead_vendor')
+            .eq('submission_id', submissionId)
+            .single();
+
+          if (leadData && !leadError && leadData.lead_vendor) {
+            console.log('Loading lead_vendor from leads table for new entry:', leadData.lead_vendor);
+            setLeadVendor(leadData.lead_vendor);
+          }
+        } catch (leadError) {
+          console.log('Could not fetch lead_vendor from leads table for new entry:', leadError);
+        }
       }
     };
 
