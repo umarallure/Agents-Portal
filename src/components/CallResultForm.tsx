@@ -37,6 +37,7 @@ const carrierOptions = [
   "Transamerica",
   "RNA",
   "ANAM",
+  "GTL",
   "Aetna",
   "Americo",
   "CICA",
@@ -64,8 +65,7 @@ const bufferAgentOptions = [
   "Justine",
   "Isaac",
   "Landon",
-  "Juan",
-  "N/A"
+  "Juan"
 ];
 
 const agentOptions = [
@@ -242,7 +242,6 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           setSentToUnderwriting(Boolean(existingResult.sent_to_underwriting));
           setBufferAgent(existingResult.buffer_agent || '');
           setAgentWhoTookCall(existingResult.agent_who_took_call || '');
-          setLeadVendor(existingResult.lead_vendor || '');
           setCallSource(existingResult.call_source || '');
           
           // Set status reason if it exists
@@ -253,22 +252,20 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           console.log('No existing call result found for submission:', submissionId);
         }
 
-        // Always try to fetch lead_vendor from leads table if not already set
-        if (!existingResult?.lead_vendor) {
-          try {
-            const { data: leadData, error: leadError } = await supabase
-              .from('leads')
-              .select('lead_vendor')
-              .eq('submission_id', submissionId)
-              .single();
+        // Always try to fetch lead_vendor from leads table
+        try {
+          const { data: leadData, error: leadError } = await supabase
+            .from('leads')
+            .select('lead_vendor')
+            .eq('submission_id', submissionId)
+            .single();
 
-            if (leadData && !leadError && leadData.lead_vendor) {
-              console.log('Loading lead_vendor from leads table:', leadData.lead_vendor);
-              setLeadVendor(leadData.lead_vendor);
-            }
-          } catch (leadError) {
-            console.log('Could not fetch lead_vendor from leads table:', leadError);
+          if (leadData && !leadError && leadData.lead_vendor) {
+            console.log('Loading lead_vendor from leads table:', leadData.lead_vendor);
+            setLeadVendor(leadData.lead_vendor);
           }
+        } catch (leadError) {
+          console.log('Could not fetch lead_vendor from leads table:', leadError);
         }
       } catch (error) {
         console.log('No existing call result found (expected for new entries)');
@@ -343,8 +340,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
           submission_date: submissionDate ? format(submissionDate, "yyyy-MM-dd") : null,
         } : {}),
-        call_source: callSource,
-        lead_vendor: leadVendor
+        call_source: callSource
       };
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -354,7 +350,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         .from('call_results')
         .select('id')
         .eq('submission_id', submissionId)
-        .single();
+        .maybeSingle();
 
       let result;
       if (existingResult) {
