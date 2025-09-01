@@ -73,7 +73,8 @@ const agentOptions = [
   "Lydia",
   "Benjamin",
   "Erica",
-  "N/A"
+  "N/A",
+  "Isaac"
 ];
 
 const licensedAccountOptions = [
