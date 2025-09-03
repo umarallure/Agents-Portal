@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { CalendarIcon, CheckCircle, XCircle } from "lucide-react";
+import { CalendarIcon, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -467,32 +467,40 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
               console.error("Error updating Google Sheets:", sheetsError);
             }
           } else if (callSource === "Reconnected Transfer" || callSource === "Agent Callback") {
+            // Prepare lead data with all necessary fields
+            const callbackLeadData = {
+              ...leadData,
+              submission_date: todayDate,
+              lead_vendor: leadData.lead_vendor || leadVendor || 'N/A'
+            };
+
+            // Prepare call result data
+            const callbackCallResult = {
+              application_submitted: applicationSubmitted,
+              status: finalStatus,
+              buffer_agent: bufferAgent || '',
+              agent_who_took_call: agentWhoTookCall || '',
+              licensed_agent_account: licensedAgentAccount || '',
+              carrier: carrier || '',
+              product_type: productType || '',
+              draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
+              monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
+              face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
+              notes: notes || '',
+              dq_reason: showStatusReasonDropdown ? statusReason : null,
+              sent_to_underwriting: sentToUnderwriting,
+              from_callback: callSource === "Agent Callback" ? "TRUE" : "FALSE",
+              call_source: callSource
+            };
+
             // Create new entry in daily deal flow with today's date
             const { error: sheetsError } = await supabase.functions.invoke('create-new-callback-sheet', {
               body: {
-                leadData: {
-                  ...leadData,
-                  submission_date: todayDate
-                },
-                callResult: {
-                  application_submitted: applicationSubmitted,
-                  status: finalStatus,
-                  buffer_agent: bufferAgent,
-                  agent_who_took_call: agentWhoTookCall,
-                  licensed_agent_account: licensedAgentAccount,
-                  carrier: carrier,
-                  product_type: productType,
-                  draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
-                  monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-                  face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
-                  notes: notes,
-                  dq_reason: showStatusReasonDropdown ? statusReason : null,
-                  sent_to_underwriting: sentToUnderwriting,
-                  from_callback: callSource === "Agent Callback" ? "TRUE" : "FALSE",
-                  call_source: callSource
-                }
+                leadData: callbackLeadData,
+                callResult: callbackCallResult
               }
             });
+            
             if (sheetsError) {
               console.error("Error creating new Google Sheets entry:", sheetsError);
             }
@@ -649,11 +657,22 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Update Call Result</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <>
+      {/* Full Screen Loading Overlay */}
+      {isSubmitting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg flex items-center gap-3">
+            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+            <span className="text-lg font-medium">Saving call result...</span>
+          </div>
+        </div>
+      )}
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Update Call Result</CardTitle>
+        </CardHeader>
+        <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Primary Question */}
           <div className="space-y-3">
@@ -682,12 +701,14 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
             </div>
           </div>
 
-          {/* Call Source Dropdown */}
+          {/* Call Source Dropdown - REQUIRED */}
           <div>
-            <Label htmlFor="callSource">Call Source</Label>
-            <Select value={callSource} onValueChange={setCallSource}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select call source" />
+            <Label htmlFor="callSource" className="text-base font-semibold">
+              Call Source <span className="text-red-500">*</span>
+            </Label>
+            <Select value={callSource || undefined} onValueChange={setCallSource} required>
+              <SelectTrigger className={`${!callSource ? 'border-red-300 focus:border-red-500' : ''}`}>
+                <SelectValue placeholder="Select call source (required)" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="First Time Transfer">First Time Transfer</SelectItem>
@@ -695,6 +716,9 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 <SelectItem value="Agent Callback">Agent Callback</SelectItem>
               </SelectContent>
             </Select>
+            {!callSource && (
+              <p className="text-sm text-red-500 mt-1">Call source is required</p>
+            )}
           </div>
           {/* Fields for submitted applications */}
           {showSubmittedFields && (
@@ -1094,14 +1118,22 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           <div className="flex justify-end">
             <Button 
               type="submit" 
-              disabled={applicationSubmitted === null || isSubmitting}
+              disabled={applicationSubmitted === null || !callSource || isSubmitting}
               className="min-w-32"
             >
-              {isSubmitting ? "Saving..." : "Save Call Result"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Call Result"
+              )}
             </Button>
           </div>
         </form>
       </CardContent>
     </Card>
+    </>
   );
 };
