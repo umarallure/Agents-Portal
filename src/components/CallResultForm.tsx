@@ -71,6 +71,7 @@ const bufferAgentOptions = [
 const agentOptions = [
   "Claudia",
   "Lydia",
+  "Juan",
   "Benjamin",
   "Erica",
   "N/A",
