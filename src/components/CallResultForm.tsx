@@ -86,7 +86,6 @@ const licensedAccountOptions = [
   "Claudia",
   "Lydia",
   "Isaac",
-  "Juan",
   "Benjamin",
   "Noah",
   "Erica",
