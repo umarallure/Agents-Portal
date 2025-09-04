@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Filter, LogOut, Phone, User, DollarSign, CheckCircle, BarChart3, Eye, Clock } from 'lucide-react';
+import { Calendar, Filter, LogOut, Phone, User, DollarSign, CheckCircle, BarChart3, Eye, Clock, Grid3X3 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
@@ -37,6 +37,7 @@ const Dashboard = () => {
   const [nameFilter, setNameFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const isBen = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79';
 
   useEffect(() => {
     if (!loading && !user) {
@@ -226,14 +227,26 @@ const Dashboard = () => {
             </Badge>
           </div>
           <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
-              onClick={() => navigate('/analytics')}
-              className="flex items-center gap-2"
-            >
-              <BarChart3 className="h-4 w-4" />
-              Analytics Dashboard
-            </Button>
+            {isBen && (
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/daily-deal-flow')}
+                className="flex items-center gap-2"
+              >
+                <Grid3X3 className="h-4 w-4" />
+                Daily Deal Flow
+              </Button>
+            )}
+            {isBen && (
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/analytics')}
+                className="flex items-center gap-2"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Analytics Dashboard
+              </Button>
+            )}
             <Button variant="outline" onClick={handleSignOut}>
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out

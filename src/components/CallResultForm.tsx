@@ -384,6 +384,45 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         return;
       }
 
+      // Sync daily_deal_flow on form submit
+      try {
+        const { data: leadData } = await supabase
+          .from("leads")
+          .select("*")
+          .eq("submission_id", submissionId)
+          .single();
+        if (leadData) {
+          const dealFlowData = {
+            submission_id: submissionId,
+            client_phone_number: leadData.phone_number,
+            lead_vendor: leadData.lead_vendor || leadVendor || "N/A",
+            date: new Date().toISOString().split('T')[0],
+            insured_name: leadData.customer_full_name,
+            buffer_agent: bufferAgent,
+            agent: agentWhoTookCall,
+            licensed_agent_account: licensedAgentAccount,
+            status: finalStatus,
+            call_result: applicationSubmitted === true
+              ? (sentToUnderwriting === true ? "Underwriting" : "Submitted")
+              : "Not Submitted",
+            carrier: carrier || null,
+            product_type: productType || null,
+            draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
+            monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
+            face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
+            from_callback: callSource === "Agent Callback",
+            notes: notes,
+            updated_at: new Date().toISOString()
+          };
+          const { error: dealFlowError } = await supabase
+            .from('daily_deal_flow')
+            .upsert(dealFlowData, { onConflict: 'submission_id' });
+          if (dealFlowError) console.error('Error syncing daily_deal_flow:', dealFlowError);
+        }
+      } catch (syncError) {
+        console.error('Sync to daily_deal_flow failed:', syncError);
+      }
+      
       // Update verification session status to completed if one exists
       try {
         const { error: sessionUpdateError } = await supabase

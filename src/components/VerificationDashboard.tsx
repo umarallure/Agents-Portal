@@ -127,7 +127,6 @@ export const VerificationDashboard = () => {
       setLoading(false);
       if (isManualRefresh) {
         setRefreshing(false);
-          const [fetchingAgents, setFetchingAgents] = useState(false);
       }
     }
   };
@@ -255,7 +254,7 @@ export const VerificationDashboard = () => {
         title: "Call Reconnected",
         description: `${claimAgentType === 'buffer'
           ? bufferAgents.find(a => a.user_id === agentId)?.display_name
-          : licensedAgents.find(a => a.user_id === agentId)?.display_name} is reconnected with ${claimLead?.customer_full_name}`,
+          : licensedAgents.find(a => a.user_id === agentId)?.display_name} get connected with ${claimLead?.customer_full_name}`,
       });
 
       setClaimModalOpen(false);

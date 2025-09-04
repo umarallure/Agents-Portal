@@ -14,14 +14,14 @@ serve(async (req)=>{
     // Log incoming request for debugging
     const rawBody = await req.text();
     console.log('[DEBUG] Incoming request body:', rawBody);
-    const { type, submissionId, leadData, bufferAgentName, licensedAgentName } = JSON.parse(rawBody);
+  const { type, submissionId, leadData, bufferAgentName, licensedAgentName, agentName } = JSON.parse(rawBody);
     if (!SLACK_BOT_TOKEN) {
       console.error('[ERROR] SLACK_BOT_TOKEN not configured');
       throw new Error('SLACK_BOT_TOKEN not configured');
     }
     // Center mapping for different lead vendors
     const leadVendorCenterMapping = {
-      "Ark Tech": "#test-bpo",
+      "Ark Tech": "#orbit-team-ark-tech",
       "GrowthOnics BPO": "#orbit-team-growthonics-bpo",
       "Maverick": "#orbit-team-maverick-comm",
       "Omnitalk BPO": "#orbit-team-omnitalk-bpo",
@@ -47,7 +47,8 @@ serve(async (req)=>{
       "Cutting Edge": "#test-bpo",
       "Next Era": "#test-bpo",
       "Rock BPO": "#orbit-team-rock-bpo",
-      "Avenue Consultancy": "#test-bpo"
+      "Avenue Consultancy": "#test-bpo",
+      "Crown Connect BPO": "#orbit-team-crown-connect-bpo"
     };
     const leadVendor = leadData?.lead_vendor;
     if (!leadVendor) {
@@ -90,17 +91,18 @@ serve(async (req)=>{
         bufferAgentName,
         licensedAgentName
       });
-      if (bufferAgentName && leadData?.customer_full_name) {
-        slackText = `:white_check_mark: *${bufferAgentName}* is connected to *${leadData.customer_full_name}*`;
-      } else if (licensedAgentName && leadData?.customer_full_name) {
-        slackText = `:white_check_mark: *${licensedAgentName}* is connected to *${leadData.customer_full_name}*`;
+      // Prefer explicit agentName if provided, otherwise fall back to specific roles
+      const startedAgent = agentName || bufferAgentName || licensedAgentName;
+      if (startedAgent && leadData?.customer_full_name) {
+        slackText = `:white_check_mark: *${startedAgent}* is connected to *${leadData.customer_full_name}*`;
       } else {
         slackText = `:white_check_mark: Agent is connected to *${leadData?.customer_full_name || 'Unknown Customer'}*`;
       }
     } else if (type === 'reconnected') {
       // Notification for agent claim and reconnect after dropped call
-      const agentName = bufferAgentName || licensedAgentName || 'Agent';
-      slackText = `:green_circle: *${agentName}* is reconnected with *${leadData?.customer_full_name || 'Unknown Customer'}*`;
+      const effectiveAgentName = agentName || bufferAgentName || licensedAgentName || 'Agent';
+      // Copy requested phrasing: "Agent name get connected with <Customer>"
+      slackText = `*${effectiveAgentName}* get connected with *${leadData?.customer_full_name || 'Unknown Customer'}*`;
     } else {
       slackText = 'Notification.';
     }

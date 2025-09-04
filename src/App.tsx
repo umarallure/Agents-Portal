@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import CallResultUpdate from "./pages/CallResultUpdate";
 import CallResultJourney from "./pages/CallResultJourney";
 import NewCallback from "./pages/NewCallback";
+import DailyDealFlowPage from "./pages/DailyDealFlow/DailyDealFlowPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -63,6 +64,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AgentActivityDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/daily-deal-flow" 
+              element={
+                <ProtectedRoute>
+                  <DailyDealFlowPage />
                 </ProtectedRoute>
               } 
             />
