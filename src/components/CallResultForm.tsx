@@ -65,7 +65,9 @@ const bufferAgentOptions = [
   "Justine",
   "Isaac",
   "Landon",
-  "Juan"
+  "Juan",
+  "Precy Lou",
+  "Laiza Batain"
 ];
 
 const agentOptions = [
@@ -75,7 +77,9 @@ const agentOptions = [
   "Benjamin",
   "Erica",
   "N/A",
-  "Isaac"
+  "Isaac",
+  "Precy Lou",
+  "Laiza Batain"
 ];
 
 const licensedAccountOptions = [
@@ -84,6 +88,7 @@ const licensedAccountOptions = [
   "Isaac",
   "Juan",
   "Benjamin",
+  "Noah",
   "Erica",
   "N/A"
 ];
