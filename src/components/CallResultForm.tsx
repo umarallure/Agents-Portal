@@ -1050,10 +1050,12 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 </div>
 
                 <div>
-                  <Label htmlFor="agentWhoTookCallNotSubmitted">Agent who took the call</Label>
-                  <Select value={agentWhoTookCall} onValueChange={setAgentWhoTookCall}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select agent" />
+                  <Label htmlFor="agentWhoTookCallNotSubmitted">
+                    Agent who took the call <span className="text-red-500">*</span>
+                  </Label>
+                  <Select value={agentWhoTookCall} onValueChange={setAgentWhoTookCall} required>
+                    <SelectTrigger className={`${!agentWhoTookCall ? 'border-red-300 focus:border-red-500' : ''}`}>
+                      <SelectValue placeholder="Select agent (required)" />
                     </SelectTrigger>
                     <SelectContent>
                       {agentOptions.map((agent) => (
@@ -1063,14 +1065,19 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                       ))}
                     </SelectContent>
                   </Select>
+                  {!agentWhoTookCall && (
+                    <p className="text-sm text-red-500 mt-1">Agent who took the call is required</p>
+                  )}
                 </div>
               </div>
               
               <div>
-                <Label htmlFor="status">Status/Stage</Label>
-                <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
+                <Label htmlFor="status">
+                  Status/Stage <span className="text-red-500">*</span>
+                </Label>
+                <Select value={status} onValueChange={setStatus} required>
+                  <SelectTrigger className={`${!status ? 'border-red-300 focus:border-red-500' : ''}`}>
+                    <SelectValue placeholder="Select status (required)" />
                   </SelectTrigger>
                   <SelectContent>
                     {statusOptions.map((option) => (
@@ -1080,6 +1087,9 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                     ))}
                   </SelectContent>
                 </Select>
+                {!status && (
+                  <p className="text-sm text-red-500 mt-1">Status/Stage is required</p>
+                )}
               </div>
 
               {/* Status Reason dropdown - shows for DQ, Needs Callback, Not Interested, Future Submission Date, Updated Banking/draft date, Fulfilled carrier requirements */}
@@ -1139,7 +1149,9 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
               )}
 
               <div>
-                <Label htmlFor="notes">Notes</Label>
+                <Label htmlFor="notes">
+                  Notes <span className="text-red-500">*</span>
+                </Label>
                 <Textarea
                   id="notes"
                   value={notes}
@@ -1148,9 +1160,11 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                     ? "Note has been auto-populated. You can edit if needed." 
                     : showStatusReasonDropdown && statusReason === "Other"
                     ? "Please enter a custom message."
-                    : "Why was the application not submitted?"
+                    : "Why the call got dropped or application not get submitted? Please provide the reason (required)"
                   }
+                  className={`${!notes.trim() ? 'border-red-300 focus:border-red-500' : ''}`}
                   rows={3}
+                  required
                 />
                 {showStatusReasonDropdown && statusReason && statusReason !== "Other" && (
                   <p className="text-sm text-muted-foreground mt-1">
@@ -1161,6 +1175,9 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                   <p className="text-sm text-muted-foreground mt-1">
                     Please enter a custom message for this reason.
                   </p>
+                )}
+                {!notes.trim() && (
+                  <p className="text-sm text-red-500 mt-1">Notes are required</p>
                 )}
               </div>
 
@@ -1245,10 +1262,27 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
             </div>
           )}
 
+          {/* Validation message for not submitted applications */}
+          {applicationSubmitted === false && (!agentWhoTookCall || !status || !notes.trim()) && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-600">
+                Please complete all required fields:
+                {!agentWhoTookCall && " Agent who took the call"}
+                {!status && " Status/Stage"}
+                {!notes.trim() && " Notes"}
+              </p>
+            </div>
+          )}
+
           <div className="flex justify-end">
             <Button 
               type="submit" 
-              disabled={applicationSubmitted === null || !callSource || isSubmitting}
+              disabled={
+                applicationSubmitted === null || 
+                !callSource || 
+                isSubmitting || 
+                (applicationSubmitted === false && (!agentWhoTookCall || !status || !notes.trim()))
+              }
               className="min-w-32"
             >
               {isSubmitting ? (
