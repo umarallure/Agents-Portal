@@ -91,12 +91,12 @@ serve(async (req) => {
     // Status mapping
     const mapStatusToSheetValue = (userSelectedStatus) => {
       const statusMap = {
-        "Needs callback": "Needs to be Fixed",
+        "Needs callback": "Needs BPO Callback",
         "Call Never Sent": "Incomplete Transfer",
-        "Not Interested": "Returned to Center",
+        "Not Interested": "Returned To Center - DQ",
         "DQ": "DQ'd Can't be sold",
         "⁠DQ": "DQ'd Can't be sold",
-        "Future Submission Date": "Needs Carrier application",
+        "Future Submission Date": "Application Withdrawn",
         "Call Back Fix": "NO STAGE CHANGE",
         "Disconnected": "Incomplete Transfer",
         "Disconnected - Never Retransferred": "Incomplete Transfer"

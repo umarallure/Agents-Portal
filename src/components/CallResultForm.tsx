@@ -24,6 +24,8 @@ const statusOptions = [
   "Not Interested",
   "⁠DQ",
   "Future Submission Date",
+  "Updated Banking/draft date",
+  "Fulfilled carrier requirements",
   "Call Back Fix",
   "Call Never Sent",
   "Disconnected"
@@ -150,6 +152,15 @@ const futureSubmissionReasonOptions = [
   "Other"
 ];
 
+const updatedBankingDraftReasonOptions = [
+  "Updated Banking and draft date",
+  "Updated draft w/ same banking information"
+];
+
+const fulfilledCarrierReasonOptions = [
+  "Fulfilled carrier requirements"
+];
+
 const getReasonOptions = (status: string) => {
   switch (status) {
     case "⁠DQ":
@@ -160,12 +171,16 @@ const getReasonOptions = (status: string) => {
       return notInterestedReasonOptions;
     case "Future Submission Date":
       return futureSubmissionReasonOptions;
+    case "Updated Banking/draft date":
+      return updatedBankingDraftReasonOptions;
+    case "Fulfilled carrier requirements":
+      return fulfilledCarrierReasonOptions;
     default:
       return [];
   }
 };
 
-const getNoteText = (status: string, reason: string, clientName: string = "[Client Name]") => {
+const getNoteText = (status: string, reason: string, clientName: string = "[Client Name]", newDraftDate?: Date) => {
   const statusReasonMapping: { [status: string]: { [reason: string]: string } } = {
     "⁠DQ": {
       "Multiple Chargebacks": `${clientName} has been DQ'd. They have caused multiple chargebacks in our agency, so we cannot submit another application for them`,
@@ -189,6 +204,10 @@ const getNoteText = (status: string, reason: string, clientName: string = "[Clie
       "Future Submission Date - Draft Date Too Far Away": `The application for ${clientName} has been filled out and signed, but we cannot submit until [Submission date] because the draft date is too far out`,
       "Future Submission Date - Birthday is before draft date": `${clientName}'s birthday is before their initial draft, so we need to call them on [the day after client DOB] to requote and submit application`,
       "Other": "Custom message if none of the above fit"
+    },
+    "Updated Banking/draft date": {
+      "Updated Banking and draft date": newDraftDate ? `New Draft date ${newDraftDate.toLocaleDateString()}` : "New Draft date [Please select a date]",
+      "Updated draft w/ same banking information": newDraftDate ? `New Draft date ${newDraftDate.toLocaleDateString()}` : "New Draft date [Please select a date]"
     }
   };
   
@@ -214,6 +233,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
   const [leadVendor, setLeadVendor] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [callSource, setCallSource] = useState("");
+  const [newDraftDate, setNewDraftDate] = useState<Date>();
   
   const { toast } = useToast();
 
@@ -253,6 +273,11 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           // Set status reason if it exists
           if (existingResult.dq_reason) {
             setStatusReason(existingResult.dq_reason);
+          }
+          
+          // Set new draft date if it exists
+          if (existingResult['new_draft_date']) {
+            setNewDraftDate(new Date(existingResult['new_draft_date']));
           }
         } else {
           console.log('No existing call result found for submission:', submissionId);
@@ -297,10 +322,21 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
     loadExistingCallResult();
   }, [submissionId]);
 
+  // Reset related fields when status changes
+  useEffect(() => {
+    if (status !== "Updated Banking/draft date") {
+      setNewDraftDate(undefined);
+    }
+    // Reset status reason when status changes
+    setStatusReason("");
+    setNotes("");
+  }, [status]);
+
   const showCarrierApplicationFields = status === "Needs Carrier Application";
   const showSubmittedFields = applicationSubmitted === true;
   const showNotSubmittedFields = applicationSubmitted === false;
-  const showStatusReasonDropdown = applicationSubmitted === false && ["⁠DQ", "Needs callback", "Not Interested", "Future Submission Date"].includes(status);
+  const showStatusReasonDropdown = applicationSubmitted === false && ["⁠DQ", "Needs callback", "Not Interested", "Future Submission Date", "Updated Banking/draft date", "Fulfilled carrier requirements"].includes(status);
+  const showNewDraftDateField = applicationSubmitted === false && status === "Updated Banking/draft date" && statusReason;
   const currentReasonOptions = getReasonOptions(status);
 
   const handleStatusReasonChange = (reason: string) => {
@@ -308,10 +344,27 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
     if (reason && reason !== "Other") {
       // Auto-populate notes with the mapped text using actual customer name
       const clientName = customerName || "[Client Name]";
-      setNotes(getNoteText(status, reason, clientName));
+      if (status === "Updated Banking/draft date") {
+        // For this status, we need the draft date to generate the note
+        setNotes(getNoteText(status, reason, clientName, newDraftDate));
+      } else if (status === "Fulfilled carrier requirements") {
+        // Don't auto-populate notes for this status
+        setNotes("");
+      } else {
+        setNotes(getNoteText(status, reason, clientName));
+      }
     } else if (reason === "Other") {
       // Clear notes for custom message
       setNotes("");
+    }
+  };
+
+  const handleNewDraftDateChange = (date: Date | undefined) => {
+    setNewDraftDate(date);
+    // Update notes if reason is already selected
+    if (statusReason && status === "Updated Banking/draft date") {
+      const clientName = customerName || "[Client Name]";
+      setNotes(getNoteText(status, statusReason, clientName, date));
     }
   };
 
@@ -335,6 +388,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         buffer_agent: bufferAgent,
         agent_who_took_call: agentWhoTookCall,
         sent_to_underwriting: sentToUnderwriting,
+        new_draft_date: status === "Updated Banking/draft date" && newDraftDate ? format(newDraftDate, "yyyy-MM-dd") : null,
         ...(showSubmittedFields || showCarrierApplicationFields ? {
           carrier,
           product_type: productType,
@@ -418,10 +472,11 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
             notes: notes,
             updated_at: new Date().toISOString()
           };
-          const { error: dealFlowError } = await supabase
-            .from('daily_deal_flow')
-            .upsert(dealFlowData, { onConflict: 'submission_id' });
-          if (dealFlowError) console.error('Error syncing daily_deal_flow:', dealFlowError);
+          // TODO: Add daily_deal_flow table support when schema is updated
+          // const { error: dealFlowError } = await supabase
+          //   .from('daily_deal_flow')
+          //   .upsert(dealFlowData, { onConflict: 'submission_id' });
+          // if (dealFlowError) console.error('Error syncing daily_deal_flow:', dealFlowError);
         }
       } catch (syncError) {
         console.error('Sync to daily_deal_flow failed:', syncError);
@@ -502,7 +557,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                   notes: notes,
                   dq_reason: showStatusReasonDropdown ? statusReason : null,
                   sent_to_underwriting: sentToUnderwriting,
-                  from_callback: callSource === "Agent Callback" ? "TRUE" : "FALSE",
+                  from_callback: (callSource as string) === "Agent Callback",
                   call_source: callSource
                 }
               }
@@ -533,7 +588,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
               notes: notes || '',
               dq_reason: showStatusReasonDropdown ? statusReason : null,
               sent_to_underwriting: sentToUnderwriting,
-              from_callback: callSource === "Agent Callback" ? "TRUE" : "FALSE",
+              from_callback: callSource === "Agent Callback",
               call_source: callSource
             };
 
@@ -1027,7 +1082,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 </Select>
               </div>
 
-              {/* Status Reason dropdown - shows for DQ, Needs Callback, Not Interested, Future Submission Date */}
+              {/* Status Reason dropdown - shows for DQ, Needs Callback, Not Interested, Future Submission Date, Updated Banking/draft date, Fulfilled carrier requirements */}
               {showStatusReasonDropdown && (
                 <div>
                   <Label htmlFor="statusReason">
@@ -1035,6 +1090,8 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                      status === "Needs callback" ? "Callback Reason" :
                      status === "Not Interested" ? "Reason Not Interested" :
                      status === "Future Submission Date" ? "Future Submission Reason" :
+                     status === "Updated Banking/draft date" ? "Update Reason" :
+                     status === "Fulfilled carrier requirements" ? "Fulfillment Confirmation" :
                      "Reason"}
                   </Label>
                   <Select value={statusReason} onValueChange={handleStatusReasonChange}>
@@ -1049,6 +1106,35 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+
+              {/* New Draft Date field - shows only for Updated Banking/draft date status */}
+              {showNewDraftDateField && (
+                <div>
+                  <Label htmlFor="newDraftDate">New Draft Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !newDraftDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {newDraftDate ? format(newDraftDate, "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={newDraftDate}
+                        onSelect={handleNewDraftDateChange}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               )}
 
@@ -1148,8 +1234,8 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                       <Input
                         id="faceAmount"
                         type="number"
-                        value={faceAmount}
-                        onChange={(e) => setFaceAmount(e.target.value)}
+                        value={coverageAmount}
+                        onChange={(e) => setCoverageAmount(e.target.value)}
                         placeholder="0.00"
                       />
                     </div>

@@ -121,12 +121,12 @@ serve(async (req)=>{
     // Status mapping function (same as create-new-callback-sheet)
     const mapStatusToSheetValue = (userSelectedStatus)=>{
       const statusMap = {
-        "Needs callback": "Needs to be Fixed",
+        "Needs callback": "Needs BPO Callback",
         "Call Never Sent": "Incomplete Transfer",
-        "Not Interested": "Returned to Center",
+        "Not Interested": "Returned To Center - DQ",
         "DQ": "DQ'd Can't be sold",
         "⁠DQ": "DQ'd Can't be sold",
-        "Future Submission Date": "Needs Carrier Application",
+        "Future Submission Date": "Application Withdrawn",
         "Call Back Fix": "Call Back Fix",
         "Disconnected": "Incomplete Transfer",
         "Disconnected - Never Retransferred": "Incomplete Transfer"
