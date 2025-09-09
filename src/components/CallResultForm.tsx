@@ -62,15 +62,12 @@ const productTypeOptions = [
 const bufferAgentOptions = [
   "N/A",
   "Ira",
-  "Burney", 
   "Kyla",
   "Bryan",
   "Justine",
   "Isaac",
-  "Landon",
   "Juan",
   "Kaye",
-  "Precy Lou",
   "Laiza Batain"
 ];
 
