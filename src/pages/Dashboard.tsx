@@ -247,6 +247,16 @@ const Dashboard = () => {
                 Analytics Dashboard
               </Button>
             )}
+            {isBen && (
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/reports')}
+                className="flex items-center gap-2"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Agent Reports & Logs
+              </Button>
+            )}
             <Button variant="outline" onClick={handleSignOut}>
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out

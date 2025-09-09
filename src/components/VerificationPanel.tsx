@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { logCallUpdate, getLeadInfo } from "@/lib/callLogging";
 // Custom field order for display - matches DetailedLeadInfoCard sequence
 const customFieldOrder = [
   "lead_vendor", // Lead Vendor: William G Moore
@@ -236,6 +237,32 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
 
   const handleTransferToLA = async () => {
     await updateSessionStatus('transferred');
+    
+    // Log the transfer event for buffer agents
+    if (session?.buffer_agent_id) {
+      const { customerName, leadVendor } = await getLeadInfo(session.submission_id);
+      const { data: bufferAgentProfile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('user_id', session.buffer_agent_id)
+        .single();
+
+      await logCallUpdate({
+        submissionId: session.submission_id,
+        agentId: session.buffer_agent_id,
+        agentType: 'buffer',
+        agentName: bufferAgentProfile?.display_name || 'Buffer Agent',
+        eventType: 'transferred_to_la',
+        eventDetails: {
+          verification_session_id: session.id,
+          transferred_at: new Date().toISOString()
+        },
+        verificationSessionId: session.id,
+        customerName,
+        leadVendor
+      });
+    }
+    
     onTransferReady?.();
   };
 
@@ -415,6 +442,54 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
                   onClick={async () => {
                     await updateSessionStatus('call_dropped');
                     const leadData = getLeadData();
+                    
+                    // Log the call dropped event
+                    if (session?.buffer_agent_id) {
+                      const { customerName, leadVendor } = await getLeadInfo(session.submission_id);
+                      const { data: bufferAgentProfile } = await supabase
+                        .from('profiles')
+                        .select('display_name')
+                        .eq('user_id', session.buffer_agent_id)
+                        .single();
+
+                      await logCallUpdate({
+                        submissionId: session.submission_id,
+                        agentId: session.buffer_agent_id,
+                        agentType: 'buffer',
+                        agentName: bufferAgentProfile?.display_name || 'Buffer Agent',
+                        eventType: 'call_dropped',
+                        eventDetails: {
+                          verification_session_id: session.id,
+                          dropped_at: new Date().toISOString()
+                        },
+                        verificationSessionId: session.id,
+                        customerName,
+                        leadVendor
+                      });
+                    } else if (session?.licensed_agent_id) {
+                      const { customerName, leadVendor } = await getLeadInfo(session.submission_id);
+                      const { data: licensedAgentProfile } = await supabase
+                        .from('profiles')
+                        .select('display_name')
+                        .eq('user_id', session.licensed_agent_id)
+                        .single();
+
+                      await logCallUpdate({
+                        submissionId: session.submission_id,
+                        agentId: session.licensed_agent_id,
+                        agentType: 'licensed',
+                        agentName: licensedAgentProfile?.display_name || 'Licensed Agent',
+                        eventType: 'call_dropped',
+                        eventDetails: {
+                          verification_session_id: session.id,
+                          dropped_at: new Date().toISOString()
+                        },
+                        verificationSessionId: session.id,
+                        customerName,
+                        leadVendor
+                      });
+                    }
+                    
                     // Send notification to center
                     await supabase.functions.invoke('center-transfer-notification', {
                       body: {

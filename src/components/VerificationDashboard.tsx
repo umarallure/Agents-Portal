@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { ClaimDroppedCallModal } from "./ClaimDroppedCallModal";
 import { ClaimLicensedAgentModal } from "./ClaimLicensedAgentModal";
+import { logCallUpdate, getLeadInfo } from "@/lib/callLogging";
 
 interface VerificationSession {
   id: string;
@@ -237,15 +238,53 @@ export const VerificationDashboard = () => {
         .update(updateFields)
         .eq('id', claimSessionId);
 
+      // Log the call claim event
+      const agentName = claimAgentType === 'buffer'
+        ? bufferAgents.find(a => a.user_id === agentId)?.display_name || 'Buffer Agent'
+        : licensedAgents.find(a => a.user_id === agentId)?.display_name || 'Licensed Agent';
+
+      const { customerName, leadVendor } = await getLeadInfo(claimSubmissionId!);
+      
+      // Determine the event type based on the claim scenario
+      let eventType: 'call_claimed' | 'transferred_to_licensed_agent' = 'call_claimed';
+      
+      // Get the current session to check if there was a previous licensed agent
+      const { data: currentSession } = await supabase
+        .from('verification_sessions')
+        .select('licensed_agent_id, buffer_agent_id')
+        .eq('id', claimSessionId)
+        .single();
+      
+      // If a licensed agent is claiming a call that was previously with another licensed agent
+      if (claimAgentType === 'licensed' && currentSession?.licensed_agent_id && currentSession.licensed_agent_id !== agentId) {
+        eventType = 'transferred_to_licensed_agent';
+      }
+      
+      await logCallUpdate({
+        submissionId: claimSubmissionId!,
+        agentId: agentId,
+        agentType: claimAgentType,
+        agentName: agentName,
+        eventType: eventType,
+        eventDetails: {
+          verification_session_id: claimSessionId,
+          claimed_at: new Date().toISOString(),
+          claimed_from_dashboard: true,
+          previous_agent_id: currentSession?.licensed_agent_id || currentSession?.buffer_agent_id,
+          transfer_type: eventType === 'transferred_to_licensed_agent' ? 'licensed_to_licensed' : 'claim'
+        },
+        verificationSessionId: claimSessionId!,
+        customerName,
+        leadVendor
+      });
+
       // Send notification
       await supabase.functions.invoke('center-transfer-notification', {
         body: {
           type: 'reconnected',
           submissionId: claimSubmissionId,
           agentType: claimAgentType,
-          agentName: claimAgentType === 'buffer'
-            ? bufferAgents.find(a => a.user_id === agentId)?.display_name || 'Buffer Agent'
-            : licensedAgents.find(a => a.user_id === agentId)?.display_name || 'Licensed Agent',
+          agentName: agentName,
           leadData: claimLead
         }
       });

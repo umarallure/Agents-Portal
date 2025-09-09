@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, UserCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { logCallUpdate, getLeadInfo, getAgentProfile } from "@/lib/callLogging";
 
 interface BufferAgent {
   id: string;
@@ -260,6 +261,29 @@ export const StartVerificationModal = ({ submissionId, onVerificationStarted }: 
       // Send notification to center when verification starts
       await supabase.functions.invoke('center-transfer-notification', {
         body: notificationPayload
+      });
+
+      // Log the verification started event
+      const { customerName, leadVendor } = await getLeadInfo(submissionId);
+      const selectedAgentId = agentType === 'buffer' ? selectedAgent : selectedLA;
+      const selectedAgentName = agentType === 'buffer' 
+        ? bufferAgents.find(a => a.id === selectedAgent)?.display_name || 'Buffer Agent'
+        : licensedAgents.find(a => a.id === selectedLA)?.display_name || 'Licensed Agent';
+
+      await logCallUpdate({
+        submissionId,
+        agentId: selectedAgentId,
+        agentType,
+        agentName: selectedAgentName,
+        eventType: 'verification_started',
+        eventDetails: {
+          workflow_type: agentType,
+          session_id: session.id,
+          started_by: user.id
+        },
+        verificationSessionId: session.id,
+        customerName,
+        leadVendor
       });
 
       toast({

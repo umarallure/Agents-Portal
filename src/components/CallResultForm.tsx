@@ -12,6 +12,7 @@ import { CalendarIcon, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { logCallUpdate, getLeadInfo } from "@/lib/callLogging";
 
 interface CallResultFormProps {
   submissionId: string;
@@ -440,6 +441,82 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           variant: "destructive",
         });
         return;
+      }
+
+      // Log the call result event
+      try {
+        const { customerName: leadCustomerName, leadVendor: leadVendorName } = await getLeadInfo(submissionId);
+        
+        // Determine which agent to log for
+        let loggedAgentId = agentWhoTookCall;
+        let loggedAgentType: 'buffer' | 'licensed' = 'licensed';
+        let loggedAgentName = agentWhoTookCall;
+        
+        // If it's a buffer agent workflow, log for buffer agent
+        if (bufferAgent && bufferAgent !== 'N/A') {
+          // Get buffer agent user_id from agent_status table
+          const { data: bufferAgentData } = await supabase
+            .from('agent_status')
+            .select('user_id')
+            .eq('agent_type', 'buffer')
+            .single();
+          
+          if (bufferAgentData?.user_id) {
+            loggedAgentId = bufferAgentData.user_id;
+            loggedAgentType = 'buffer';
+            loggedAgentName = bufferAgent;
+          }
+        } else if (licensedAgentAccount && licensedAgentAccount !== 'N/A') {
+          // For licensed agent, try to get the user_id
+          const { data: licensedAgentData } = await supabase
+            .from('agent_status')
+            .select('user_id')
+            .eq('agent_type', 'licensed')
+            .single();
+          
+          if (licensedAgentData?.user_id) {
+            loggedAgentId = licensedAgentData.user_id;
+            loggedAgentType = 'licensed';
+            loggedAgentName = licensedAgentAccount;
+          }
+        }
+
+        // Determine the event type based on status and submission
+        let eventType: 'application_submitted' | 'application_not_submitted' | 'call_disconnected';
+        
+        if (applicationSubmitted === false && status === "Disconnected") {
+          // Special case for disconnected calls by buffer agents
+          eventType = 'call_disconnected';
+        } else if (applicationSubmitted) {
+          eventType = 'application_submitted';
+        } else {
+          eventType = 'application_not_submitted';
+        }
+        
+        if (loggedAgentId) {
+          await logCallUpdate({
+            submissionId,
+            agentId: loggedAgentId,
+            agentType: loggedAgentType,
+            agentName: loggedAgentName,
+            eventType,
+            eventDetails: {
+              status: finalStatus,
+              carrier: carrier || null,
+              monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
+              coverage_amount: coverageAmount ? parseFloat(coverageAmount) : null,
+              call_source: callSource,
+              dq_reason: showStatusReasonDropdown ? statusReason : null,
+              sent_to_underwriting: sentToUnderwriting,
+              notes: notes
+            },
+            customerName: leadCustomerName,
+            leadVendor: leadVendorName
+          });
+        }
+      } catch (loggingError) {
+        console.error('Failed to log call result:', loggingError);
+        // Don't fail the entire process if logging fails
       }
 
       // Sync daily_deal_flow on form submit
