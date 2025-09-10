@@ -35,11 +35,20 @@ export interface DailyDealFlowRow {
 }
 
 const DailyDealFlowPage = () => {
+  // Special constant to match GridToolbar (cannot use empty string with Radix UI)
+  const ALL_OPTION = "__ALL__";
+  
   const [data, setData] = useState<DailyDealFlowRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
+  const [bufferAgentFilter, setBufferAgentFilter] = useState(ALL_OPTION);
+  const [licensedAgentFilter, setLicensedAgentFilter] = useState(ALL_OPTION);
+  const [leadVendorFilter, setLeadVendorFilter] = useState(ALL_OPTION);
+  const [statusFilter, setStatusFilter] = useState(ALL_OPTION);
+  const [carrierFilter, setCarrierFilter] = useState(ALL_OPTION);
+  const [callResultFilter, setCallResultFilter] = useState(ALL_OPTION);
   
   const { toast } = useToast();
 
@@ -99,19 +108,74 @@ const DailyDealFlowPage = () => {
   }, [dateFilter]);
 
 
-  // Filter data based on search term
+  // Filter data based on all filter criteria
   const filteredData = data.filter(row => {
-    if (!searchTerm) return true;
-    
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      row.insured_name?.toLowerCase().includes(searchLower) ||
-      row.client_phone_number?.toLowerCase().includes(searchLower) ||
-      row.submission_id?.toLowerCase().includes(searchLower) ||
-      row.lead_vendor?.toLowerCase().includes(searchLower) ||
-      row.agent?.toLowerCase().includes(searchLower) ||
-      row.status?.toLowerCase().includes(searchLower)
-    );
+    // Search term filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = (
+        row.insured_name?.toLowerCase().includes(searchLower) ||
+        row.client_phone_number?.toLowerCase().includes(searchLower) ||
+        row.submission_id?.toLowerCase().includes(searchLower) ||
+        row.lead_vendor?.toLowerCase().includes(searchLower) ||
+        row.agent?.toLowerCase().includes(searchLower) ||
+        row.status?.toLowerCase().includes(searchLower) ||
+        row.carrier?.toLowerCase().includes(searchLower) ||
+        row.licensed_agent_account?.toLowerCase().includes(searchLower) ||
+        row.buffer_agent?.toLowerCase().includes(searchLower)
+      );
+      if (!matchesSearch) return false;
+    }
+
+    // Buffer Agent filter - handle null/undefined values and ALL_OPTION
+    if (bufferAgentFilter && bufferAgentFilter !== ALL_OPTION) {
+      const rowBufferAgent = row.buffer_agent || "N/A";
+      if (rowBufferAgent !== bufferAgentFilter) {
+        return false;
+      }
+    }
+
+    // Licensed Agent filter - handle null/undefined values and ALL_OPTION
+    if (licensedAgentFilter && licensedAgentFilter !== ALL_OPTION) {
+      const rowLicensedAgent = row.licensed_agent_account || "N/A";
+      if (rowLicensedAgent !== licensedAgentFilter) {
+        return false;
+      }
+    }
+
+    // Lead Vendor filter - handle null/undefined values and ALL_OPTION
+    if (leadVendorFilter && leadVendorFilter !== ALL_OPTION) {
+      const rowLeadVendor = row.lead_vendor || "N/A";
+      if (rowLeadVendor !== leadVendorFilter) {
+        return false;
+      }
+    }
+
+    // Status filter - handle null/undefined values and ALL_OPTION
+    if (statusFilter && statusFilter !== ALL_OPTION) {
+      const rowStatus = row.status || "N/A";
+      if (rowStatus !== statusFilter) {
+        return false;
+      }
+    }
+
+    // Carrier filter - handle null/undefined values and ALL_OPTION
+    if (carrierFilter && carrierFilter !== ALL_OPTION) {
+      const rowCarrier = row.carrier || "N/A";
+      if (rowCarrier !== carrierFilter) {
+        return false;
+      }
+    }
+
+    // Call Result filter - handle null/undefined values and ALL_OPTION
+    if (callResultFilter && callResultFilter !== ALL_OPTION) {
+      const rowCallResult = row.call_result || "N/A";
+      if (rowCallResult !== callResultFilter) {
+        return false;
+      }
+    }
+
+    return true;
   });
 
   const handleRefresh = () => {
@@ -177,6 +241,18 @@ const DailyDealFlowPage = () => {
           onSearchChange={setSearchTerm}
           dateFilter={dateFilter}
           onDateFilterChange={setDateFilter}
+          bufferAgentFilter={bufferAgentFilter}
+          onBufferAgentFilterChange={setBufferAgentFilter}
+          licensedAgentFilter={licensedAgentFilter}
+          onLicensedAgentFilterChange={setLicensedAgentFilter}
+          leadVendorFilter={leadVendorFilter}
+          onLeadVendorFilterChange={setLeadVendorFilter}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          carrierFilter={carrierFilter}
+          onCarrierFilterChange={setCarrierFilter}
+          callResultFilter={callResultFilter}
+          onCallResultFilterChange={setCallResultFilter}
           totalRows={filteredData.length}
         />
 

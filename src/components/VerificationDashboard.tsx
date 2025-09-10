@@ -6,7 +6,7 @@ import { ColoredProgress } from "@/components/ui/colored-progress";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eye, Clock, User, Filter, Search, RefreshCw, UserCheck, ChevronDown, ChevronUp } from "lucide-react";
+import { Eye, Clock, User, Filter, Search, RefreshCw, UserCheck, ChevronDown, ChevronUp, CalendarDays, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -44,6 +44,10 @@ export const VerificationDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [agentTypeFilter, setAgentTypeFilter] = useState("all"); // all, buffer, licensed
+  const [agentNameFilter, setAgentNameFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [activePage, setActivePage] = useState(1);
   const [incompletePage, setIncompletePage] = useState(1);
   const [completedPage, setCompletedPage] = useState(1);
@@ -310,6 +314,29 @@ export const VerificationDashboard = () => {
     }
   };
 
+  // Helper function for date filtering
+  const matchesDateFilter = (session: VerificationSession) => {
+    if (!startDate && !endDate) return true;
+    
+    const sessionDate = new Date(session.started_at);
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    
+    // Set end date to end of day if provided
+    if (end) {
+      end.setHours(23, 59, 59, 999);
+    }
+    
+    if (start && end) {
+      return sessionDate >= start && sessionDate <= end;
+    } else if (start) {
+      return sessionDate >= start;
+    } else if (end) {
+      return sessionDate <= end;
+    }
+    return true;
+  };
+
   const filteredSessions = sessions.filter(session => {
     const matchesSearch = 
       session.leads?.customer_full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -317,7 +344,17 @@ export const VerificationDashboard = () => {
     
     const matchesStatus = statusFilter === "all" || session.status === statusFilter;
     
-    return matchesSearch && matchesStatus;
+    const matchesAgentType = agentTypeFilter === "all" || 
+      (agentTypeFilter === "buffer" && session.buffer_agent_profile?.display_name) ||
+      (agentTypeFilter === "licensed" && session.licensed_agent_profile?.display_name);
+    
+    const matchesAgentName = agentNameFilter === "all" ||
+      session.buffer_agent_profile?.display_name === agentNameFilter ||
+      session.licensed_agent_profile?.display_name === agentNameFilter;
+    
+    const matchesDate = matchesDateFilter(session);
+    
+    return matchesSearch && matchesStatus && matchesAgentType && matchesAgentName && matchesDate;
   });
 
   // Categorize sessions
@@ -372,12 +409,39 @@ export const VerificationDashboard = () => {
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
   };
 
+  // Get unique agent names based on type filter
+  const getAgentNames = () => {
+    const names = new Set<string>();
+    sessions.forEach(session => {
+      if (agentTypeFilter === "all" || agentTypeFilter === "buffer") {
+        if (session.buffer_agent_profile?.display_name) {
+          names.add(session.buffer_agent_profile.display_name);
+        }
+      }
+      if (agentTypeFilter === "all" || agentTypeFilter === "licensed") {
+        if (session.licensed_agent_profile?.display_name) {
+          names.add(session.licensed_agent_profile.display_name);
+        }
+      }
+    });
+    return Array.from(names).sort();
+  };
+
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
   };
 
   const handleStatusFilterChange = (value: string) => {
     setStatusFilter(value);
+  };
+
+  const handleAgentTypeFilterChange = (value: string) => {
+    setAgentTypeFilter(value);
+    setAgentNameFilter("all"); // Reset agent name when type changes
+  };
+
+  const handleAgentNameFilterChange = (value: string) => {
+    setAgentNameFilter(value);
   };
 
   const viewSession = (submissionId: string) => {
@@ -573,17 +637,87 @@ export const VerificationDashboard = () => {
                         Previous
                       </Button>
                       <div className="flex items-center gap-1">
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                          <Button
-                            key={page}
-                            variant={currentPage === page ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => handlePageChange(page)}
-                            className="w-8 h-8 p-0"
-                          >
-                            {page}
-                          </Button>
-                        ))}
+                        {(() => {
+                          const maxVisiblePages = 5;
+                          const pages = [];
+                          
+                          if (totalPages <= maxVisiblePages) {
+                            // Show all pages if total is small
+                            for (let i = 1; i <= totalPages; i++) {
+                              pages.push(
+                                <Button
+                                  key={i}
+                                  variant={currentPage === i ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => handlePageChange(i)}
+                                  className="w-8 h-8 p-0"
+                                >
+                                  {i}
+                                </Button>
+                              );
+                            }
+                          } else {
+                            // Show first page
+                            pages.push(
+                              <Button
+                                key={1}
+                                variant={currentPage === 1 ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handlePageChange(1)}
+                                className="w-8 h-8 p-0"
+                              >
+                                1
+                              </Button>
+                            );
+                            
+                            // Show ellipsis if current page is far from start
+                            if (currentPage > 3) {
+                              pages.push(<span key="start-ellipsis" className="px-2">...</span>);
+                            }
+                            
+                            // Show pages around current page
+                            const start = Math.max(2, currentPage - 1);
+                            const end = Math.min(totalPages - 1, currentPage + 1);
+                            
+                            for (let i = start; i <= end; i++) {
+                              if (i !== 1 && i !== totalPages) {
+                                pages.push(
+                                  <Button
+                                    key={i}
+                                    variant={currentPage === i ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => handlePageChange(i)}
+                                    className="w-8 h-8 p-0"
+                                  >
+                                    {i}
+                                  </Button>
+                                );
+                              }
+                            }
+                            
+                            // Show ellipsis if current page is far from end
+                            if (currentPage < totalPages - 2) {
+                              pages.push(<span key="end-ellipsis" className="px-2">...</span>);
+                            }
+                            
+                            // Show last page
+                            if (totalPages > 1) {
+                              pages.push(
+                                <Button
+                                  key={totalPages}
+                                  variant={currentPage === totalPages ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => handlePageChange(totalPages)}
+                                  className="w-8 h-8 p-0"
+                                >
+                                  {totalPages}
+                                </Button>
+                              );
+                            }
+                          }
+                          
+                          return pages;
+                        })()}
                       </div>
                       <Button
                         variant="outline"
@@ -683,33 +817,101 @@ export const VerificationDashboard = () => {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <div className="space-y-4">
+            {/* First row - Search and Status */}
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by customer name or submission ID..."
+                    value={searchTerm}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+                <SelectTrigger className="w-48">
+                  <Filter className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="ready_for_transfer">Ready for Transfer</SelectItem>
+                  <SelectItem value="transferred">Transferred</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="call_dropped">Call Dropped</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Second row - Agent filters and Date */}
+            <div className="flex gap-4">
+              <Select value={agentTypeFilter} onValueChange={handleAgentTypeFilterChange}>
+                <SelectTrigger className="w-48">
+                  <User className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Agent type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Agent Types</SelectItem>
+                  <SelectItem value="buffer">Buffer Agents</SelectItem>
+                  <SelectItem value="licensed">Licensed Agents</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={agentNameFilter} onValueChange={handleAgentNameFilterChange}>
+                <SelectTrigger className="w-48">
+                  <User className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Agent name" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Agents</SelectItem>
+                  {getAgentNames().map(name => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium whitespace-nowrap">Start Date:</label>
                 <Input
-                  placeholder="Search by customer name or submission ID..."
-                  value={searchTerm}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-10"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-40"
                 />
               </div>
+              
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium whitespace-nowrap">End Date:</label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+
+              {/* Clear Filters Button */}
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setSearchTerm("");
+                  setStatusFilter("all");
+                  setAgentTypeFilter("all");
+                  setAgentNameFilter("all");
+                  setStartDate("");
+                  setEndDate("");
+                }}
+                className="flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                Clear Filters
+              </Button>
             </div>
-            <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-              <SelectTrigger className="w-48">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="ready_for_transfer">Ready for Transfer</SelectItem>
-                <SelectItem value="transferred">Transferred</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="call_dropped">Call Dropped</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>
