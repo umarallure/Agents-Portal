@@ -180,6 +180,21 @@ const getReasonOptions = (status: string) => {
   }
 };
 
+// Status mapping function for Daily Deal Flow sheet
+const mapStatusToSheetValue = (userSelectedStatus: string) => {
+  const statusMap: { [key: string]: string } = {
+    "Needs callback": "Needs BPO Callback",
+    "Call Never Sent": "Incomplete Transfer",
+    "Not Interested": "Returned To Center - DQ",
+    "DQ": "DQ'd Can't be sold",
+    "Future Submission Date": "Application Withdrawn",
+    "Call Back Fix": "Call Back Fix",
+    "Disconnected": "Incomplete Transfer",
+    "Disconnected - Never Retransferred": "Incomplete Transfer"
+  };
+  return statusMap[userSelectedStatus] || userSelectedStatus;
+};
+
 const getNoteText = (status: string, reason: string, clientName: string = "[Client Name]", newDraftDate?: Date) => {
   const statusReasonMapping: { [status: string]: { [reason: string]: string } } = {
     "⁠DQ": {
@@ -212,6 +227,83 @@ const getNoteText = (status: string, reason: string, clientName: string = "[Clie
   };
   
   return statusReasonMapping[status]?.[reason] || "";
+};
+
+// Function to generate structured notes for submitted applications
+const generateSubmittedApplicationNotes = (
+  licensedAgentAccount: string,
+  carrier: string,
+  productType: string,
+  monthlyPremium: string,
+  coverageAmount: string,
+  draftDate: Date | undefined,
+  sentToUnderwriting: boolean | null
+) => {
+  const parts = [];
+
+  // Licensed agent account (point 1)
+  if (licensedAgentAccount && licensedAgentAccount !== 'N/A') {
+    parts.push(`1. Licensed agent account: ${licensedAgentAccount}`);
+  }
+
+  // Carrier (point 2)
+  if (carrier && carrier !== 'N/A') {
+    parts.push(`2. Carrier: ${carrier}`);
+  }
+
+  // Carrier product name and level (point 3)
+  if (productType && productType !== 'N/A') {
+    parts.push(`3. Carrier product name and level: ${productType}`);
+  }
+
+  // Premium amount (point 4)
+  if (monthlyPremium && monthlyPremium !== '0' && monthlyPremium !== '') {
+    parts.push(`4. Premium amount: $${monthlyPremium}`);
+  }
+
+  // Coverage amount (point 5)
+  if (coverageAmount && coverageAmount !== '0' && coverageAmount !== '') {
+    parts.push(`5. Coverage amount: $${coverageAmount}`);
+  }
+
+  // Draft date (point 6)
+  if (draftDate) {
+    parts.push(`6. Draft date: ${draftDate.toLocaleDateString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: 'numeric'
+    })}`);
+  }
+
+  // Sent to Underwriting (only if sentToUnderwriting is true) - point 7
+  if (sentToUnderwriting === true) {
+    parts.push('7. Sent to Underwriting');
+  }
+
+  // --- Carrier-specific commission rules as the final point ---
+  let commissionNote = "";
+  if (/aetna/i.test(carrier) || /corebridge/i.test(carrier)) {
+    commissionNote = "8. Commissions from this carrier are paid after the first successful draft";
+  } else if (/cica/i.test(carrier)) {
+    commissionNote = "8. Commissions from this carrier are paid 10-14 days after first successful draft";
+  } else {
+    commissionNote = "8. Commissions are paid after policy is officially approved and issued";
+  }
+
+  // Add commission note at the bottom
+  parts.push(commissionNote);
+
+  return parts.join('\n');
+};
+
+// Function to combine structured notes with additional user notes
+const combineNotes = (structuredNotes: string, additionalNotes: string) => {
+  if (!structuredNotes && !additionalNotes) return '';
+
+  if (!structuredNotes) return additionalNotes;
+  if (!additionalNotes) return structuredNotes;
+
+  return structuredNotes + '\n\n' + additionalNotes;
 };
 
 export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallResultFormProps) => {
@@ -526,33 +618,98 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           .eq("submission_id", submissionId)
           .single();
         if (leadData) {
-          const dealFlowData = {
-            submission_id: submissionId,
-            client_phone_number: leadData.phone_number,
-            lead_vendor: leadData.lead_vendor || leadVendor || "N/A",
-            date: new Date().toISOString().split('T')[0],
-            insured_name: leadData.customer_full_name,
-            buffer_agent: bufferAgent,
-            agent: agentWhoTookCall,
-            licensed_agent_account: licensedAgentAccount,
-            status: finalStatus,
-            call_result: applicationSubmitted === true
-              ? (sentToUnderwriting === true ? "Underwriting" : "Submitted")
-              : "Not Submitted",
-            carrier: carrier || null,
-            product_type: productType || null,
-            draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
-            monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-            face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
-            from_callback: callSource === "Agent Callback",
-            notes: notes,
-            updated_at: new Date().toISOString()
-          };
-          // TODO: Add daily_deal_flow table support when schema is updated
-          // const { error: dealFlowError } = await supabase
-          //   .from('daily_deal_flow')
-          //   .upsert(dealFlowData, { onConflict: 'submission_id' });
-          // if (dealFlowError) console.error('Error syncing daily_deal_flow:', dealFlowError);
+          // Determine mapped status for the sheet
+          const mappedStatus = applicationSubmitted === true 
+            ? "Pending Approval" 
+            : mapStatusToSheetValue(finalStatus);
+
+          // Handle different call sources for daily_deal_flow sync
+          if (callSource === "First Time Transfer" || callSource === "Agent Callback") {
+            // Generate structured notes for submitted applications
+            let finalNotes = notes;
+            if (applicationSubmitted === true) {
+              const structuredNotes = generateSubmittedApplicationNotes(
+                licensedAgentAccount,
+                carrier,
+                productType,
+                monthlyPremium,
+                coverageAmount,
+                draftDate,
+                sentToUnderwriting
+              );
+              // Combine structured notes with agent's manual notes
+              finalNotes = combineNotes(structuredNotes, notes);
+            }
+
+            // For first time transfer and agent callback - create/update with current date
+            const dealFlowData = {
+              submission_id: submissionId,
+              client_phone_number: leadData.phone_number,
+              lead_vendor: leadData.lead_vendor || leadVendor || "N/A",
+              date: new Date().toISOString().split('T')[0],
+              insured_name: leadData.customer_full_name,
+              buffer_agent: bufferAgent,
+              agent: agentWhoTookCall,
+              licensed_agent_account: licensedAgentAccount,
+              status: mappedStatus,
+              call_result: applicationSubmitted === true
+                ? (sentToUnderwriting === true ? "Underwriting" : "Submitted")
+                : "Not Submitted",
+              carrier: carrier || null,
+              product_type: productType || null,
+              draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
+              monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
+              face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
+              from_callback: callSource === "Agent Callback",
+              notes: finalNotes,
+              updated_at: new Date().toISOString()
+            };
+            const { error: dealFlowError } = await supabase
+              .from('daily_deal_flow')
+              .upsert(dealFlowData, { onConflict: 'submission_id' });
+            if (dealFlowError) console.error('Error syncing daily_deal_flow:', dealFlowError);
+            
+          } else if (callSource === "Reconnected Transfer") {
+            // Generate structured notes for submitted applications
+            let finalNotes = notes;
+            if (applicationSubmitted === true) {
+              const structuredNotes = generateSubmittedApplicationNotes(
+                licensedAgentAccount,
+                carrier,
+                productType,
+                monthlyPremium,
+                coverageAmount,
+                draftDate,
+                sentToUnderwriting
+              );
+              // Combine structured notes with agent's manual notes
+              finalNotes = combineNotes(structuredNotes, notes);
+            }
+
+            // For reconnected transfer - update existing record, preserve original date
+            const updateData = {
+              buffer_agent: bufferAgent,
+              agent: agentWhoTookCall,
+              licensed_agent_account: licensedAgentAccount,
+              status: mappedStatus,
+              call_result: applicationSubmitted === true
+                ? (sentToUnderwriting === true ? "Underwriting" : "Submitted")
+                : "Not Submitted",
+              carrier: carrier || null,
+              product_type: productType || null,
+              draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
+              monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
+              face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
+              from_callback: false, // Reconnected transfer is not from callback
+              notes: finalNotes,
+              updated_at: new Date().toISOString()
+            };
+            const { error: dealFlowError } = await supabase
+              .from('daily_deal_flow')
+              .update(updateData)
+              .eq('submission_id', submissionId);
+            if (dealFlowError) console.error('Error updating daily_deal_flow for reconnected transfer:', dealFlowError);
+          }
         }
       } catch (syncError) {
         console.error('Sync to daily_deal_flow failed:', syncError);
@@ -615,13 +772,28 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           console.error("Error fetching lead data:", leadError);
         } else {
           if (callSource === "First Time Transfer") {
+            // Generate combined notes for Google Sheets
+            let finalNotes = notes;
+            if (applicationSubmitted === true) {
+              const structuredNotes = generateSubmittedApplicationNotes(
+                licensedAgentAccount,
+                carrier,
+                productType,
+                monthlyPremium,
+                coverageAmount,
+                draftDate,
+                sentToUnderwriting
+              );
+              finalNotes = combineNotes(structuredNotes, notes);
+            }
+
             // Update existing entry in daily deal flow
             const { error: sheetsError } = await supabase.functions.invoke('google-sheets-update', {
               body: {
                 submissionId: submissionId,
                 callResult: {
                   application_submitted: applicationSubmitted,
-                  status: finalStatus,
+                  status: applicationSubmitted === true ? "Pending Approval" : mapStatusToSheetValue(finalStatus),
                   buffer_agent: bufferAgent,
                   agent_who_took_call: agentWhoTookCall,
                   licensed_agent_account: licensedAgentAccount,
@@ -630,7 +802,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                   draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
                   monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
                   face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
-                  notes: notes,
+                  notes: finalNotes,
                   dq_reason: showStatusReasonDropdown ? statusReason : null,
                   sent_to_underwriting: sentToUnderwriting,
                   from_callback: (callSource as string) === "Agent Callback",
@@ -642,6 +814,21 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
               console.error("Error updating Google Sheets:", sheetsError);
             }
           } else if (callSource === "Reconnected Transfer" || callSource === "Agent Callback") {
+            // Generate combined notes for Google Sheets
+            let finalNotes = notes;
+            if (applicationSubmitted === true) {
+              const structuredNotes = generateSubmittedApplicationNotes(
+                licensedAgentAccount,
+                carrier,
+                productType,
+                monthlyPremium,
+                coverageAmount,
+                draftDate,
+                sentToUnderwriting
+              );
+              finalNotes = combineNotes(structuredNotes, notes);
+            }
+
             // Prepare lead data with all necessary fields
             const callbackLeadData = {
               ...leadData,
@@ -652,7 +839,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
             // Prepare call result data
             const callbackCallResult = {
               application_submitted: applicationSubmitted,
-              status: finalStatus,
+              status: applicationSubmitted === true ? "Pending Approval" : mapStatusToSheetValue(finalStatus),
               buffer_agent: bufferAgent || '',
               agent_who_took_call: agentWhoTookCall || '',
               licensed_agent_account: licensedAgentAccount || '',
@@ -661,7 +848,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
               draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
               monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
               face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
-              notes: notes || '',
+              notes: finalNotes || '',
               dq_reason: showStatusReasonDropdown ? statusReason : null,
               sent_to_underwriting: sentToUnderwriting,
               from_callback: callSource === "Agent Callback",
@@ -698,6 +885,21 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
             .single();
 
           if (!leadError && leadData) {
+            // Generate combined notes for Slack notification
+            let finalNotes = notes;
+            if (applicationSubmitted === true) {
+              const structuredNotes = generateSubmittedApplicationNotes(
+                licensedAgentAccount,
+                carrier,
+                productType,
+                monthlyPremium,
+                coverageAmount,
+                draftDate,
+                sentToUnderwriting
+              );
+              finalNotes = combineNotes(structuredNotes, notes);
+            }
+
             const callResultForSlack = {
               application_submitted: applicationSubmitted,
               buffer_agent: bufferAgent,
@@ -709,7 +911,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
               face_amount: coverageAmount ? parseFloat(coverageAmount) : null, // Coverage Amount saves to face_amount
               sent_to_underwriting: sentToUnderwriting,
               lead_vendor: leadData.lead_vendor || leadVendor || 'N/A',
-              notes: notes,
+              notes: finalNotes,
               dq_reason: showStatusReasonDropdown ? statusReason : null
             };
             
@@ -1089,14 +1291,17 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
 
               {/* Notes for Submitted Applications */}
               <div>
-                <Label htmlFor="notesSubmitted">Notes</Label>
+                <Label htmlFor="notesSubmitted">Agent Notes</Label>
                 <Textarea
                   id="notesSubmitted"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add any additional notes about the submitted application..."
-                  rows={3}
+                  placeholder="Enter any additional notes about this application..."
+                  rows={4}
                 />
+                <p className="text-sm text-muted-foreground mt-1">
+                  Application details will be auto-generated and combined with your notes when saved.
+                </p>
               </div>
             </div>
             </>

@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface EditableRowProps {
   row: DailyDealFlowRow;
+  rowIndex: number;
   onUpdate: () => void;
 }
 
@@ -42,8 +43,12 @@ const productTypeOptions = [
 ];
 
 const statusOptions = [
-  "Needs callback", "Not Interested", "⁠DQ", "Future Submission Date",
-  "Call Back Fix", "Call Never Sent", "Disconnected"
+  "Needs BPO Callback",
+  "Not Interested", 
+  "Returned To Center - DQ",
+  "Application Withdrawn",
+  "Call Back Fix",
+  "Incomplete Transfer"
 ];
 
 const callResultOptions = [
@@ -59,12 +64,165 @@ const leadVendorOptions = [
   "Cutting Edge", "Next Era", "Rock BPO", "Avenue Consultancy"
 ];
 
-export const EditableRow = ({ row, onUpdate }: EditableRowProps) => {
+export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<DailyDealFlowRow>(row);
   const [isSaving, setIsSaving] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const { toast } = useToast();
+
+  // Color coding based on status
+  const getStatusColor = (status?: string) => {
+    switch (status?.toLowerCase()) {
+      case 'submitted':
+        return 'bg-green-50 border-green-200';
+      case 'underwriting':
+        return 'bg-blue-50 border-blue-200';
+      case 'not submitted':
+        return 'bg-red-50 border-red-200';
+      case 'needs callback':
+        return 'bg-yellow-50 border-yellow-200';
+      case 'dq':
+        return 'bg-gray-50 border-gray-200';
+      default:
+        return rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50/50';
+    }
+  };
+
+  const getStatusTextColor = (status?: string) => {
+    switch (status?.toLowerCase()) {
+      case 'submitted':
+        return 'text-green-800';
+      case 'underwriting':
+        return 'text-blue-800';
+      case 'not submitted':
+        return 'text-red-800';
+      case 'needs callback':
+        return 'text-yellow-800';
+      case 'dq':
+        return 'text-gray-800';
+      default:
+        return 'text-foreground';
+    }
+  };
+
+  // Lead Vendor color coding
+  const getLeadVendorBadge = (vendor?: string) => {
+    const colors: { [key: string]: string } = {
+      'Ark Tech': 'bg-blue-500 text-white',
+      'GrowthOnics BPO': 'bg-green-500 text-white',
+      'Maverick': 'bg-purple-500 text-white',
+      'Omnitalk BPO': 'bg-orange-500 text-white',
+      'Vize BPO': 'bg-red-500 text-white',
+      'Corebiz': 'bg-indigo-500 text-white',
+      'Digicon': 'bg-pink-500 text-white',
+      'Ambition': 'bg-teal-500 text-white',
+      'Benchmark': 'bg-yellow-600 text-white',
+      'Poshenee': 'bg-cyan-500 text-white',
+      'Plexi': 'bg-emerald-500 text-white',
+      'Gigabite': 'bg-rose-500 text-white',
+      'Everline solution': 'bg-violet-500 text-white',
+      'Progressive BPO': 'bg-amber-500 text-white',
+      'Cerberus BPO': 'bg-slate-500 text-white',
+      'TM Global': 'bg-lime-500 text-white',
+      'Optimum BPO': 'bg-fuchsia-500 text-white',
+      'Ethos BPO': 'bg-sky-500 text-white',
+      'Trust Link': 'bg-stone-500 text-white',
+      'Crown Connect BPO': 'bg-neutral-500 text-white',
+      'Quotes BPO': 'bg-zinc-500 text-white',
+      'Zupax Marketing': 'bg-red-600 text-white',
+      'Argon Communications': 'bg-blue-600 text-white',
+      'Care Solutions': 'bg-green-600 text-white',
+      'Cutting Edge': 'bg-purple-600 text-white',
+      'Next Era': 'bg-orange-600 text-white',
+      'Rock BPO': 'bg-gray-600 text-white',
+      'Avenue Consultancy': 'bg-pink-600 text-white',
+    };
+    return colors[vendor || ''] || 'bg-gray-400 text-white';
+  };
+
+  // Status color badge
+  const getStatusBadge = (status?: string) => {
+    switch (status?.toLowerCase()) {
+      case 'pending approval':
+        return 'bg-green-600 text-white';
+      case 'needs bpo callback':
+        return 'bg-yellow-500 text-white';
+      case 'returned to center - dq':
+        return 'bg-orange-500 text-white';
+      case 'dq':
+      case "dq'd can't be sold":
+        return 'bg-gray-500 text-white';
+      case 'application withdrawn':
+        return 'bg-purple-500 text-white';
+      case 'call back fix':
+        return 'bg-pink-500 text-white';
+      case 'incomplete transfer':
+        return 'bg-indigo-500 text-white';
+      case 'disconnected':
+        return 'bg-slate-500 text-white';
+      default:
+        return 'bg-gray-400 text-white';
+    }
+  };
+
+  // Call Result color badge
+  const getCallResultBadge = (result?: string) => {
+    switch (result?.toLowerCase()) {
+      case 'submitted':
+        return 'bg-green-600 text-white';
+      case 'underwriting':
+        return 'bg-yellow-600 text-white';
+      case 'not submitted':
+        return 'bg-red-600 text-white';
+      default:
+        return 'bg-gray-500 text-white';
+    }
+  };
+
+  // Buffer Agent color badge
+  const getBufferAgentBadge = (agent?: string) => {
+    const colors: { [key: string]: string } = {
+      'N/A': 'bg-gray-500 text-white',
+      'Ira': 'bg-blue-500 text-white',
+      'Burney': 'bg-green-500 text-white',
+      'Kyla': 'bg-purple-500 text-white',
+      'Bryan': 'bg-orange-500 text-white',
+      'Justine': 'bg-pink-500 text-white',
+      'Isaac': 'bg-indigo-500 text-white',
+      'Landon': 'bg-teal-500 text-white',
+      'Juan': 'bg-red-500 text-white',
+    };
+    return colors[agent || ''] || 'bg-gray-400 text-white';
+  };
+
+  // Agent color badge
+  const getAgentBadge = (agent?: string) => {
+    const colors: { [key: string]: string } = {
+      'Claudia': 'bg-emerald-500 text-white',
+      'Lydia': 'bg-violet-500 text-white',
+      'Juan': 'bg-amber-500 text-white',
+      'Benjamin': 'bg-sky-500 text-white',
+      'Erica': 'bg-rose-500 text-white',
+      'N/A': 'bg-gray-500 text-white',
+      'Isaac': 'bg-cyan-500 text-white',
+    };
+    return colors[agent || ''] || 'bg-gray-400 text-white';
+  };
+
+  // Licensed Agent color badge
+  const getLicensedAgentBadge = (agent?: string) => {
+    const colors: { [key: string]: string } = {
+      'Claudia': 'bg-emerald-600 text-white',
+      'Lydia': 'bg-violet-600 text-white',
+      'Isaac': 'bg-cyan-600 text-white',
+      'Juan': 'bg-amber-600 text-white',
+      'Benjamin': 'bg-sky-600 text-white',
+      'Erica': 'bg-rose-600 text-white',
+      'N/A': 'bg-gray-600 text-white',
+    };
+    return colors[agent || ''] || 'bg-gray-500 text-white';
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -359,6 +517,23 @@ export const EditableRow = ({ row, onUpdate }: EditableRowProps) => {
             />
           </td>
 
+          {/* Buffer Agent */}
+          <td className="border border-border px-3 py-2">
+            <Select
+              value={editData.buffer_agent || ''}
+              onValueChange={(value) => updateField('buffer_agent', value)}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Buffer Agent" />
+              </SelectTrigger>
+              <SelectContent>
+                {bufferAgentOptions.map(option => (
+                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </td>
+
           {/* Agent */}
           <td className="border border-border px-3 py-2">
             <Select
@@ -461,6 +636,55 @@ export const EditableRow = ({ row, onUpdate }: EditableRowProps) => {
             </Select>
           </td>
 
+          {/* Draft Date */}
+          <td className="border border-border px-3 py-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full h-8 text-xs justify-start text-left font-normal",
+                    !editData.draft_date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-1 h-3 w-3" />
+                  {editData.draft_date ? format(new Date(editData.draft_date), "MMM dd") : "Draft Date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={editData.draft_date ? new Date(editData.draft_date) : undefined}
+                  onSelect={(date) => updateField('draft_date', date ? format(date, "yyyy-MM-dd") : null)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </td>
+
+          {/* MP (Monthly Premium) */}
+          <td className="border border-border px-3 py-2">
+            <Input
+              type="number"
+              step="0.01"
+              value={editData.monthly_premium?.toString() || ''}
+              onChange={(e) => updateField('monthly_premium', parseFloat(e.target.value) || null)}
+              className="h-8 text-xs"
+              placeholder="0.00"
+            />
+          </td>
+
+          {/* Face Amount */}
+          <td className="border border-border px-3 py-2">
+            <Input
+              type="number"
+              value={editData.face_amount?.toString() || ''}
+              onChange={(e) => updateField('face_amount', parseFloat(e.target.value) || null)}
+              className="h-8 text-xs"
+              placeholder="0.00"
+            />
+          </td>
+
           {/* Notes (3 lines max) */}
           <td className="border border-border px-3 py-2 max-w-md">
             <Textarea
@@ -510,54 +734,100 @@ export const EditableRow = ({ row, onUpdate }: EditableRowProps) => {
   // Display mode
   return (
     <>
-      <tr className="hover:bg-muted/50 transition-colors">
+      <tr className={`${getStatusColor(row.status)} hover:bg-muted/50 transition-colors border`}>
         {/* Date */}
-        <td className="border border-border px-3 py-2 text-sm w-24">
+        <td className="border border-border px-3 py-2 text-sm w-20">
           {row.date ? format(new Date(row.date), "MMM dd, yy") : ''}
         </td>
 
         {/* Lead Vendor */}
-        <td className="border border-border px-3 py-2 text-sm w-32 truncate">
-          {row.lead_vendor}
+        <td className="border border-border px-2 py-2 text-sm w-20">
+          {row.lead_vendor ? (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap inline-block ${getLeadVendorBadge(row.lead_vendor)}`}>
+              {row.lead_vendor.length > 12 ? row.lead_vendor.substring(0, 12) + '...' : row.lead_vendor}
+            </span>
+          ) : ''}
         </td>
 
         {/* Insured Name */}
-  <td className="border border-border px-3 py-2 text-sm w-40 truncate">
-          {row.insured_name}
+        <td className="border border-border px-2 py-2 text-sm w-14 truncate">
+          <span className="font-medium text-gray-800 block truncate">
+            {row.insured_name && row.insured_name.length > 12 ? row.insured_name.substring(0, 12) + '...' : row.insured_name}
+          </span>
+        </td>
+
+        {/* Buffer Agent */}
+        <td className="border border-border px-2 py-2 text-sm w-24">
+          {row.buffer_agent ? (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap inline-block ${getBufferAgentBadge(row.buffer_agent)}`}>
+              {row.buffer_agent}
+            </span>
+          ) : ''}
         </td>
 
         {/* Agent */}
-        <td className="border border-border px-3 py-2 text-sm w-24 truncate">
-          {row.agent}
+        <td className="border border-border px-2 py-2 text-sm w-20">
+          {row.agent ? (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap inline-block ${getAgentBadge(row.agent)}`}>
+              {row.agent}
+            </span>
+          ) : ''}
         </td>
 
         {/* Licensed Account */}
-        <td className="border border-border px-3 py-2 text-sm w-28 truncate">
-          {row.licensed_agent_account}
+        <td className="border border-border px-2 py-2 text-sm w-28">
+          {row.licensed_agent_account ? (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap inline-block ${getLicensedAgentBadge(row.licensed_agent_account)}`}>
+              {row.licensed_agent_account.length > 10 ? row.licensed_agent_account.substring(0, 10) + '...' : row.licensed_agent_account}
+            </span>
+          ) : ''}
         </td>
 
         {/* Status */}
-        <td className="border border-border px-3 py-2 text-sm w-32 truncate">
-          {row.status}
+        <td className="border border-border px-2 py-2 text-sm w-32">
+          {row.status ? (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap inline-block ${getStatusBadge(row.status)}`}>
+              {row.status.length > 16 ? row.status.substring(0, 16) + '...' : row.status}
+            </span>
+          ) : ''}
         </td>
 
         {/* Call Result */}
-        <td className="border border-border px-3 py-2 text-sm w-28 truncate">
-          {row.call_result}
+        <td className="border border-border px-2 py-2 text-sm w-24">
+          {row.call_result ? (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap inline-block ${getCallResultBadge(row.call_result)}`}>
+              {row.call_result.length > 12 ? row.call_result.substring(0, 12) + '...' : row.call_result}
+            </span>
+          ) : ''}
         </td>
 
         {/* Carrier */}
-        <td className="border border-border px-3 py-2 text-sm w-28 truncate">
+        <td className="border border-border px-3 py-2 text-sm w-16 truncate">
           {row.carrier}
         </td>
 
         {/* Product Type */}
-        <td className="border border-border px-3 py-2 text-sm w-24 truncate">
+        <td className="border border-border px-3 py-2 text-sm w-20 truncate">
           {row.product_type}
         </td>
 
+        {/* Draft Date */}
+        <td className="border border-border px-3 py-2 text-sm w-20">
+          {row.draft_date ? format(new Date(row.draft_date), "MMM dd, yy") : ''}
+        </td>
+
+        {/* MP (Monthly Premium) */}
+        <td className="border border-border px-3 py-2 text-sm w-16 text-right">
+          {row.monthly_premium ? `$${row.monthly_premium.toFixed(2)}` : ''}
+        </td>
+
+        {/* Face Amount */}
+        <td className="border border-border px-3 py-2 text-sm w-20 text-right">
+          {row.face_amount ? `$${row.face_amount.toLocaleString()}` : ''}
+        </td>
+
         {/* Notes (3 lines max) */}
-  <td className="border border-border px-3 py-2 text-xs max-w-md">
+        <td className="border border-border px-3 py-2 text-xs w-28">
           <div className="line-clamp-3 whitespace-pre-wrap">
             {row.notes || ''}
           </div>

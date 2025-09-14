@@ -5,6 +5,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { DataGrid } from "./components/DataGrid";
 import { GridToolbar } from "./components/GridToolbar";
+import { EODReports } from "@/components/EODReports";
+import { GHLExport } from "@/components/GHLExport";
 import { Loader2, RefreshCw, Download } from "lucide-react";
 
 export interface DailyDealFlowRow {
@@ -65,7 +67,11 @@ const DailyDealFlowPage = () => {
 
       // Apply date filter if set
       if (dateFilter) {
-        const dateStr = dateFilter.toISOString().split('T')[0];
+        // Format date correctly to avoid timezone issues
+        const year = dateFilter.getFullYear();
+        const month = String(dateFilter.getMonth() + 1).padStart(2, '0');
+        const day = String(dateFilter.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
         query = query.eq('date', dateStr);
       }
 
@@ -214,6 +220,9 @@ const DailyDealFlowPage = () => {
           </div>
           
           <div className="flex items-center gap-2">
+            <EODReports />
+            <GHLExport />
+            
             <Button
               variant="outline"
               onClick={handleRefresh}
