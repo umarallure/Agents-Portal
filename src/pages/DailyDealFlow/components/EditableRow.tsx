@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -70,6 +70,14 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const { toast } = useToast();
+
+  // Reset edit state when dialog closes
+  useEffect(() => {
+    if (!showDetailsDialog) {
+      setIsEditing(false);
+      setEditData(row);
+    }
+  }, [showDetailsDialog, row]);
 
   // Color coding based on status
   const getStatusColor = (status?: string) => {
@@ -278,10 +286,23 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
     <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Lead Details - {row.insured_name}</DialogTitle>
+          <div className="flex justify-between items-center">
+            <DialogTitle>Lead Details - {row.insured_name}</DialogTitle>
+            {!isEditing && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(true)}
+                className="ml-4"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+            )}
+          </div>
         </DialogHeader>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Contact Information */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg border-b pb-2">Contact Information</h3>
@@ -320,7 +341,182 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
               )}
             </div>
 
-            {/* Submission ID intentionally omitted from editable form */}
+            <div>
+              <Label className="text-sm font-medium">Insured Name</Label>
+              {isEditing ? (
+                <Input
+                  value={editData.insured_name || ''}
+                  onChange={(e) => updateField('insured_name', e.target.value)}
+                  className="mt-1"
+                />
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.insured_name || 'N/A'}</div>
+              )}
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Submission ID</Label>
+              <div className="mt-1 p-2 bg-muted rounded text-sm font-mono">
+                {row.submission_id || 'N/A'}
+              </div>
+            </div>
+          </div>
+
+          {/* Agent Information */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg border-b pb-2">Agent Information</h3>
+            
+            <div>
+              <Label className="text-sm font-medium">Buffer Agent</Label>
+              {isEditing ? (
+                <Select
+                  value={editData.buffer_agent || ''}
+                  onValueChange={(value) => updateField('buffer_agent', value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select buffer agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bufferAgentOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.buffer_agent || 'N/A'}</div>
+              )}
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Agent</Label>
+              {isEditing ? (
+                <Select
+                  value={editData.agent || ''}
+                  onValueChange={(value) => updateField('agent', value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {agentOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.agent || 'N/A'}</div>
+              )}
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Licensed Agent Account</Label>
+              {isEditing ? (
+                <Select
+                  value={editData.licensed_agent_account || ''}
+                  onValueChange={(value) => updateField('licensed_agent_account', value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select licensed agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {licensedAccountOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.licensed_agent_account || 'N/A'}</div>
+              )}
+            </div>
+          </div>
+
+          {/* Application Information */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg border-b pb-2">Application Information</h3>
+            
+            <div>
+              <Label className="text-sm font-medium">Status</Label>
+              {isEditing ? (
+                <Select
+                  value={editData.status || ''}
+                  onValueChange={(value) => updateField('status', value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.status || 'N/A'}</div>
+              )}
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Call Result</Label>
+              {isEditing ? (
+                <Select
+                  value={editData.call_result || ''}
+                  onValueChange={(value) => updateField('call_result', value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select call result" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {callResultOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.call_result || 'N/A'}</div>
+              )}
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Carrier</Label>
+              {isEditing ? (
+                <Select
+                  value={editData.carrier || ''}
+                  onValueChange={(value) => updateField('carrier', value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select carrier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {carrierOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.carrier || 'N/A'}</div>
+              )}
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Product Type</Label>
+              {isEditing ? (
+                <Select
+                  value={editData.product_type || ''}
+                  onValueChange={(value) => updateField('product_type', value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select product type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productTypeOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.product_type || 'N/A'}</div>
+              )}
+            </div>
           </div>
 
           {/* Financial Information */}
@@ -417,8 +613,115 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
             </div>
           </div>
 
+          {/* Additional Information */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg border-b pb-2">Additional Information</h3>
+            
+            <div>
+              <Label className="text-sm font-medium">Date</Label>
+              {isEditing ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full mt-1 justify-start text-left font-normal",
+                        !editData.date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editData.date ? format(new Date(editData.date), "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={editData.date ? new Date(editData.date) : undefined}
+                      onSelect={(date) => updateField('date', date ? format(date, "yyyy-MM-dd") : null)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">
+                  {row.date ? format(new Date(row.date), "PPP") : 'N/A'}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Policy Number</Label>
+              {isEditing ? (
+                <Input
+                  value={editData.policy_number || ''}
+                  onChange={(e) => updateField('policy_number', e.target.value)}
+                  className="mt-1"
+                  placeholder="Enter policy number"
+                />
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.policy_number || 'N/A'}</div>
+              )}
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Carrier Audit</Label>
+              {isEditing ? (
+                <Input
+                  value={editData.carrier_audit || ''}
+                  onChange={(e) => updateField('carrier_audit', e.target.value)}
+                  className="mt-1"
+                  placeholder="Enter carrier audit info"
+                />
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.carrier_audit || 'N/A'}</div>
+              )}
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Product Type Carrier</Label>
+              {isEditing ? (
+                <Input
+                  value={editData.product_type_carrier || ''}
+                  onChange={(e) => updateField('product_type_carrier', e.target.value)}
+                  className="mt-1"
+                  placeholder="Enter product type carrier"
+                />
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.product_type_carrier || 'N/A'}</div>
+              )}
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Level or GI</Label>
+              {isEditing ? (
+                <Input
+                  value={editData.level_or_gi || ''}
+                  onChange={(e) => updateField('level_or_gi', e.target.value)}
+                  className="mt-1"
+                  placeholder="Enter level or GI"
+                />
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.level_or_gi || 'N/A'}</div>
+              )}
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Created At</Label>
+              <div className="mt-1 p-2 bg-muted rounded text-sm">
+                {row.created_at ? format(new Date(row.created_at), "PPP 'at' p") : 'N/A'}
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">Updated At</Label>
+              <div className="mt-1 p-2 bg-muted rounded text-sm">
+                {row.updated_at ? format(new Date(row.updated_at), "PPP 'at' p") : 'N/A'}
+              </div>
+            </div>
+          </div>
+
           {/* Notes Section - Full Width */}
-          <div className="md:col-span-2 space-y-4">
+          <div className="md:col-span-2 lg:col-span-3 space-y-4">
             <h3 className="font-semibold text-lg border-b pb-2">Notes</h3>
             {isEditing ? (
               <Textarea
@@ -436,13 +739,14 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
         </div>
 
         {/* Action Buttons */}
-        {isEditing && (
+        {isEditing ? (
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button
               variant="outline"
               onClick={() => {
                 setEditData(row);
                 setIsEditing(false);
+                setShowDetailsDialog(false);
               }}
               disabled={isSaving}
             >
@@ -453,6 +757,15 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
               disabled={isSaving}
             >
               {isSaving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setShowDetailsDialog(false)}
+            >
+              Close
             </Button>
           </div>
         )}
@@ -848,7 +1161,7 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => { setIsEditing(true); setShowDetailsDialog(true); }}
+              onClick={() => { setShowDetailsDialog(true); }}
               className="h-7 w-7 p-0"
               title="View & edit details"
             >
