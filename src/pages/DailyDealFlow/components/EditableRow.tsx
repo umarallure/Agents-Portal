@@ -22,11 +22,11 @@ interface EditableRowProps {
 
 // Dropdown options (same as CallResultForm)
 const bufferAgentOptions = [
-  "N/A", "Ira", "Burney", "Kyla", "Bryan", "Justine", "Isaac", "Landon", "Juan"
+  "N/A", "Ira", "Burney","Tatumn", "Kyla", "Bryan", "Justine", "Isaac", "Landon", "Juan"
 ];
 
 const agentOptions = [
-  "Claudia", "Lydia", "Juan", "Benjamin", "Erica", "N/A", "Isaac"
+  "Claudia", "Lydia", "Juan","Tatumn", "Benjamin", "Erica", "N/A", "Isaac"
 ];
 
 const licensedAccountOptions = [
@@ -59,7 +59,7 @@ const leadVendorOptions = [
   "Ark Tech", "GrowthOnics BPO", "Maverick", "Omnitalk BPO", "Vize BPO",
   "Corebiz", "Digicon", "Ambition", "Benchmark", "Poshenee", "Plexi",
   "Gigabite", "Everline solution", "Progressive BPO", "Cerberus BPO",
-  "TM Global", "Optimum BPO", "Ethos BPO", "Trust Link", "Crown Connect BPO",
+  "NanoTech", "Optimum BPO", "Ethos BPO", "Trust Link", "Crown Connect BPO",
   "Quotes BPO", "Zupax Marketing", "Argon Communications", "Care Solutions",
   "Cutting Edge", "Next Era", "Rock BPO", "Avenue Consultancy"
 ];
@@ -132,7 +132,7 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
       'Everline solution': 'bg-violet-500 text-white',
       'Progressive BPO': 'bg-amber-500 text-white',
       'Cerberus BPO': 'bg-slate-500 text-white',
-      'TM Global': 'bg-lime-500 text-white',
+      'NanoTech': 'bg-lime-500 text-white',
       'Optimum BPO': 'bg-fuchsia-500 text-white',
       'Ethos BPO': 'bg-sky-500 text-white',
       'Trust Link': 'bg-stone-500 text-white',
@@ -200,6 +200,7 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
       'Isaac': 'bg-indigo-500 text-white',
       'Landon': 'bg-teal-500 text-white',
       'Juan': 'bg-red-500 text-white',
+      'Tatumn': 'bg-orange-500 text-white'
     };
     return colors[agent || ''] || 'bg-gray-400 text-white';
   };
@@ -214,6 +215,7 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
       'Erica': 'bg-rose-500 text-white',
       'N/A': 'bg-gray-500 text-white',
       'Isaac': 'bg-cyan-500 text-white',
+      'Tatumn': 'bg-orange-500 text-white'
     };
     return colors[agent || ''] || 'bg-gray-400 text-white';
   };

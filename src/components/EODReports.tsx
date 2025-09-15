@@ -48,7 +48,7 @@ export const EODReports = ({ className }: EODReportsProps) => {
     "Ark Tech", "GrowthOnics BPO", "Maverick", "Omnitalk BPO", "Vize BPO",
     "Corebiz", "Digicon", "Ambition", "Benchmark", "Poshenee", "Plexi",
     "Gigabite", "Everline solution", "Progressive BPO", "Cerberus BPO",
-    "TM Global", "Optimum BPO", "Ethos BPO", "Trust Link", "Crown Connect BPO",
+    "NanoTech", "Optimum BPO", "Ethos BPO", "Trust Link", "Crown Connect BPO",
     "Quotes BPO", "Zupax Marketing", "Argon Communications", "Care Solutions",
     "Cutting Edge", "Next Era", "Rock BPO", "Avenue Consultancy"
   ];

@@ -32,7 +32,7 @@ serve(async (req)=>{
       "Everline solution": "#orbit-team-everline-bpo",
       "Progressive BPO": "#orbit-team-progressive-bpo",
       "Cerberus BPO": "#orbit-team-cerberus-bpo",
-      "TM Global": "#orbit-team-tm-global-bpo",
+      "NanoTech": "#orbit-team-nanotech-bpo",
       "Optimum BPO": "#orbit-team-optimum-bpo",
       "Ethos BPO": "#orbit-team-ethos-bpo",
       "Trust Link": "#orbit-team-trust-link",

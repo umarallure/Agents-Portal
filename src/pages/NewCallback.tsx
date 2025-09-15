@@ -30,7 +30,7 @@ const leadVendorOptions = [
 "Everline solution",
 "Progressive BPO",
 "Cerberus BPO",
-"TM Global",
+"NanoTech",
 "Optimum BPO",
 "Ethos BPO",
 "Trust Link",
