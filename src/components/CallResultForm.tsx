@@ -992,6 +992,57 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         }
       }
 
+      // Send disconnected call notification for disconnected statuses
+      if (applicationSubmitted === false && (finalStatus === 'Disconnected' || finalStatus === 'Disconnected - Never Retransferred')) {
+        try {
+          // First, fetch the lead data for the disconnected call notification
+          const { data: leadData, error: leadError } = await supabase
+            .from("leads")
+            .select("*")
+            .eq("submission_id", submissionId)
+            .single();
+
+          if (!leadError && leadData) {
+            const callResultForDisconnected = {
+              application_submitted: applicationSubmitted,
+              status: finalStatus,
+              dq_reason: showStatusReasonDropdown ? statusReason : null,
+              status_reason: showStatusReasonDropdown ? statusReason : null,
+              notes: notes,
+              buffer_agent: bufferAgent,
+              agent_who_took_call: agentWhoTookCall,
+              lead_vendor: leadData.lead_vendor || leadVendor || 'N/A',
+              call_source: callSource
+            };
+
+            console.log("Sending disconnected call notification");
+
+            const { error: disconnectedError } = await supabase.functions.invoke('disconnected-call-notification', {
+              body: {
+                submissionId: submissionId,
+                leadData: {
+                  customer_full_name: leadData.customer_full_name,
+                  phone_number: leadData.phone_number,
+                  email: leadData.email,
+                  lead_vendor: leadData.lead_vendor
+                },
+                callResult: callResultForDisconnected
+              }
+            });
+
+            if (disconnectedError) {
+              console.error("Error sending disconnected call notification:", disconnectedError);
+              // Don't fail the entire process if disconnected notification fails
+            } else {
+              console.log("Disconnected call notification sent successfully");
+            }
+          }
+        } catch (disconnectedError) {
+          console.error("Disconnected call notification failed:", disconnectedError);
+          // Don't fail the entire process if disconnected notification fails
+        }
+      }
+
       toast({
         title: "Success",
         description: existingResult ? "Call result updated successfully" : "Call result saved successfully",

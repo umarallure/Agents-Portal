@@ -72,7 +72,7 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
     const leadData: Record<string, string> = {};
     if (verificationItems) {
       verificationItems.forEach(item => {
-        if (['lead_vendor', 'customer_full_name'].includes(item.field_name)) {
+        if (['lead_vendor', 'customer_full_name', 'phone_number', 'email'].includes(item.field_name)) {
           leadData[item.field_name] = inputValues[item.id] || item.original_value || '';
         }
       });
@@ -443,20 +443,37 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
                     await updateSessionStatus('call_dropped');
                     const leadData = getLeadData();
                     
-                    // Log the call dropped event
+                    // Get agent profile information
+                    let agentProfile = null;
+                    let agentType = 'buffer';
+                    
                     if (session?.buffer_agent_id) {
-                      const { customerName, leadVendor } = await getLeadInfo(session.submission_id);
-                      const { data: bufferAgentProfile } = await supabase
+                      const { data: profile } = await supabase
                         .from('profiles')
                         .select('display_name')
                         .eq('user_id', session.buffer_agent_id)
                         .single();
+                      agentProfile = profile;
+                      agentType = 'buffer';
+                    } else if (session?.licensed_agent_id) {
+                      const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('display_name')
+                        .eq('user_id', session.licensed_agent_id)
+                        .single();
+                      agentProfile = profile;
+                      agentType = 'licensed';
+                    }
+                    
+                    // Log the call dropped event
+                    if (session?.buffer_agent_id) {
+                      const { customerName, leadVendor } = await getLeadInfo(session.submission_id);
 
                       await logCallUpdate({
                         submissionId: session.submission_id,
                         agentId: session.buffer_agent_id,
                         agentType: 'buffer',
-                        agentName: bufferAgentProfile?.display_name || 'Buffer Agent',
+                        agentName: agentProfile?.display_name || 'Buffer Agent',
                         eventType: 'call_dropped',
                         eventDetails: {
                           verification_session_id: session.id,
@@ -468,17 +485,12 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
                       });
                     } else if (session?.licensed_agent_id) {
                       const { customerName, leadVendor } = await getLeadInfo(session.submission_id);
-                      const { data: licensedAgentProfile } = await supabase
-                        .from('profiles')
-                        .select('display_name')
-                        .eq('user_id', session.licensed_agent_id)
-                        .single();
 
                       await logCallUpdate({
                         submissionId: session.submission_id,
                         agentId: session.licensed_agent_id,
                         agentType: 'licensed',
-                        agentName: licensedAgentProfile?.display_name || 'Licensed Agent',
+                        agentName: agentProfile?.display_name || 'Licensed Agent',
                         eventType: 'call_dropped',
                         eventDetails: {
                           verification_session_id: session.id,
@@ -498,6 +510,30 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
                         leadData
                       }
                     });
+
+                    // Send disconnected call notification
+                    const agentInfo = agentType === 'buffer' ? 
+                      { buffer_agent: agentProfile?.display_name || 'Buffer Agent' } : 
+                      { agent_who_took_call: agentProfile?.display_name || 'Licensed Agent' };
+
+                    await supabase.functions.invoke('disconnected-call-notification', {
+                      body: {
+                        submissionId: session.submission_id,
+                        leadData: {
+                          customer_full_name: leadData.customer_full_name,
+                          phone_number: leadData.phone_number,
+                          email: leadData.email,
+                          lead_vendor: leadData.lead_vendor
+                        },
+                        callResult: {
+                          status: "Call Dropped",
+                          notes: `Call dropped during verification session. Agent: ${agentProfile?.display_name || (agentType === 'buffer' ? 'Buffer Agent' : 'Licensed Agent')}`,
+                          call_source: "Verification Session",
+                          ...agentInfo
+                        }
+                      }
+                    });
+
                     alert(`Call with ${leadData.customer_full_name || 'client'} dropped. Need to reconnect.`);
                     toast({
                       title: 'Call Dropped',
@@ -560,6 +596,32 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
                         leadData
                       }
                     });
+
+                    // Send disconnected call notification
+                    const { data: licensedAgentProfile } = await supabase
+                      .from('profiles')
+                      .select('display_name')
+                      .eq('user_id', session.licensed_agent_id)
+                      .single();
+
+                    await supabase.functions.invoke('disconnected-call-notification', {
+                      body: {
+                        submissionId: session.submission_id,
+                        leadData: {
+                          customer_full_name: leadData.customer_full_name,
+                          phone_number: leadData.phone_number,
+                          email: leadData.email,
+                          lead_vendor: leadData.lead_vendor
+                        },
+                        callResult: {
+                          status: "Call Dropped",
+                          notes: `Call dropped during verification session. Agent: ${licensedAgentProfile?.display_name || 'Licensed Agent'}`,
+                          call_source: "Verification Session",
+                          agent_who_took_call: licensedAgentProfile?.display_name || 'Licensed Agent'
+                        }
+                      }
+                    });
+
                     alert(`Call with ${leadData.customer_full_name || 'client'} dropped. Need to reconnect.`);
                     toast({
                       title: 'Call Dropped',

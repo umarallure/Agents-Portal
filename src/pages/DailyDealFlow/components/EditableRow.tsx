@@ -14,6 +14,18 @@ import { DailyDealFlowRow } from "../DailyDealFlowPage";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+// Utility function to format dates without timezone conversion
+const formatDateWithoutTimezone = (dateString: string): string => {
+  // Parse YYYY-MM-DD format directly without creating Date object
+  const [year, month, day] = dateString.split('-');
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthIndex = parseInt(month) - 1;
+  const shortYear = year.slice(-2);
+  
+  return `${monthNames[monthIndex]} ${day.padStart(2, '0')}, ${shortYear}`;
+};
+
 interface EditableRowProps {
   row: DailyDealFlowRow;
   rowIndex: number;
@@ -44,7 +56,8 @@ const productTypeOptions = [
 
 const statusOptions = [
   "Needs BPO Callback",
-  "Not Interested", 
+  "Not Interested",
+  "Pending Approval",
   "Returned To Center - DQ",
   "Application Withdrawn",
   "Call Back Fix",
@@ -1052,7 +1065,7 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
       <tr className={`${getStatusColor(row.status)} hover:bg-muted/50 transition-colors border`}>
         {/* Date */}
         <td className="border border-border px-3 py-2 text-sm w-20">
-          {row.date ? format(new Date(row.date), "MMM dd, yy") : ''}
+          {row.date ? formatDateWithoutTimezone(row.date) : ''}
         </td>
 
         {/* Lead Vendor */}
@@ -1128,7 +1141,7 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
 
         {/* Draft Date */}
         <td className="border border-border px-3 py-2 text-sm w-20">
-          {row.draft_date ? format(new Date(row.draft_date), "MMM dd, yy") : ''}
+          {row.draft_date ? formatDateWithoutTimezone(row.draft_date) : ''}
         </td>
 
         {/* MP (Monthly Premium) */}
