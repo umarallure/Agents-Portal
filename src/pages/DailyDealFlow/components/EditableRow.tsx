@@ -5,9 +5,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Save, X, Edit, CalendarIcon, Eye } from "lucide-react";
+import { Save, X, Edit, CalendarIcon, Eye, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DailyDealFlowRow } from "../DailyDealFlowPage";
@@ -29,6 +30,7 @@ const formatDateWithoutTimezone = (dateString: string): string => {
 interface EditableRowProps {
   row: DailyDealFlowRow;
   rowIndex: number;
+  serialNumber: number;
   onUpdate: () => void;
 }
 
@@ -77,11 +79,12 @@ const leadVendorOptions = [
   "Cutting Edge", "Next Era", "Rock BPO", "Avenue Consultancy"
 ];
 
-export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
+export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<DailyDealFlowRow>(row);
   const [isSaving, setIsSaving] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
   // Reset edit state when dialog closes
@@ -290,6 +293,42 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
   const handleCancel = () => {
     setEditData(row);
     setIsEditing(false);
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('daily_deal_flow')
+        .delete()
+        .eq('id', row.id);
+
+      if (error) {
+        console.error("Error deleting row:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete row",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: "Row deleted successfully",
+      });
+
+      onUpdate();
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const updateField = (field: keyof DailyDealFlowRow, value: any) => {
@@ -792,6 +831,11 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
     return (
       <>
         <tr className="bg-blue-50 border-2 border-blue-200">
+          {/* Serial Number */}
+          <td className="border border-border px-3 py-2 text-center font-medium">
+            {serialNumber}
+          </td>
+
           {/* Date */}
           <td className="border border-border px-3 py-2">
             <Popover>
@@ -836,12 +880,13 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
           </td>
 
           {/* Insured Name */}
-          <td className="border border-border px-3 py-2">
-            <Input
+          <td className="border border-border px-3 py-2 w-32 align-top">
+            <Textarea
               value={editData.insured_name || ''}
               onChange={(e) => updateField('insured_name', e.target.value)}
-              className="h-8 text-xs"
+              className="min-h-[2.5rem] text-xs resize-none"
               placeholder="Customer name"
+              rows={2}
             />
           </td>
 
@@ -1013,13 +1058,14 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
             />
           </td>
 
-          {/* Notes (3 lines max) */}
-          <td className="border border-border px-3 py-2 max-w-md">
+          {/* Notes */}
+          <td className="border border-border px-3 py-2 w-32 align-top">
             <Textarea
               value={editData.notes || ''}
               onChange={(e) => updateField('notes', e.target.value)}
-              className="h-16 text-xs resize-none"
+              className="min-h-[4rem] text-xs resize-none"
               placeholder="Notes..."
+              rows={3}
             />
           </td>
 
@@ -1063,6 +1109,11 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
   return (
     <>
       <tr className={`${getStatusColor(row.status)} hover:bg-muted/50 transition-colors border`}>
+        {/* Serial Number */}
+        <td className="border border-border px-3 py-2 text-sm text-center font-medium">
+          {serialNumber}
+        </td>
+
         {/* Date */}
         <td className="border border-border px-3 py-2 text-sm w-20">
           {row.date ? formatDateWithoutTimezone(row.date) : ''}
@@ -1078,10 +1129,10 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
         </td>
 
         {/* Insured Name */}
-        <td className="border border-border px-2 py-2 text-sm w-14 truncate">
-          <span className="font-medium text-gray-800 block truncate">
-            {row.insured_name && row.insured_name.length > 12 ? row.insured_name.substring(0, 12) + '...' : row.insured_name}
-          </span>
+        <td className="border border-border px-2 py-3 text-sm w-32 align-top">
+          <div className="font-medium text-gray-800 whitespace-normal break-words leading-tight min-h-[2.5rem]">
+            {row.insured_name || ''}
+          </div>
         </td>
 
         {/* Buffer Agent */}
@@ -1154,9 +1205,9 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
           {row.face_amount ? `$${row.face_amount.toLocaleString()}` : ''}
         </td>
 
-        {/* Notes (3 lines max) */}
-        <td className="border border-border px-3 py-2 text-xs w-28">
-          <div className="line-clamp-3 whitespace-pre-wrap">
+        {/* Notes */}
+        <td className="border border-border px-3 py-3 text-xs w-32 align-top">
+          <div className="whitespace-pre-wrap break-words leading-tight min-h-[2.5rem] max-h-20 overflow-y-auto">
             {row.notes || ''}
           </div>
         </td>
@@ -1182,6 +1233,37 @@ export const EditableRow = ({ row, rowIndex, onUpdate }: EditableRowProps) => {
             >
               <Eye className="h-3 w-3" />
             </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  title="Delete row"
+                  disabled={isDeleting}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure you want to delete this row?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the row for {row.insured_name || 'this customer'}.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-red-600 hover:bg-red-700"
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </td>
       </tr>
