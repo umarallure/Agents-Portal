@@ -612,7 +612,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         // Don't fail the entire process if logging fails
       }
 
-      // Sync daily_deal_flow on form submit
+      // Sync daily_deal_flow using the new Edge Function
       try {
         const { data: leadData } = await supabase
           .from("leads")
@@ -621,35 +621,31 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           .single();
         if (leadData) {
           // Determine mapped status for the sheet
-          const mappedStatus = applicationSubmitted === true 
-            ? "Pending Approval" 
+          const mappedStatus = applicationSubmitted === true
+            ? "Pending Approval"
             : mapStatusToSheetValue(finalStatus);
 
-          // Handle different call sources for daily_deal_flow sync
-          if (callSource === "First Time Transfer" || callSource === "Agent Callback") {
-            // Generate structured notes for submitted applications
-            let finalNotes = notes;
-            if (applicationSubmitted === true) {
-              const structuredNotes = generateSubmittedApplicationNotes(
-                licensedAgentAccount,
-                carrier,
-                productType,
-                monthlyPremium,
-                coverageAmount,
-                draftDate,
-                sentToUnderwriting
-              );
-              // Combine structured notes with agent's manual notes
-              finalNotes = combineNotes(structuredNotes, notes);
-            }
+          // Generate structured notes for submitted applications
+          let finalNotes = notes;
+          if (applicationSubmitted === true) {
+            const structuredNotes = generateSubmittedApplicationNotes(
+              licensedAgentAccount,
+              carrier,
+              productType,
+              monthlyPremium,
+              coverageAmount,
+              draftDate,
+              sentToUnderwriting
+            );
+            // Combine structured notes with agent's manual notes
+            finalNotes = combineNotes(structuredNotes, notes);
+          }
 
-            // For first time transfer and agent callback - create/update with current date
-            const dealFlowData = {
+          // Call the update-daily-deal-flow-entry function
+          const { data: updateResult, error: updateError } = await supabase.functions.invoke('update-daily-deal-flow-entry', {
+            body: {
               submission_id: submissionId,
-              client_phone_number: leadData.phone_number,
-              lead_vendor: leadData.lead_vendor || leadVendor || "N/A",
-              date: new Date().toISOString().split('T')[0],
-              insured_name: leadData.customer_full_name,
+              call_source: callSource,
               buffer_agent: bufferAgent,
               agent: agentWhoTookCall,
               licensed_agent_account: licensedAgentAccount,
@@ -662,55 +658,19 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
               draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
               monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
               face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
-              from_callback: callSource === "Agent Callback",
               notes: finalNotes,
-              updated_at: new Date().toISOString()
-            };
-            const { error: dealFlowError } = await supabase
-              .from('daily_deal_flow')
-              .upsert(dealFlowData, { onConflict: 'submission_id' });
-            if (dealFlowError) console.error('Error syncing daily_deal_flow:', dealFlowError);
-            
-          } else if (callSource === "Reconnected Transfer") {
-            // Generate structured notes for submitted applications
-            let finalNotes = notes;
-            if (applicationSubmitted === true) {
-              const structuredNotes = generateSubmittedApplicationNotes(
-                licensedAgentAccount,
-                carrier,
-                productType,
-                monthlyPremium,
-                coverageAmount,
-                draftDate,
-                sentToUnderwriting
-              );
-              // Combine structured notes with agent's manual notes
-              finalNotes = combineNotes(structuredNotes, notes);
+              policy_number: null,
+              carrier_audit: null,
+              product_type_carrier: null,
+              level_or_gi: null,
+              from_callback: callSource === "Agent Callback"
             }
+          });
 
-            // For reconnected transfer - update existing record, preserve original date
-            const updateData = {
-              buffer_agent: bufferAgent,
-              agent: agentWhoTookCall,
-              licensed_agent_account: licensedAgentAccount,
-              status: mappedStatus,
-              call_result: applicationSubmitted === true
-                ? (sentToUnderwriting === true ? "Underwriting" : "Submitted")
-                : "Not Submitted",
-              carrier: carrier || null,
-              product_type: productType || null,
-              draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
-              monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-              face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
-              from_callback: false, // Reconnected transfer is not from callback
-              notes: finalNotes,
-              updated_at: new Date().toISOString()
-            };
-            const { error: dealFlowError } = await supabase
-              .from('daily_deal_flow')
-              .update(updateData)
-              .eq('submission_id', submissionId);
-            if (dealFlowError) console.error('Error updating daily_deal_flow for reconnected transfer:', dealFlowError);
+          if (updateError) {
+            console.error('Error updating daily deal flow:', updateError);
+          } else {
+            console.log('Daily deal flow updated successfully:', updateResult);
           }
         }
       } catch (syncError) {

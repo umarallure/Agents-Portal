@@ -43,7 +43,11 @@ export const AgentActivityDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [bufferAgentsPage, setBufferAgentsPage] = useState(1);
+  const [licensedAgentsPage, setLicensedAgentsPage] = useState(1);
   const { toast } = useToast();
+
+  const ITEMS_PER_PAGE = 100;
 
   useEffect(() => {
     fetchAgentActivity();
@@ -81,14 +85,20 @@ export const AgentActivityDashboard = () => {
         setRefreshing(true);
       }
 
-      // Fetch all verification sessions with agent and lead data
+      // Fetch recent verification sessions with agent and lead data
+      // Limit to recent sessions for performance, focusing on active and recent ones
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
       const { data: sessions, error: sessionsError } = await supabase
         .from('verification_sessions')
         .select(`
           *,
           leads!inner(customer_full_name, phone_number)
         `)
-        .order('created_at', { ascending: false });
+        .gte('created_at', sevenDaysAgo.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1000); // Limit for performance
 
       if (sessionsError) throw sessionsError;
 
@@ -107,58 +117,85 @@ export const AgentActivityDashboard = () => {
         // Process buffer agents
         if (session.buffer_agent_id) {
           const bufferProfile = profiles?.find(p => p.user_id === session.buffer_agent_id);
-          if (bufferProfile) {
-            const isActive = ['pending', 'in_progress'].includes(session.status);
-            
-            bufferAgentMap.set(session.buffer_agent_id, {
-              id: session.buffer_agent_id,
-              agent_id: session.buffer_agent_id,
-              agent_name: bufferProfile.display_name || 'Unknown',
-              agent_type: 'buffer',
-              status: isActive ? 'in_call' : 'available',
-              customer_name: isActive ? session.leads?.customer_full_name : undefined,
-              submission_id: isActive ? session.submission_id : undefined,
-              call_started_at: isActive ? session.started_at : undefined,
-              verification_status: session.status,
-              progress_percentage: session.progress_percentage
-            });
+          if (!bufferProfile) {
+            console.warn(`Missing profile for buffer agent ${session.buffer_agent_id} - using fallback name`);
           }
+          const isActive = ['pending', 'in_progress'].includes(session.status);
+          
+          bufferAgentMap.set(session.buffer_agent_id, {
+            id: session.buffer_agent_id,
+            agent_id: session.buffer_agent_id,
+            agent_name: bufferProfile?.display_name || `Buffer Agent ${session.buffer_agent_id.slice(-4)}`,
+            agent_type: 'buffer',
+            status: isActive ? 'in_call' : 'available',
+            customer_name: isActive ? session.leads?.customer_full_name : undefined,
+            submission_id: isActive ? session.submission_id : undefined,
+            call_started_at: isActive ? session.started_at : undefined,
+            verification_status: session.status,
+            progress_percentage: session.progress_percentage
+          });
         }
 
         // Process licensed agents
         if (session.licensed_agent_id && ['transferred', 'in_progress', 'completed'].includes(session.status)) {
           const licensedProfile = profiles?.find(p => p.user_id === session.licensed_agent_id);
-          if (licensedProfile) {
-            const isActive = session.status === 'in_progress';
-            
-            licensedAgentMap.set(session.licensed_agent_id, {
-              id: session.licensed_agent_id,
-              agent_id: session.licensed_agent_id,
-              agent_name: licensedProfile.display_name || 'Unknown',
-              agent_type: 'licensed',
-              status: isActive ? 'in_call' : 'available',
-              customer_name: session.leads?.customer_full_name,
-              submission_id: session.submission_id,
-              call_started_at: session.started_at,
-              verification_status: session.status,
-              progress_percentage: session.progress_percentage
-            });
+          if (!licensedProfile) {
+            console.warn(`Missing profile for licensed agent ${session.licensed_agent_id} - using fallback name`);
           }
+          const isActive = session.status === 'in_progress';
+          
+          licensedAgentMap.set(session.licensed_agent_id, {
+            id: session.licensed_agent_id,
+            agent_id: session.licensed_agent_id,
+            agent_name: licensedProfile?.display_name || `Licensed Agent ${session.licensed_agent_id.slice(-4)}`,
+            agent_type: 'licensed',
+            status: isActive ? 'in_call' : 'available',
+            customer_name: session.leads?.customer_full_name,
+            submission_id: session.submission_id,
+            call_started_at: session.started_at,
+            verification_status: session.status,
+            progress_percentage: session.progress_percentage
+          });
         }
       });
 
       setBufferAgents(Array.from(bufferAgentMap.values()));
       setLicensedAgents(Array.from(licensedAgentMap.values()));
 
-      // Calculate stats
-      const today = new Date().toISOString().split('T')[0];
-      const transferredToday = sessions?.filter(s => 
-        s.status === 'transferred' && s.transferred_at?.startsWith(today)
-      ).length || 0;
+      // Reset pagination when data is refreshed
+      setBufferAgentsPage(1);
+      setLicensedAgentsPage(1);
+
+      // Calculate stats using EST timezone (Eastern Time) - UTC-5 during EST, UTC-4 during EDT
+      const now = new Date();
       
-      const completedToday = sessions?.filter(s => 
-        s.status === 'completed' && s.completed_at?.startsWith(today)
-      ).length || 0;
+      // Determine if Daylight Saving Time is in effect (March to November approximation)
+      const isDST = now.getUTCMonth() >= 2 && now.getUTCMonth() <= 10; // March to November
+      const estOffset = isDST ? -4 : -5; // EDT (UTC-4) or EST (UTC-5) in hours
+      
+      // Calculate EST date by adjusting UTC time
+      const nowEST = new Date(now.getTime() + (estOffset * 60 * 60 * 1000));
+      
+      // Create date boundaries in EST timezone using UTC methods to avoid local timezone interference
+      const todayEST = new Date(Date.UTC(nowEST.getUTCFullYear(), nowEST.getUTCMonth(), nowEST.getUTCDate()));
+      const tomorrowEST = new Date(todayEST);
+      tomorrowEST.setUTCDate(tomorrowEST.getUTCDate() + 1);
+
+      const transferredToday = sessions?.filter(s => {
+        if (s.status !== 'transferred' || !s.transferred_at) return false;
+        const transferredDate = new Date(s.transferred_at);
+        // Convert to EST/EDT for comparison
+        const transferredDateEST = new Date(transferredDate.getTime() + (estOffset * 60 * 60 * 1000));
+        return transferredDateEST >= todayEST && transferredDateEST < tomorrowEST;
+      }).length || 0;
+      
+      const completedToday = sessions?.filter(s => {
+        if (s.status !== 'completed' || !s.completed_at) return false;
+        const completedDate = new Date(s.completed_at);
+        // Convert to EST/EDT for comparison
+        const completedDateEST = new Date(completedDate.getTime() + (estOffset * 60 * 60 * 1000));
+        return completedDateEST >= todayEST && completedDateEST < tomorrowEST;
+      }).length || 0;
 
       setStats({
         total_buffer_agents: bufferAgentMap.size,
@@ -172,10 +209,42 @@ export const AgentActivityDashboard = () => {
 
     } catch (error) {
       console.error('Error fetching agent activity:', error);
+      
+      // Log specific error details for debugging
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+      }
+
+      // Check for specific error types and provide better user feedback
+      let errorMessage = "Failed to load agent activity";
+      if (error?.message?.includes('network') || error?.message?.includes('fetch')) {
+        errorMessage = "Network error - please check your connection";
+      } else if (error?.message?.includes('timeout')) {
+        errorMessage = "Request timed out - please try refreshing";
+      } else if (error?.code === 'PGRST116') {
+        errorMessage = "Database connection error - please try again later";
+      }
+
       toast({
-        title: "Error",
-        description: "Failed to load agent activity",
+        title: "Error Loading Dashboard",
+        description: errorMessage,
         variant: "destructive",
+      });
+
+      // Set empty state on error to prevent crashes
+      setBufferAgents([]);
+      setLicensedAgents([]);
+      setStats({
+        total_buffer_agents: 0,
+        total_licensed_agents: 0,
+        agents_in_call: 0,
+        active_verifications: 0,
+        transferred_today: 0,
+        completed_today: 0
       });
     } finally {
       setLoading(false);
@@ -187,6 +256,87 @@ export const AgentActivityDashboard = () => {
 
   const handleManualRefresh = () => {
     fetchAgentActivity(true);
+  };
+
+  // Pagination helpers
+  const getPaginatedData = (data: AgentSession[], currentPage: number) => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return data.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = (totalItems: number) => {
+    return Math.ceil(totalItems / ITEMS_PER_PAGE);
+  };
+
+  const PaginationControls = ({ 
+    currentPage, 
+    totalItems, 
+    onPageChange, 
+    title 
+  }: { 
+    currentPage: number; 
+    totalItems: number; 
+    onPageChange: (page: number) => void; 
+    title: string; 
+  }) => {
+    const totalPages = getTotalPages(totalItems);
+    
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex items-center justify-between mt-4 px-4 py-2 bg-gray-50 rounded-lg">
+        <div className="text-sm text-gray-600">
+          Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, totalItems)} to {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems} {title.toLowerCase()}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </Button>
+          
+          <div className="flex items-center gap-1">
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+              
+              return (
+                <Button
+                  key={pageNum}
+                  variant={currentPage === pageNum ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => onPageChange(pageNum)}
+                  className="w-8 h-8 p-0"
+                >
+                  {pageNum}
+                </Button>
+              );
+            })}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+    );
   };
 
   const getStatusColor = (status: string) => {
@@ -343,12 +493,12 @@ export const AgentActivityDashboard = () => {
           </CardHeader>
           <CardContent className="p-4">
             <div className="space-y-3">
-              {bufferAgents.length === 0 ? (
+              {getPaginatedData(bufferAgents, bufferAgentsPage).length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No buffer agents currently active
                 </div>
               ) : (
-                bufferAgents.map((agent) => (
+                getPaginatedData(bufferAgents, bufferAgentsPage).map((agent) => (
                   <div key={agent.id} className="flex items-center justify-between p-3 bg-white rounded-lg border shadow-sm">
                     <div className="flex items-center gap-3">
                       <div className="relative">
@@ -387,6 +537,12 @@ export const AgentActivityDashboard = () => {
                 ))
               )}
             </div>
+            <PaginationControls
+              currentPage={bufferAgentsPage}
+              totalItems={bufferAgents.length}
+              onPageChange={setBufferAgentsPage}
+              title="Buffer Agents"
+            />
           </CardContent>
         </Card>
 
@@ -400,12 +556,12 @@ export const AgentActivityDashboard = () => {
           </CardHeader>
           <CardContent className="p-4">
             <div className="space-y-3">
-              {licensedAgents.length === 0 ? (
+              {getPaginatedData(licensedAgents, licensedAgentsPage).length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No licensed agents currently handling cases
                 </div>
               ) : (
-                licensedAgents.map((agent) => (
+                getPaginatedData(licensedAgents, licensedAgentsPage).map((agent) => (
                   <div key={agent.id} className="flex items-center justify-between p-3 bg-white rounded-lg border shadow-sm">
                     <div className="flex items-center gap-3">
                       <div className="relative">
@@ -442,6 +598,12 @@ export const AgentActivityDashboard = () => {
                 ))
               )}
             </div>
+            <PaginationControls
+              currentPage={licensedAgentsPage}
+              totalItems={licensedAgents.length}
+              onPageChange={setLicensedAgentsPage}
+              title="Licensed Agents"
+            />
           </CardContent>
         </Card>
       </div>

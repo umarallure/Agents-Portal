@@ -101,12 +101,28 @@ export const AgentReportsAndLogs = () => {
   const loadData = async () => {
     setLoading(true);
     try {
+      // Calculate default date range in EST timezone if no dates are selected
+      let defaultStartDate: string | undefined;
+      let defaultEndDate: string | undefined;
+      
+      if (!startDate && !endDate) {
+        // Use current EST date as default when no dates are selected
+        const now = new Date();
+        const isDST = now.getUTCMonth() >= 2 && now.getUTCMonth() <= 10;
+        const estOffset = isDST ? -4 : -5;
+        const nowEST = new Date(now.getTime() + (estOffset * 60 * 60 * 1000));
+        const todayEST = new Date(Date.UTC(nowEST.getUTCFullYear(), nowEST.getUTCMonth(), nowEST.getUTCDate()));
+        
+        defaultStartDate = format(todayEST, 'yyyy-MM-dd');
+        defaultEndDate = format(todayEST, 'yyyy-MM-dd');
+      }
+
       // Load agent stats
       const stats = await getAgentStats(
         selectedAgentId === 'all' ? undefined : selectedAgentId,
         selectedAgentType === 'all' ? undefined : selectedAgentType,
-        startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
-        endDate ? format(endDate, 'yyyy-MM-dd') : undefined
+        startDate ? format(startDate, 'yyyy-MM-dd') : defaultStartDate,
+        endDate ? format(endDate, 'yyyy-MM-dd') : defaultEndDate
       );
 
       if (stats) {
@@ -118,8 +134,8 @@ export const AgentReportsAndLogs = () => {
         undefined, // submissionId
         selectedAgentId === 'all' ? undefined : selectedAgentId,
         undefined, // eventType
-        startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
-        endDate ? format(endDate, 'yyyy-MM-dd') : undefined
+        startDate ? format(startDate, 'yyyy-MM-dd') : defaultStartDate,
+        endDate ? format(endDate, 'yyyy-MM-dd') : defaultEndDate
       );
 
       if (logs) {
@@ -217,6 +233,9 @@ export const AgentReportsAndLogs = () => {
       <Card>
         <CardHeader>
           <CardTitle>Filters</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {!startDate && !endDate ? "Showing today's data in EST timezone by default" : "Custom date range selected"}
+          </p>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
