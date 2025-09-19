@@ -50,7 +50,23 @@ npm run dev
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
-## What technologies are used for this project?
+## Features
+
+### Bulk Duplicate Lookup
+The agent portal includes a powerful bulk lookup feature that helps identify duplicate entries with pending approval status.
+
+**How it works:**
+1. Upload a CSV file containing phone numbers, lead vendors, and insured names
+2. The system searches for duplicate entries in the daily deal flow table
+3. Returns all entries where there are multiple records with at least one having 'Pending Approval' status
+4. Export results to CSV for further analysis
+
+**CSV Format Requirements:**
+- Must include columns for phone number, lead vendor, and insured name
+- Column headers should contain: phone, lead vendor, insured name
+- One entry per row to check for duplicates
+
+**Access:** Available to authorized users via the "Bulk Lookup" button in the dashboard header.
 
 This project is built with:
 

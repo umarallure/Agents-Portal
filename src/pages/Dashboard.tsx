@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Filter, LogOut, Phone, User, DollarSign, CheckCircle, BarChart3, Eye, Clock, Grid3X3 } from 'lucide-react';
+import { Calendar, Filter, LogOut, Phone, User, DollarSign, CheckCircle, BarChart3, Eye, Clock, Grid3X3, Search, Menu, ChevronDown } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
@@ -38,7 +39,7 @@ const Dashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const isBen = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79';
-  const isAuthorizedUser = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79' || user?.id === '9c004d97-b5fb-4ed6-805e-e2c383fe8b6f' || user?.id === 'c2f07638-d3d2-4fe9-9a65-f57395745695';
+  const isAuthorizedUser = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79' || user?.id === '9c004d97-b5fb-4ed6-805e-e2c383fe8b6f' || user?.id === 'c2f07638-d3d2-4fe9-9a65-f57395745695' || user?.id === '30b23a3f-df6b-40af-85d1-84d3e6f0b8b4';
 
   useEffect(() => {
     if (!loading && !user) {
@@ -228,36 +229,53 @@ const Dashboard = () => {
             </Badge>
           </div>
           <div className="flex items-center space-x-2">
+            {/* Main Navigation Menu */}
             {isAuthorizedUser && (
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/daily-deal-flow')}
-                className="flex items-center gap-2"
-              >
-                <Grid3X3 className="h-4 w-4" />
-                Daily Deal Flow
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Menu className="h-4 w-4" />
+                    Menue
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Lead Management</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => navigate('/daily-deal-flow')}>
+                    <Grid3X3 className="mr-2 h-4 w-4" />
+                    Daily Deal Flow
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/transfer-portal')}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    Transfer Portal
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/submission-portal')}>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Submission Portal
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Reports & Analytics</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => navigate('/reports')}>
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Agent Reports & Logs
+                  </DropdownMenuItem>
+                  {isBen && (
+                    <DropdownMenuItem onClick={() => navigate('/analytics')}>
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Analytics Dashboard
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Tools</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => navigate('/bulk-lookup')}>
+                    <Search className="mr-2 h-4 w-4" />
+                    Bulk Lookup
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-            {isBen && (
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/analytics')}
-                className="flex items-center gap-2"
-              >
-                <BarChart3 className="h-4 w-4" />
-                Analytics Dashboard
-              </Button>
-            )}
-            {isAuthorizedUser && (
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/reports')}
-                className="flex items-center gap-2"
-              >
-                <BarChart3 className="h-4 w-4" />
-                Agent Reports & Logs
-              </Button>
-            )}
+            
+            {/* Sign Out Button */}
             <Button variant="outline" onClick={handleSignOut}>
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out

@@ -25,6 +25,11 @@ serve(async (req)=>{
       "Corebiz": "#orbit-team-corebiz-bpo",
       "Digicon": "#orbit-team-digicon-bpo",
       "Ambition": "#orbit-team-ambition-bpo",
+      
+      "AJ BPO": "#orbit-team-aj-bpo",
+      "Pro Solutions BPO": "#orbit-team-pro-solutions-bpo",
+      "Emperor BPO": "#orbit-team-emperor-bpo",
+
       "Benchmark": "#orbit-team-benchmark-bpo",
       "Poshenee": "#orbit-team-poshenee-tech-bpo",
       "Plexi": "#orbit-team-plexi-bpo",

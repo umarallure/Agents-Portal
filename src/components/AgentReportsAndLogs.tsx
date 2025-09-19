@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { CalendarIcon, Download, Users, Phone, PhoneCall, UserCheck, TrendingUp, TrendingDown } from "lucide-react";
+import { CalendarIcon, Download, Users, Phone, PhoneCall, UserCheck, TrendingUp, TrendingDown, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getAgentStats, getCallLogs } from "@/lib/callLogging";
@@ -217,16 +218,27 @@ export const AgentReportsAndLogs = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Agent Reports & Call Logs</h1>
-        <div className="flex gap-2">
-          <Button onClick={() => exportData(agentStats, 'agent_stats')} variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export Stats
-          </Button>
-          <Button onClick={() => exportData(callLogs, 'call_logs')} variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export Logs
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              Export Data
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => exportData(agentStats, 'agent_stats')}>
+              <Download className="mr-2 h-4 w-4" />
+              Export Agent Stats
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => exportData(callLogs, 'call_logs')}>
+              <Download className="mr-2 h-4 w-4" />
+              Export Call Logs
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Filters */}

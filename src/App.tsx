@@ -14,6 +14,9 @@ import CallResultUpdate from "./pages/CallResultUpdate";
 import CallResultJourney from "./pages/CallResultJourney";
 import NewCallback from "./pages/NewCallback";
 import DailyDealFlowPage from "./pages/DailyDealFlow/DailyDealFlowPage";
+import TransferPortalPage from "./pages/TransferPortalPage";
+import SubmissionPortalPage from "./pages/SubmissionPortalPage";
+import BulkLookupPage from "./pages/BulkLookupPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -77,10 +80,34 @@ const App = () => (
               } 
             />
             <Route 
+              path="/transfer-portal" 
+              element={
+                <ProtectedRoute>
+                  <TransferPortalPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/submission-portal" 
+              element={
+                <ProtectedRoute>
+                  <SubmissionPortalPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/reports" 
               element={
                 <ProtectedRoute>
                   <AgentReportsAndLogs />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/bulk-lookup" 
+              element={
+                <ProtectedRoute>
+                  <BulkLookupPage />
                 </ProtectedRoute>
               } 
             />

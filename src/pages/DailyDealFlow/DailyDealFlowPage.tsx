@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { NavigationHeader } from "@/components/NavigationHeader";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { DataGrid } from "./components/DataGrid";
 import { GridToolbar } from "./components/GridToolbar";
 import { EODReports } from "@/components/EODReports";
 import { GHLExport } from "@/components/GHLExport";
-import { Loader2, RefreshCw, Download } from "lucide-react";
+import { Loader2, RefreshCw, Download, FileSpreadsheet, ChevronDown, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export interface DailyDealFlowRow {
   id: string;
@@ -208,21 +210,41 @@ const DailyDealFlowPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-full mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Daily Deal Flow Sheet</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage and edit your daily deal flow data in real-time
-            </p>
-          </div>
+    <div className="min-h-screen bg-background">
+      <NavigationHeader title="Daily Deal Flow Sheet" />
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-full mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-muted-foreground">
+                Manage and edit your daily deal flow data in real-time
+              </p>
+            </div>
           
           <div className="flex items-center gap-2">
-            <EODReports />
-            <GHLExport />
+            {/* Reports Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Reports
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <EODReports />
+                <GHLExport />
+                <DropdownMenuItem onClick={handleExport}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Current View
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
+            {/* Refresh Button */}
             <Button
               variant="outline"
               onClick={handleRefresh}
@@ -231,15 +253,6 @@ const DailyDealFlowPage = () => {
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               Refresh
-            </Button>
-            
-            <Button
-              variant="outline"
-              onClick={handleExport}
-              className="flex items-center gap-2"
-            >
-              <Download className="h-4 w-4" />
-              Export
             </Button>
           </div>
         </div>
@@ -282,6 +295,7 @@ const DailyDealFlowPage = () => {
             />
           </CardContent>
         </Card>
+        </div>
       </div>
     </div>
   );
