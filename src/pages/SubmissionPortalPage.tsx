@@ -37,6 +37,14 @@ export interface SubmissionPortalRow {
   dq_reason?: string;
   call_source?: string;
   submission_source?: string;
+  verification_logs?: string;
+}
+
+interface CallLog {
+  agent_type: string;
+  agent_name: string;
+  event_type: string;
+  created_at: string;
 }
 
 const SubmissionPortalPage = () => {
@@ -47,6 +55,130 @@ const SubmissionPortalPage = () => {
   const [statusFilter, setStatusFilter] = useState("__ALL__");
 
   const { toast } = useToast();
+
+  // Function to generate verification log summary showing complete call workflow
+  const generateVerificationLogSummary = (logs: CallLog[], submission?: any): string => {
+    if (!logs || logs.length === 0) {
+      // Fallback to data from submission/call_results table
+      if (submission) {
+        const workflow = [];
+        
+        if (submission.buffer_agent) {
+          workflow.push(`🟡 Buffer: ${submission.buffer_agent}`);
+        }
+        
+        if (submission.agent && submission.agent !== submission.buffer_agent) {
+          workflow.push(`📞 Handled by: ${submission.agent}`);
+        }
+        
+        if (submission.licensed_agent_account) {
+          if (submission.buffer_agent || submission.agent_who_took_call) {
+            workflow.push(`➡️ Transfer to Licensed`);
+          }
+          workflow.push(`🔵 Licensed: ${submission.licensed_agent_account}`);
+        }
+        
+        if (workflow.length > 0) {
+          return workflow.join(' → ');
+        }
+      }
+      
+      return "No verification activity";
+    }
+
+    const sortedLogs = logs.sort((a, b) => 
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+
+    const workflow: string[] = [];
+    let initialAgent: string | null = null;
+    let currentAgent: string | null = null;
+    let bufferAgent: string | null = null;
+    let licensedAgent: string | null = null;
+    let hasTransfer = false;
+    
+    for (const log of sortedLogs) {
+      const agentName = log.agent_name || `${log.agent_type} agent`;
+      
+      switch (log.event_type) {
+        case 'verification_started':
+          if (!initialAgent) {
+            initialAgent = agentName;
+            currentAgent = agentName;
+            
+            if (log.agent_type === 'buffer') {
+              bufferAgent = agentName;
+              workflow.push(`� Buffer "${agentName}" picked up initially`);
+            } else if (log.agent_type === 'licensed') {
+              licensedAgent = agentName;
+              workflow.push(`🔵 Licensed "${agentName}" picked up initially`);
+            }
+          }
+          break;
+          
+        case 'call_picked_up':
+          if (agentName !== currentAgent) {
+            if (log.agent_type === 'buffer') {
+              bufferAgent = agentName;
+              workflow.push(`� Buffer "${agentName}" picked up`);
+            } else {
+              licensedAgent = agentName;
+              workflow.push(`🔵 Licensed "${agentName}" picked up`);
+            }
+            currentAgent = agentName;
+          }
+          break;
+          
+        case 'call_claimed':
+          if (log.agent_type === 'buffer') {
+            bufferAgent = agentName;
+            workflow.push(`� Buffer "${agentName}" claimed dropped call`);
+          } else {
+            licensedAgent = agentName;
+            workflow.push(`🔵 Licensed "${agentName}" claimed dropped call`);
+          }
+          currentAgent = agentName;
+          break;
+          
+        case 'transferred_to_la':
+          hasTransfer = true;
+          workflow.push(`➡️ Transferred to Licensed Agent`);
+          break;
+          
+        case 'call_dropped':
+          workflow.push(`❌ "${agentName}" dropped call`);
+          break;
+          
+        case 'application_submitted':
+          workflow.push(`✅ Application submitted by "${agentName}"`);
+          break;
+          
+        case 'application_not_submitted':
+          workflow.push(`❌ Application not submitted`);
+          break;
+          
+        case 'call_disconnected':
+          workflow.push(`📞 Call disconnected from "${agentName}"`);
+          break;
+      }
+    }
+
+    // If no workflow events, show basic structure
+    if (workflow.length === 0) {
+      return "No detailed workflow events recorded";
+    }
+
+    // Add summary at the end showing final state
+    const summary = [];
+    if (bufferAgent) summary.push(`Buffer: ${bufferAgent}`);
+    if (hasTransfer || licensedAgent) summary.push(`Licensed: ${licensedAgent || 'TBD'}`);
+    
+    if (summary.length > 0) {
+      workflow.push(`📋 Summary: ${summary.join(' → ')}`);
+    }
+
+    return workflow.join(" → ");
+  };
 
   // Fetch data from Supabase
   const fetchData = async (showRefreshToast = false) => {
@@ -86,7 +218,39 @@ const SubmissionPortalPage = () => {
         return;
       }
 
-      setData((portalData as SubmissionPortalRow[]) || []);
+      // Fetch call logs for each submission
+      const submissionIds = (portalData as SubmissionPortalRow[])?.map(row => row.submission_id) || [];
+      
+      let callLogsData: Record<string, CallLog[]> = {};
+      
+      if (submissionIds.length > 0) {
+        const { data: logsData, error: logsError } = await supabase
+          .from('call_update_logs')
+          .select('submission_id, agent_type, agent_name, event_type, created_at')
+          .in('submission_id', submissionIds)
+          .order('created_at', { ascending: true });
+
+        if (logsError) {
+          console.warn("Error fetching call logs:", logsError);
+        } else {
+          // Group logs by submission_id
+          callLogsData = (logsData || []).reduce((acc, log) => {
+            if (!acc[log.submission_id]) {
+              acc[log.submission_id] = [];
+            }
+            acc[log.submission_id].push(log);
+            return acc;
+          }, {} as Record<string, CallLog[]>);
+        }
+      }
+
+      // Add verification logs to each row
+      const dataWithLogs = (portalData as SubmissionPortalRow[])?.map(row => ({
+        ...row,
+        verification_logs: generateVerificationLogSummary(callLogsData[row.submission_id] || [], row)
+      })) || [];
+
+      setData(dataWithLogs);
 
       if (showRefreshToast) {
         toast({
@@ -146,6 +310,7 @@ const SubmissionPortalPage = () => {
       'Submission Date',
       'Call Source',
       'Submission Source',
+      'Verification Logs',
       'Created At'
     ];
 
@@ -171,6 +336,7 @@ const SubmissionPortalPage = () => {
         row.submission_date || '',
         row.call_source || '',
         row.submission_source || '',
+        row.verification_logs || '',
         row.created_at || ''
       ].map(field => `"${field}"`).join(','))
     ].join('\n');
@@ -277,7 +443,7 @@ const SubmissionPortalPage = () => {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left p-2">Submission ID</th>
+                      
                       <th className="text-left p-2">Date</th>
                       <th className="text-left p-2">Insured Name</th>
                       <th className="text-left p-2">Lead Vendor</th>
@@ -288,12 +454,13 @@ const SubmissionPortalPage = () => {
                       <th className="text-left p-2">Submitted</th>
                       <th className="text-left p-2">Underwriting</th>
                       <th className="text-left p-2">Call Source</th>
+                      <th className="text-left p-2 min-w-80">Verification Logs</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.map((row) => (
                       <tr key={row.id} className="border-b hover:bg-gray-50">
-                        <td className="p-2 font-mono text-sm">{row.submission_id}</td>
+                        
                         <td className="p-2">{row.date}</td>
                         <td className="p-2">{row.insured_name}</td>
                         <td className="p-2">{row.lead_vendor}</td>
@@ -326,6 +493,11 @@ const SubmissionPortalPage = () => {
                           </span>
                         </td>
                         <td className="p-2">{row.call_source}</td>
+                        <td className="p-2 min-w-80">
+                          <div className="text-xs text-gray-700 leading-relaxed">
+                            {row.verification_logs}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -63,7 +63,8 @@ const statusOptions = [
   "Returned To Center - DQ",
   "Application Withdrawn",
   "Call Back Fix",
-  "Incomplete Transfer"
+  "Incomplete Transfer",
+  "DQ'd Can't be sold"
 ];
 
 const callResultOptions = [

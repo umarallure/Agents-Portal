@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { DataGrid } from "./components/DataGrid";
 import { GridToolbar } from "./components/GridToolbar";
+import { CreateEntryForm } from "./components/CreateEntryForm";
 import { EODReports } from "@/components/EODReports";
 import { GHLExport } from "@/components/GHLExport";
 import { Loader2, RefreshCw, Download, FileSpreadsheet, ChevronDown, MoreHorizontal } from "lucide-react";
@@ -223,6 +224,9 @@ const DailyDealFlowPage = () => {
             </div>
           
           <div className="flex items-center gap-2">
+            {/* Create Entry Button */}
+            <CreateEntryForm onSuccess={fetchData} />
+            
             {/* Reports Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

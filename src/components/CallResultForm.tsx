@@ -231,6 +231,44 @@ const getNoteText = (status: string, reason: string, clientName: string = "[Clie
   return statusReasonMapping[status]?.[reason] || "";
 };
 
+// Function to generate new submission ID for callback entries
+const generateCallbackSubmissionId = (originalSubmissionId: string): string => {
+  const randomDigits = Math.floor(1000 + Math.random() * 9000); // 4-digit random number
+  return `CB${randomDigits}${originalSubmissionId}`;
+};
+
+// Function to check if entry exists and get its date
+const checkExistingDailyDealFlowEntry = async (submissionId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('daily_deal_flow')
+      .select('date')
+      .eq('submission_id', submissionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+      console.error('Error checking existing entry:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in checkExistingDailyDealFlowEntry:', error);
+    return null;
+  }
+};
+
+// Function to get today's date in EST timezone
+const getTodayDateEST = (): string => {
+  const now = new Date();
+  // Convert to EST (UTC-5, or UTC-4 during DST)
+  const estOffset = now.getTimezoneOffset() === 300 ? -5 : -4; // EST is UTC-5, EDT is UTC-4
+  const estDate = new Date(now.getTime() + (estOffset * 60 * 60 * 1000));
+  return estDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+};
+
 // Function to generate structured notes for submitted applications
 const generateSubmittedApplicationNotes = (
   licensedAgentAccount: string,
@@ -466,11 +504,31 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
     e.preventDefault();
     setIsSubmitting(true);
 
+    let finalSubmissionId = submissionId;
+
     try {
       // Determine status based on underwriting field
       let finalStatus = status;
       if (applicationSubmitted === true) {
         finalStatus = sentToUnderwriting === true ? "Underwriting" : "Submitted";
+      }
+
+      // Map status for sheet value
+      const mappedStatus = mapStatusToSheetValue(finalStatus);
+
+      // Generate final notes
+      let finalNotes = notes;
+      if (applicationSubmitted === true) {
+        const structuredNotes = generateSubmittedApplicationNotes(
+          licensedAgentAccount,
+          carrier,
+          productType,
+          monthlyPremium,
+          coverageAmount,
+          draftDate,
+          sentToUnderwriting
+        );
+        finalNotes = combineNotes(structuredNotes, notes);
       }
 
       const callResultData = {
@@ -612,72 +670,45 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         // Don't fail the entire process if logging fails
       }
 
-      // Sync daily_deal_flow using the new Edge Function
-      try {
-        const { data: leadData } = await supabase
-          .from("leads")
-          .select("*")
-          .eq("submission_id", submissionId)
-          .single();
-        if (leadData) {
-          // Determine mapped status for the sheet
-          const mappedStatus = applicationSubmitted === true
-            ? "Pending Approval"
-            : mapStatusToSheetValue(finalStatus);
+          // Sync daily_deal_flow using the Edge Function
+          try {
+            console.log('DEBUG: Calling update-daily-deal-flow-entry for daily_deal_flow update');
 
-          // Generate structured notes for submitted applications
-          let finalNotes = notes;
-          if (applicationSubmitted === true) {
-            const structuredNotes = generateSubmittedApplicationNotes(
-              licensedAgentAccount,
-              carrier,
-              productType,
-              monthlyPremium,
-              coverageAmount,
-              draftDate,
-              sentToUnderwriting
-            );
-            // Combine structured notes with agent's manual notes
-            finalNotes = combineNotes(structuredNotes, notes);
-          }
+            const { data: updateResult, error: updateError } = await supabase.functions.invoke('update-daily-deal-flow-entry', {
+              body: {
+                submission_id: submissionId,
+                call_source: callSource,
+                buffer_agent: bufferAgent,
+                agent: agentWhoTookCall,
+                licensed_agent_account: licensedAgentAccount,
+                status: mappedStatus,
+                call_result: applicationSubmitted === true
+                  ? (sentToUnderwriting === true ? "Underwriting" : "Submitted")
+                  : "Not Submitted",
+                carrier: carrier || null,
+                product_type: productType || null,
+                draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
+                monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
+                face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
+                notes: finalNotes,
+                policy_number: null,
+                carrier_audit: null,
+                product_type_carrier: null,
+                level_or_gi: null,
+                from_callback: callSource === "Agent Callback"
+              }
+            });
 
-          // Call the update-daily-deal-flow-entry function
-          const { data: updateResult, error: updateError } = await supabase.functions.invoke('update-daily-deal-flow-entry', {
-            body: {
-              submission_id: submissionId,
-              call_source: callSource,
-              buffer_agent: bufferAgent,
-              agent: agentWhoTookCall,
-              licensed_agent_account: licensedAgentAccount,
-              status: mappedStatus,
-              call_result: applicationSubmitted === true
-                ? (sentToUnderwriting === true ? "Underwriting" : "Submitted")
-                : "Not Submitted",
-              carrier: carrier || null,
-              product_type: productType || null,
-              draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
-              monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-              face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
-              notes: finalNotes,
-              policy_number: null,
-              carrier_audit: null,
-              product_type_carrier: null,
-              level_or_gi: null,
-              from_callback: callSource === "Agent Callback"
+            if (updateError) {
+              console.error('Error updating daily deal flow:', updateError);
+            } else {
+              console.log('Daily deal flow updated successfully:', updateResult);
+              // Use the submission_id returned by the function for Google Sheets
+              finalSubmissionId = updateResult.submission_id || submissionId;
             }
-          });
-
-          if (updateError) {
-            console.error('Error updating daily deal flow:', updateError);
-          } else {
-            console.log('Daily deal flow updated successfully:', updateResult);
-          }
-        }
-      } catch (syncError) {
-        console.error('Sync to daily_deal_flow failed:', syncError);
-      }
-      
-      // Update verification session status to completed if one exists
+          } catch (syncError) {
+            console.error('Sync to daily_deal_flow failed:', syncError);
+          }      // Update verification session status to completed if one exists
       try {
         const { error: sessionUpdateError } = await supabase
           .from('verification_sessions')
@@ -733,102 +764,139 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         if (leadError || !leadData) {
           console.error("Error fetching lead data:", leadError);
         } else {
-          if (callSource === "First Time Transfer") {
-            // Generate combined notes for Google Sheets
-            let finalNotes = notes;
-            if (applicationSubmitted === true) {
-              const structuredNotes = generateSubmittedApplicationNotes(
-                licensedAgentAccount,
-                carrier,
-                productType,
-                monthlyPremium,
-                coverageAmount,
-                draftDate,
-                sentToUnderwriting
-              );
-              finalNotes = combineNotes(structuredNotes, notes);
-            }
+            // This was the start of the problematic nested try
+            if (callSource === "First Time Transfer" || callSource === "Reconnected Transfer") {
+              // Use the finalSubmissionId from the Edge function
+              console.log(`DEBUG: Google Sheets - ${callSource}, finalSubmissionId:`, finalSubmissionId, 'original:', submissionId);
 
-            // Update existing entry in daily deal flow
-            const { error: sheetsError } = await supabase.functions.invoke('google-sheets-update', {
-              body: {
-                submissionId: submissionId,
-                callResult: {
+              if (finalSubmissionId !== submissionId) {
+                // New entry was created
+                console.log(`DEBUG: Google Sheets - Creating new entry for submission ${submissionId} -> ${finalSubmissionId}`);
+
+                // Prepare lead data with new submission_id
+                const newEntryLeadData = {
+                  ...leadData,
+                  submission_id: finalSubmissionId,
+                  submission_date: todayDate,
+                  lead_vendor: leadData.lead_vendor || leadVendor || 'N/A'
+                };
+
+                // Prepare call result data
+                const newEntryCallResult = {
                   application_submitted: applicationSubmitted,
                   status: applicationSubmitted === true ? "Pending Approval" : mapStatusToSheetValue(finalStatus),
-                  buffer_agent: bufferAgent,
-                  agent_who_took_call: agentWhoTookCall,
-                  licensed_agent_account: licensedAgentAccount,
-                  carrier: carrier,
-                  product_type: productType,
+                  buffer_agent: bufferAgent || '',
+                  agent_who_took_call: agentWhoTookCall || '',
+                  licensed_agent_account: licensedAgentAccount || '',
+                  carrier: carrier || '',
+                  product_type: productType || '',
                   draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
                   monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
                   face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
-                  notes: finalNotes,
+                  notes: finalNotes || '',
                   dq_reason: showStatusReasonDropdown ? statusReason : null,
                   sent_to_underwriting: sentToUnderwriting,
-                  from_callback: (callSource as string) === "Agent Callback",
+                  from_callback: callSource === "Reconnected Transfer",
                   call_source: callSource
+                };
+
+                // Create new entry in Google Sheets
+                const { error: sheetsError } = await supabase.functions.invoke('create-new-callback-sheet', {
+                  body: {
+                    leadData: newEntryLeadData,
+                    callResult: newEntryCallResult
+                  }
+                });
+
+                if (sheetsError) {
+                  console.error(`Error creating new Google Sheets entry for ${callSource}:`, sheetsError);
+                } else {
+                  console.log(`New Google Sheets entry created successfully for submission ${finalSubmissionId}`);
+                }
+              } else {
+                // Update existing entry
+                console.log('DEBUG: Google Sheets - Updating existing entry');
+
+                const { error: sheetsError } = await supabase.functions.invoke('google-sheets-update', {
+                  body: {
+                    submissionId: submissionId,
+                    callResult: {
+                      application_submitted: applicationSubmitted,
+                      status: applicationSubmitted === true ? "Pending Approval" : mapStatusToSheetValue(finalStatus),
+                      buffer_agent: bufferAgent,
+                      agent_who_took_call: agentWhoTookCall,
+                      licensed_agent_account: licensedAgentAccount,
+                      carrier: carrier,
+                      product_type: productType,
+                      draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
+                      monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
+                      face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
+                      notes: finalNotes,
+                      dq_reason: showStatusReasonDropdown ? statusReason : null,
+                      sent_to_underwriting: sentToUnderwriting,
+                      from_callback: callSource === "Reconnected Transfer",
+                      call_source: callSource
+                    }
+                  }
+                });
+                if (sheetsError) {
+                  console.error("Error updating Google Sheets:", sheetsError);
                 }
               }
-            });
-            if (sheetsError) {
-              console.error("Error updating Google Sheets:", sheetsError);
-            }
-          } else if (callSource === "Reconnected Transfer" || callSource === "Agent Callback") {
-            // Generate combined notes for Google Sheets
-            let finalNotes = notes;
-            if (applicationSubmitted === true) {
-              const structuredNotes = generateSubmittedApplicationNotes(
-                licensedAgentAccount,
-                carrier,
-                productType,
-                monthlyPremium,
-                coverageAmount,
-                draftDate,
-                sentToUnderwriting
-              );
-              finalNotes = combineNotes(structuredNotes, notes);
-            }
-
-            // Prepare lead data with all necessary fields
-            const callbackLeadData = {
-              ...leadData,
-              submission_date: todayDate,
-              lead_vendor: leadData.lead_vendor || leadVendor || 'N/A'
-            };
-
-            // Prepare call result data
-            const callbackCallResult = {
-              application_submitted: applicationSubmitted,
-              status: applicationSubmitted === true ? "Pending Approval" : mapStatusToSheetValue(finalStatus),
-              buffer_agent: bufferAgent || '',
-              agent_who_took_call: agentWhoTookCall || '',
-              licensed_agent_account: licensedAgentAccount || '',
-              carrier: carrier || '',
-              product_type: productType || '',
-              draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
-              monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-              face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
-              notes: finalNotes || '',
-              dq_reason: showStatusReasonDropdown ? statusReason : null,
-              sent_to_underwriting: sentToUnderwriting,
-              from_callback: callSource === "Agent Callback",
-              call_source: callSource
-            };
-
-            // Create new entry in daily deal flow with today's date
-            const { error: sheetsError } = await supabase.functions.invoke('create-new-callback-sheet', {
-              body: {
-                leadData: callbackLeadData,
-                callResult: callbackCallResult
-              }
-            });
-            
-            if (sheetsError) {
-              console.error("Error creating new Google Sheets entry:", sheetsError);
-            }
+            } else if (callSource === "Agent Callback") {
+          // Generate combined notes for Google Sheets
+          let finalNotes = notes;
+          if (applicationSubmitted === true) {
+            const structuredNotes = generateSubmittedApplicationNotes(
+              licensedAgentAccount,
+              carrier,
+              productType,
+              monthlyPremium,
+              coverageAmount,
+              draftDate,
+              sentToUnderwriting
+            );
+            finalNotes = combineNotes(structuredNotes, notes);
           }
+
+          // Prepare lead data with all necessary fields
+          const callbackLeadData = {
+            ...leadData,
+            submission_date: todayDate,
+            lead_vendor: leadData.lead_vendor || leadVendor || 'N/A'
+          };
+
+          // Prepare call result data
+          const callbackCallResult = {
+            application_submitted: applicationSubmitted,
+            status: applicationSubmitted === true ? "Pending Approval" : mapStatusToSheetValue(finalStatus),
+            buffer_agent: bufferAgent || '',
+            agent_who_took_call: agentWhoTookCall || '',
+            licensed_agent_account: licensedAgentAccount || '',
+            carrier: carrier || '',
+            product_type: productType || '',
+            draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
+            monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
+            face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
+            notes: finalNotes || '',
+            dq_reason: showStatusReasonDropdown ? statusReason : null,
+            sent_to_underwriting: sentToUnderwriting,
+            from_callback: callSource === "Agent Callback",
+            call_source: callSource
+          };
+
+          // Create new entry in daily deal flow with today's date
+          const { error: sheetsError } = await supabase.functions.invoke('create-new-callback-sheet', {
+            body: {
+              leadData: callbackLeadData,
+              callResult: callbackCallResult
+            }
+          });
+          
+          if (sheetsError) {
+            console.error("Error creating new Google Sheets entry:", sheetsError);
+          }
+        }
         }
       } catch (sheetsError) {
         console.error("Google Sheets operation failed:", sheetsError);
