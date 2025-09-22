@@ -8,6 +8,7 @@ import { DataGrid } from "./components/DataGrid";
 import { GridToolbar } from "./components/GridToolbar";
 import { CreateEntryForm } from "./components/CreateEntryForm";
 import { EODReports } from "@/components/EODReports";
+import { WeeklyReports } from "@/components/WeeklyReports";
 import { GHLExport } from "@/components/GHLExport";
 import { Loader2, RefreshCw, Download, FileSpreadsheet, ChevronDown, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -240,6 +241,7 @@ const DailyDealFlowPage = () => {
                 <DropdownMenuLabel>Export Options</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <EODReports />
+                <WeeklyReports />
                 <GHLExport />
                 <DropdownMenuItem onClick={handleExport}>
                   <Download className="mr-2 h-4 w-4" />
