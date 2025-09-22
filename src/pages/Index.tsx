@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import { isRestrictedUser } from "@/lib/userPermissions";
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -10,7 +11,12 @@ const Index = () => {
 
   useEffect(() => {
     if (!loading && user) {
-      navigate('/dashboard');
+      // Check if user is restricted and redirect accordingly
+      if (isRestrictedUser(user.id)) {
+        navigate('/daily-deal-flow');
+      } else {
+        navigate('/dashboard');
+      }
     }
   }, [user, loading, navigate]);
 

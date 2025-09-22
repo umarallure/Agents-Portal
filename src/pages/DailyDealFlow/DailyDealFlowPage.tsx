@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { NavigationHeader } from "@/components/NavigationHeader";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { DataGrid } from "./components/DataGrid";
 import { GridToolbar } from "./components/GridToolbar";
@@ -12,6 +13,7 @@ import { WeeklyReports } from "@/components/WeeklyReports";
 import { GHLExport } from "@/components/GHLExport";
 import { Loader2, RefreshCw, Download, FileSpreadsheet, ChevronDown, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { canPerformWriteOperations } from "@/lib/userPermissions";
 
 export interface DailyDealFlowRow {
   id: string;
@@ -57,6 +59,10 @@ const DailyDealFlowPage = () => {
   const [callResultFilter, setCallResultFilter] = useState(ALL_OPTION);
   
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  // Check if current user has write permissions
+  const hasWritePermissions = canPerformWriteOperations(user?.id);
 
   // Fetch data from Supabase
   const fetchData = async (showRefreshToast = false) => {
@@ -224,43 +230,45 @@ const DailyDealFlowPage = () => {
               </p>
             </div>
           
-          <div className="flex items-center gap-2">
-            {/* Create Entry Button */}
-            <CreateEntryForm onSuccess={fetchData} />
-            
-            {/* Reports Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2">
-                  <FileSpreadsheet className="h-4 w-4" />
-                  Reports
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Export Options</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <EODReports />
-                <WeeklyReports />
-                <GHLExport />
-                <DropdownMenuItem onClick={handleExport}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Export Current View
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            
-            {/* Refresh Button */}
-            <Button
-              variant="outline"
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-          </div>
+          {hasWritePermissions && (
+            <div className="flex items-center gap-2">
+              {/* Create Entry Button */}
+              <CreateEntryForm onSuccess={fetchData} />
+              
+              {/* Reports Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Reports
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <EODReports />
+                  <WeeklyReports />
+                  <GHLExport />
+                  <DropdownMenuItem onClick={handleExport}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export Current View
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              {/* Refresh Button */}
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Toolbar */}
@@ -298,6 +306,7 @@ const DailyDealFlowPage = () => {
             <DataGrid
               data={filteredData}
               onDataUpdate={fetchData}
+              hasWritePermissions={hasWritePermissions}
             />
           </CardContent>
         </Card>

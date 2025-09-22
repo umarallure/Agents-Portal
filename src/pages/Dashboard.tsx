@@ -12,6 +12,7 @@ import { Calendar, Filter, LogOut, Phone, User, DollarSign, CheckCircle, BarChar
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { isRestrictedUser } from '@/lib/userPermissions';
 import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -44,6 +45,11 @@ const Dashboard = () => {
   useEffect(() => {
     if (!loading && !user) {
       navigate('/auth');
+    }
+    
+    // Redirect restricted users to daily-deal-flow
+    if (!loading && user && isRestrictedUser(user.id)) {
+      navigate('/daily-deal-flow');
     }
   }, [user, loading, navigate]);
 

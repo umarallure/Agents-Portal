@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, Search, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { canAccessNavigation } from '@/lib/userPermissions';
 
 interface NavigationHeaderProps {
   title: string;
@@ -17,6 +18,7 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
   
   const isBen = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79';
   const isAuthorizedUser = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79' || user?.id === '9c004d97-b5fb-4ed6-805e-e2c383fe8b6f' || user?.id === 'c2f07638-d3d2-4fe9-9a65-f57395745695' || user?.id === '30b23a3f-df6b-40af-85d1-84d3e6f0b8b4';
+  const hasNavigationAccess = canAccessNavigation(user?.id);
 
   const handleSignOut = async () => {
     await signOut();
@@ -45,8 +47,8 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
           </Badge>
         </div>
         <div className="flex items-center space-x-2">
-          {/* Main Navigation Menu */}
-          {isAuthorizedUser && (
+          {/* Main Navigation Menu - Only show for users with navigation access */}
+          {isAuthorizedUser && hasNavigationAccess && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="flex items-center gap-2">

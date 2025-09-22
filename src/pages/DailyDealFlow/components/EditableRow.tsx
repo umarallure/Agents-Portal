@@ -32,6 +32,7 @@ interface EditableRowProps {
   rowIndex: number;
   serialNumber: number;
   onUpdate: () => void;
+  hasWritePermissions?: boolean;
 }
 
 // Dropdown options (same as CallResultForm)
@@ -81,7 +82,7 @@ const leadVendorOptions = [
   "AJ BPO", "Pro Solutions BPO", "Emperor BPO"
 ];
 
-export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableRowProps) => {
+export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePermissions = true }: EditableRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<DailyDealFlowRow>(row);
   const [isSaving, setIsSaving] = useState(false);
@@ -1182,35 +1183,37 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableR
           </td>
 
           {/* Actions */}
-          <td className="border border-border px-3 py-2">
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                onClick={handleSave}
-                disabled={isSaving}
-                className="h-7 w-7 p-0"
-              >
-                <Save className="h-3 w-3" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCancel}
-                disabled={isSaving}
-                className="h-7 w-7 p-0"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowDetailsDialog(true)}
-                className="h-7 w-7 p-0"
-              >
-                <Eye className="h-3 w-3" />
-              </Button>
-            </div>
-          </td>
+          {hasWritePermissions && (
+            <td className="border border-border px-3 py-2">
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="h-7 w-7 p-0"
+                >
+                  <Save className="h-3 w-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCancel}
+                  disabled={isSaving}
+                  className="h-7 w-7 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowDetailsDialog(true)}
+                  className="h-7 w-7 p-0"
+                >
+                  <Eye className="h-3 w-3" />
+                </Button>
+              </div>
+            </td>
+          )}
         </tr>
         {DetailsDialog}
       </>
@@ -1325,49 +1328,50 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableR
         </td>
 
         {/* Actions */}
-        <td className="border border-border px-3 py-2 w-28">
-          <div className="flex gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setIsEditing(true)}
-              className="h-7 w-7 p-0"
-              title="Edit row"
-            >
-              <Edit className="h-3 w-3" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => { setShowDetailsDialog(true); }}
-              className="h-7 w-7 p-0"
-              title="View & edit details"
-            >
-              <Eye className="h-3 w-3" />
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                  title="Delete row"
-                  disabled={isDeleting}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you sure you want to delete this row?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the row for {row.insured_name || 'this customer'}.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
+        {hasWritePermissions && (
+          <td className="border border-border px-3 py-2 w-28">
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setIsEditing(true)}
+                className="h-7 w-7 p-0"
+                title="Edit row"
+              >
+                <Edit className="h-3 w-3" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setShowDetailsDialog(true); }}
+                className="h-7 w-7 p-0"
+                title="View & edit details"
+              >
+                <Eye className="h-3 w-3" />
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    title="Delete row"
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure you want to delete this row?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete the row for {row.insured_name || 'this customer'}.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
                     className="bg-red-600 hover:bg-red-700"
                     disabled={isDeleting}
                   >
@@ -1378,6 +1382,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableR
             </AlertDialog>
           </div>
         </td>
+        )}
       </tr>
       {DetailsDialog}
     </>

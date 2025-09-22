@@ -9,9 +9,10 @@ import { EditableRow } from "./EditableRow";
 interface DataGridProps {
   data: DailyDealFlowRow[];
   onDataUpdate: () => void;
+  hasWritePermissions?: boolean;
 }
 
-export const DataGrid = ({ data, onDataUpdate }: DataGridProps) => {
+export const DataGrid = ({ data, onDataUpdate, hasWritePermissions = true }: DataGridProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [groupBy, setGroupBy] = useState<string>('none');
   const itemsPerPage = 50;
@@ -28,8 +29,13 @@ export const DataGrid = ({ data, onDataUpdate }: DataGridProps) => {
 
   const columns = [
     "S.No", "Date", "Lead Vendor", "Insured Name", "Buffer Agent", "Agent", "Licensed Account", "Status",
-    "Call Result", "Carrier", "Product Type", "Draft Date", "MP", "Face Amount", "Notes", "Actions"
+    "Call Result", "Carrier", "Product Type", "Draft Date", "MP", "Face Amount", "Notes"
   ];
+  
+  // Add Actions column only for users with write permissions
+  if (hasWritePermissions) {
+    columns.push("Actions");
+  }
 
   // Sort data based on group by selection
   const sortedData = useMemo(() => {
@@ -123,7 +129,8 @@ export const DataGrid = ({ data, onDataUpdate }: DataGridProps) => {
               row={row} 
               rowIndex={startIndex + index} 
               serialNumber={startIndex + index + 1}
-              onUpdate={onDataUpdate} 
+              onUpdate={onDataUpdate}
+              hasWritePermissions={hasWritePermissions}
             />
           ))}
         </TableBody>

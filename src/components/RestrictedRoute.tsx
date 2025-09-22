@@ -3,30 +3,37 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { isRestrictedUser } from '@/lib/userPermissions';
 
-interface ProtectedRouteProps {
+interface RestrictedRouteProps {
   children: React.ReactNode;
+  allowedRoutes?: string[];
 }
 
-const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+const RestrictedRoute = ({ children, allowedRoutes = ['/daily-deal-flow'] }: RestrictedRouteProps) => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
+    // If user is not authenticated, let ProtectedRoute handle it
     if (!loading && !user) {
-      navigate('/auth');
+      return;
     }
-    
-    // Check if user is restricted and redirect them appropriately
+
+    // If user is loaded and is a restricted user
     if (!loading && user && isRestrictedUser(user.id)) {
       const currentPath = location.pathname;
       
-      // Only allow access to /daily-deal-flow for restricted users
-      if (currentPath !== '/daily-deal-flow') {
-        navigate('/daily-deal-flow', { replace: true });
+      // Check if current path is in allowed routes
+      const isCurrentPathAllowed = allowedRoutes.some(route => 
+        currentPath === route || currentPath.startsWith(route)
+      );
+
+      // If not on an allowed route, redirect to the first allowed route
+      if (!isCurrentPathAllowed) {
+        navigate(allowedRoutes[0] || '/daily-deal-flow', { replace: true });
       }
     }
-  }, [user, loading, navigate, location.pathname]);
+  }, [user, loading, navigate, location.pathname, allowedRoutes]);
 
   if (loading) {
     return (
@@ -46,4 +53,4 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   return <>{children}</>;
 };
 
-export default ProtectedRoute;
+export default RestrictedRoute;
