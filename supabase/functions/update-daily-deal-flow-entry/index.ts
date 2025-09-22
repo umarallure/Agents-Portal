@@ -12,6 +12,67 @@ const generateCallbackSubmissionId = (originalSubmissionId: string): string => {
   return `CB${randomDigits}${originalSubmissionId}`;
 };
 
+// Complete status mapping function (matches CallResultForm statusOptions)
+const mapStatusToSheetValue = (userSelectedStatus: string): string => {
+  const statusMap: { [key: string]: string } = {
+    "Needs callback": "Needs BPO Callback",
+    "Call Never Sent": "Incomplete Transfer",
+    "Not Interested": "Returned To Center - DQ",
+    "DQ": "DQ'd Can't be sold",
+    "⁠DQ": "DQ'd Can't be sold", // Handle Unicode character
+    "Future Submission Date": "Application Withdrawn",
+    "Updated Banking/draft date": "Updated Banking Information",
+    "Fulfilled carrier requirements": "Carrier Requirements Met",
+    "Call Back Fix": "Call Back Fix",
+    "Disconnected": "Incomplete Transfer",
+    "Disconnected - Never Retransferred": "Incomplete Transfer"
+  };
+  
+  // Clean the status to handle Unicode characters
+  const cleanStatus = userSelectedStatus?.trim().replace(/\u2060/g, ''); // Remove word joiner
+  const mappedStatus = statusMap[cleanStatus] || statusMap[userSelectedStatus] || userSelectedStatus;
+  
+  console.log(`Status mapping: "${userSelectedStatus}" -> "${mappedStatus}"`);
+  return mappedStatus;
+};
+
+// Function to determine final status based on application submission
+const determineFinalStatus = (applicationSubmitted: boolean, sentToUnderwriting: boolean | null, originalStatus: string): string => {
+  let finalStatus = "";
+  
+  if (applicationSubmitted === true) {
+    // Always "Pending Approval" for submitted applications
+    finalStatus = "Pending Approval";
+  } else if (applicationSubmitted === false) {
+    finalStatus = mapStatusToSheetValue(originalStatus || 'Not Submitted');
+  } else {
+    // Handle undefined/null application_submitted
+    finalStatus = mapStatusToSheetValue(originalStatus || 'Not Submitted');
+  }
+  
+  console.log(`Final status determination:`, {
+    applicationSubmitted,
+    sentToUnderwriting,
+    originalStatus,
+    finalStatus
+  });
+  
+  return finalStatus;
+};
+
+// Function to determine call result status
+const determineCallResultStatus = (applicationSubmitted: boolean, sentToUnderwriting: boolean | null): string => {
+  let callResultStatus = "";
+  
+  if (applicationSubmitted === true) {
+    callResultStatus = sentToUnderwriting === true ? "Underwriting" : "Submitted";
+  } else {
+    callResultStatus = "Not Submitted";
+  }
+  
+  return callResultStatus;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -19,6 +80,8 @@ serve(async (req) => {
     });
   }
 
+  let requestBody: any = {};
+  
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -26,6 +89,7 @@ serve(async (req) => {
     );
 
     // Get parameters from request body
+    requestBody = await req.json();
     const {
       submission_id,
       call_source,
@@ -46,8 +110,11 @@ serve(async (req) => {
       level_or_gi,
       from_callback,
       create_new_entry = false,
-      original_submission_id = null
-    } = await req.json();
+      original_submission_id = null,
+      // Add these for proper status determination
+      application_submitted = null,
+      sent_to_underwriting = null
+    } = requestBody;
 
     // Validate required fields
     if (!submission_id) {
@@ -78,6 +145,9 @@ serve(async (req) => {
     let operation = '';
     let result = null;
     let finalSubmissionId = submission_id;
+
+    // Determine the final status using our mapping functions
+    const finalStatus = determineFinalStatus(application_submitted, sent_to_underwriting, status);
 
     if (call_source === 'First Time Transfer') {
       // Check existing entry and decide whether to create new or update
@@ -146,42 +216,91 @@ serve(async (req) => {
         operation = 'inserted';
         result = data;
       } else {
-        // Update existing row or create new if none exists
-        const { data, error } = await supabase
-          .from('daily_deal_flow')
-          .upsert({
-            submission_id,
-            lead_vendor: leadData?.lead_vendor,
-            insured_name: leadData?.customer_full_name,
-            client_phone_number: leadData?.phone_number,
-            date: todayDate,
-            buffer_agent,
-            agent,
-            licensed_agent_account,
-            status,
-            call_result,
-            carrier,
-            product_type,
-            draft_date,
-            monthly_premium,
-            face_amount,
-            notes,
-            policy_number,
-            carrier_audit,
-            product_type_carrier,
-            level_or_gi,
-            from_callback
-          }, { onConflict: 'submission_id' })
-          .select()
-          .single();
+        if (existingEntry) {
+          // Update the most recent existing entry
+          const { data: mostRecentEntry, error: fetchError } = await supabase
+            .from('daily_deal_flow')
+            .select('id')
+            .eq('submission_id', submission_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
 
-        if (error) {
-          console.error('Error upserting daily deal flow:', error);
-          throw new Error(`Failed to upsert entry: ${error.message}`);
+          if (fetchError) {
+            console.error('Error finding most recent entry:', fetchError);
+            throw new Error(`Failed to find existing entry: ${fetchError.message}`);
+          }
+
+          const { data, error } = await supabase
+            .from('daily_deal_flow')
+            .update({
+              buffer_agent,
+              agent,
+              licensed_agent_account,
+              status,
+              call_result,
+              carrier,
+              product_type,
+              draft_date,
+              monthly_premium,
+              face_amount,
+              notes,
+              policy_number,
+              carrier_audit,
+              product_type_carrier,
+              level_or_gi,
+              from_callback,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', mostRecentEntry.id)
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error updating daily deal flow:', error);
+            throw new Error(`Failed to update entry: ${error.message}`);
+          }
+
+          operation = 'updated';
+          result = data;
+        } else {
+          // Create new entry
+          const { data, error } = await supabase
+            .from('daily_deal_flow')
+            .insert({
+              submission_id,
+              lead_vendor: leadData?.lead_vendor,
+              insured_name: leadData?.customer_full_name,
+              client_phone_number: leadData?.phone_number,
+              date: todayDate,
+              buffer_agent,
+              agent,
+              licensed_agent_account,
+              status,
+              call_result,
+              carrier,
+              product_type,
+              draft_date,
+              monthly_premium,
+              face_amount,
+              notes,
+              policy_number,
+              carrier_audit,
+              product_type_carrier,
+              level_or_gi,
+              from_callback
+            })
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error inserting daily deal flow:', error);
+            throw new Error(`Failed to create entry: ${error.message}`);
+          }
+
+          operation = 'inserted';
+          result = data;
         }
-
-        operation = existingEntry ? 'updated' : 'inserted';
-        result = data;
       }
 
     } else if (call_source === 'Reconnected Transfer') {
@@ -251,42 +370,91 @@ serve(async (req) => {
         operation = 'inserted';
         result = data;
       } else {
-        // Update existing row or create new if none exists
-        const { data, error } = await supabase
-          .from('daily_deal_flow')
-          .upsert({
-            submission_id,
-            lead_vendor: leadData?.lead_vendor,
-            insured_name: leadData?.customer_full_name,
-            client_phone_number: leadData?.phone_number,
-            date: todayDate,
-            buffer_agent,
-            agent,
-            licensed_agent_account,
-            status,
-            call_result,
-            carrier,
-            product_type,
-            draft_date,
-            monthly_premium,
-            face_amount,
-            notes,
-            policy_number,
-            carrier_audit,
-            product_type_carrier,
-            level_or_gi,
-            from_callback
-          }, { onConflict: 'submission_id' })
-          .select()
-          .single();
+        if (existingEntry) {
+          // Update the most recent existing entry
+          const { data: mostRecentEntry, error: fetchError } = await supabase
+            .from('daily_deal_flow')
+            .select('id')
+            .eq('submission_id', submission_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
 
-        if (error) {
-          console.error('Error upserting daily deal flow:', error);
-          throw new Error(`Failed to upsert entry: ${error.message}`);
+          if (fetchError) {
+            console.error('Error finding most recent entry:', fetchError);
+            throw new Error(`Failed to find existing entry: ${fetchError.message}`);
+          }
+
+          const { data, error } = await supabase
+            .from('daily_deal_flow')
+            .update({
+              buffer_agent,
+              agent,
+              licensed_agent_account,
+              status,
+              call_result,
+              carrier,
+              product_type,
+              draft_date,
+              monthly_premium,
+              face_amount,
+              notes,
+              policy_number,
+              carrier_audit,
+              product_type_carrier,
+              level_or_gi,
+              from_callback,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', mostRecentEntry.id)
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error updating daily deal flow:', error);
+            throw new Error(`Failed to update entry: ${error.message}`);
+          }
+
+          operation = 'updated';
+          result = data;
+        } else {
+          // Create new entry
+          const { data, error } = await supabase
+            .from('daily_deal_flow')
+            .insert({
+              submission_id,
+              lead_vendor: leadData?.lead_vendor,
+              insured_name: leadData?.customer_full_name,
+              client_phone_number: leadData?.phone_number,
+              date: todayDate,
+              buffer_agent,
+              agent,
+              licensed_agent_account,
+              status,
+              call_result,
+              carrier,
+              product_type,
+              draft_date,
+              monthly_premium,
+              face_amount,
+              notes,
+              policy_number,
+              carrier_audit,
+              product_type_carrier,
+              level_or_gi,
+              from_callback
+            })
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error inserting daily deal flow:', error);
+            throw new Error(`Failed to create entry: ${error.message}`);
+          }
+
+          operation = 'inserted';
+          result = data;
         }
-
-        operation = existingEntry ? 'updated' : 'inserted';
-        result = data;
       }
 
     } else if (call_source === 'Agent Callback') {
@@ -352,7 +520,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
-      submission_id: submission_id
+      submission_id: requestBody?.submission_id || 'unknown'
     }), {
       status: 400,
       headers: {

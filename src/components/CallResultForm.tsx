@@ -683,7 +683,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 buffer_agent: bufferAgent,
                 agent: agentWhoTookCall,
                 licensed_agent_account: licensedAgentAccount,
-                status: mappedStatus,
+                status: finalStatus, // Use finalStatus instead of mappedStatus
                 call_result: applicationSubmitted === true
                   ? (sentToUnderwriting === true ? "Underwriting" : "Submitted")
                   : "Not Submitted",
@@ -697,7 +697,10 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 carrier_audit: null,
                 product_type_carrier: null,
                 level_or_gi: null,
-                from_callback: callSource === "Agent Callback"
+                from_callback: callSource === "Agent Callback",
+                // Add the new parameters for proper status determination
+                application_submitted: applicationSubmitted,
+                sent_to_underwriting: sentToUnderwriting
               }
             });
 
