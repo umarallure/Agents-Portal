@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -87,6 +87,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableR
   const [isSaving, setIsSaving] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const prevRowId = useRef(row.id);
   const { toast } = useToast();
 
   // Reset edit state when dialog closes
@@ -96,6 +97,14 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableR
       setEditData(row);
     }
   }, [showDetailsDialog, row]);
+
+  // Update editData when row ID changes (new row entirely) but not during editing
+  useEffect(() => {
+    if (prevRowId.current !== row.id) {
+      setEditData(row);
+      prevRowId.current = row.id;
+    }
+  }, [row]);
 
   // Color coding based on status
   const getStatusColor = (status?: string) => {
@@ -252,13 +261,108 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableR
     return colors[agent || ''] || 'bg-gray-500 text-white';
   };
 
+  // Function to generate structured notes for pending approval applications
+  const generatePendingApprovalNotes = (
+    licensedAgentAccount: string,
+    carrier: string,
+    productType: string,
+    monthlyPremium: number | null,
+    coverageAmount: number | null,
+    draftDate: string | null
+  ) => {
+    const parts = [];
+
+    // Licensed agent account (point 1)
+    if (licensedAgentAccount && licensedAgentAccount !== 'N/A') {
+      parts.push(`1. Licensed agent account: ${licensedAgentAccount}`);
+    }
+
+    // Carrier (point 2)
+    if (carrier && carrier !== 'N/A') {
+      parts.push(`2. Carrier: ${carrier}`);
+    }
+
+    // Carrier product name and level (point 3)
+    if (productType && productType !== 'N/A') {
+      parts.push(`3. Carrier product name and level: ${productType}`);
+    }
+
+    // Premium amount (point 4)
+    if (monthlyPremium && monthlyPremium > 0) {
+      parts.push(`4. Premium amount: $${monthlyPremium}`);
+    }
+
+    // Coverage amount (point 5)
+    if (coverageAmount && coverageAmount > 0) {
+      parts.push(`5. Coverage amount: $${coverageAmount}`);
+    }
+
+    // Draft date (point 6)
+    if (draftDate) {
+      const date = new Date(draftDate);
+      parts.push(`6. Draft date: ${date.toLocaleDateString('en-US', {
+        month: 'numeric',
+        day: 'numeric',
+        year: 'numeric'
+      })}`);
+    }
+
+    // Always add point 7 for pending approval
+    parts.push('7. Sent to Underwriting');
+
+    // Carrier-specific commission rules as the final point
+    let commissionNote = "";
+    if (/aetna/i.test(carrier) || /corebridge/i.test(carrier)) {
+      commissionNote = "8. Commissions from this carrier are paid after the first successful draft";
+    } else if (/cica/i.test(carrier)) {
+      commissionNote = "8. Commissions from this carrier are paid 10-14 days after first successful draft";
+    } else {
+      commissionNote = "8. Commissions are paid after policy is officially approved and issued";
+    }
+
+    // Add commission note at the bottom
+    parts.push(commissionNote);
+
+    return parts.join('\n');
+  };
+
+  // Function to combine structured notes with existing notes
+  const combineNotes = (structuredNotes: string, existingNotes: string) => {
+    if (!structuredNotes && !existingNotes) return '';
+    if (!structuredNotes) return existingNotes;
+    if (!existingNotes) return structuredNotes;
+    return structuredNotes + '\n\n' + existingNotes;
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // Check if status is being changed to "Pending Approval" and generate structured notes
+      let finalEditData = { ...editData };
+      
+      if (editData.status === "Pending Approval" && row.status !== "Pending Approval") {
+        // Generate structured notes for pending approval
+        const structuredNotes = generatePendingApprovalNotes(
+          editData.licensed_agent_account || '',
+          editData.carrier || '',
+          editData.product_type || '',
+          editData.monthly_premium || null,
+          editData.face_amount || null,
+          editData.draft_date || null
+        );
+        
+        // Combine with existing notes
+        const combinedNotes = combineNotes(structuredNotes, editData.notes || '');
+        finalEditData = {
+          ...editData,
+          notes: combinedNotes
+        };
+      }
+
       const { error } = await supabase
         .from('daily_deal_flow')
         .update({
-          ...editData,
+          ...finalEditData,
           updated_at: new Date().toISOString()
         })
         .eq('id', row.id);
@@ -279,6 +383,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableR
       });
 
       setIsEditing(false);
+      setShowDetailsDialog(false);
       onUpdate();
     } catch (error) {
       console.error("Error:", error);
@@ -295,6 +400,10 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableR
   const handleCancel = () => {
     setEditData(row);
     setIsEditing(false);
+    // Close the dialog if it's open
+    if (showDetailsDialog) {
+      setShowDetailsDialog(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -333,13 +442,18 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableR
     }
   };
 
-  const updateField = (field: keyof DailyDealFlowRow, value: any) => {
+  const updateField = useCallback((field: keyof DailyDealFlowRow, value: any) => {
     setEditData(prev => ({ ...prev, [field]: value }));
-  };
+  }, []);
 
-  // Details Dialog Component
-  const DetailsDialog = () => (
-    <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+  // Memoize dialog close handler to prevent re-renders
+  const handleDialogOpenChange = useCallback((open: boolean) => {
+    setShowDetailsDialog(open);
+  }, []);
+
+  // Details Dialog Component - Memoized to prevent unnecessary re-renders
+  const DetailsDialog = useMemo(() => (
+    <Dialog open={showDetailsDialog} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex justify-between items-center">
@@ -799,11 +913,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableR
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button
               variant="outline"
-              onClick={() => {
-                setEditData(row);
-                setIsEditing(false);
-                setShowDetailsDialog(false);
-              }}
+              onClick={handleCancel}
               disabled={isSaving}
             >
               Cancel
@@ -827,7 +937,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableR
         )}
       </DialogContent>
     </Dialog>
-  );
+  ), [showDetailsDialog, handleDialogOpenChange, isEditing, editData, row, isSaving, handleCancel, handleSave]); // Add all dependencies
 
   if (isEditing) {
     return (
@@ -1102,7 +1212,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableR
             </div>
           </td>
         </tr>
-        <DetailsDialog />
+        {DetailsDialog}
       </>
     );
   }
@@ -1269,7 +1379,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate }: EditableR
           </div>
         </td>
       </tr>
-      <DetailsDialog />
+      {DetailsDialog}
     </>
   );
 };
