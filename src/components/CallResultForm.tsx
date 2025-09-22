@@ -62,7 +62,6 @@ const productTypeOptions = [
 const bufferAgentOptions = [
   "N/A",
   "Ira",
-  "Tatumn",
   "Kyla",
   "Bryan",
   "Justine",
@@ -91,6 +90,7 @@ const licensedAccountOptions = [
   "Lydia",
   "Isaac",
   "Benjamin",
+  "Tatumn",
   "Noah",
   "Erica",
   "N/A"

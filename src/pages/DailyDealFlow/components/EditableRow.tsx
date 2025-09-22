@@ -36,7 +36,7 @@ interface EditableRowProps {
 
 // Dropdown options (same as CallResultForm)
 const bufferAgentOptions = [
-  "N/A", "Ira", "Burney","Tatumn", "Kyla", "Bryan", "Justine", "Isaac", "Landon", "Juan"
+  "N/A", "Ira", "Burney", "Kyla", "Bryan", "Justine", "Isaac", "Landon", "Juan"
 ];
 
 const agentOptions = [
@@ -44,7 +44,7 @@ const agentOptions = [
 ];
 
 const licensedAccountOptions = [
-  "Claudia", "Lydia", "Isaac", "Juan", "Benjamin", "Erica", "N/A"
+  "Claudia", "Lydia", "Isaac", "Juan", "Benjamin", "Erica", "N/A","Tatumn"
 ];
 
 const carrierOptions = [
