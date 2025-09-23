@@ -15,7 +15,6 @@ import { Loader2, RefreshCw, Download, FileSpreadsheet, ChevronDown, MoreHorizon
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { canPerformWriteOperations } from "@/lib/userPermissions";
 import { dateObjectToESTString } from "@/lib/dateUtils";
-import { TimezoneTestPanel } from "@/components/TimezoneTestPanel";
 
 export interface DailyDealFlowRow {
   id: string;
@@ -218,12 +217,6 @@ const DailyDealFlowPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <NavigationHeader title="Daily Deal Flow Sheet" />
-      
-      {/* Temporary EST Testing Panel - Remove after testing */}
-      <div className="container mx-auto px-4 py-4">
-        <TimezoneTestPanel />
-      </div>
-      
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-full mx-auto space-y-6">
           {/* Header */}
