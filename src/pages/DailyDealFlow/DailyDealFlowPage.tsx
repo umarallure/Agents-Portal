@@ -52,6 +52,8 @@ const DailyDealFlowPage = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
+  const [dateFromFilter, setDateFromFilter] = useState<Date | undefined>(undefined);
+  const [dateToFilter, setDateToFilter] = useState<Date | undefined>(undefined);
   const [bufferAgentFilter, setBufferAgentFilter] = useState(ALL_OPTION);
   const [licensedAgentFilter, setLicensedAgentFilter] = useState(ALL_OPTION);
   const [leadVendorFilter, setLeadVendorFilter] = useState(ALL_OPTION);
@@ -64,6 +66,32 @@ const DailyDealFlowPage = () => {
   
   // Check if current user has write permissions
   const hasWritePermissions = canPerformWriteOperations(user?.id);
+
+  // Helper functions to handle mutual exclusivity between single date and date range
+  const handleDateFilterChange = (date: Date | undefined) => {
+    setDateFilter(date);
+    // Clear date range when single date is set
+    if (date) {
+      setDateFromFilter(undefined);
+      setDateToFilter(undefined);
+    }
+  };
+
+  const handleDateFromFilterChange = (date: Date | undefined) => {
+    setDateFromFilter(date);
+    // Clear single date when range is used
+    if (date || dateToFilter) {
+      setDateFilter(undefined);
+    }
+  };
+
+  const handleDateToFilterChange = (date: Date | undefined) => {
+    setDateToFilter(date);
+    // Clear single date when range is used
+    if (date || dateFromFilter) {
+      setDateFilter(undefined);
+    }
+  };
 
   // Fetch data from Supabase
   const fetchData = async (showRefreshToast = false) => {
@@ -80,6 +108,17 @@ const DailyDealFlowPage = () => {
       if (dateFilter) {
         const dateStr = dateObjectToESTString(dateFilter);
         query = query.eq('date', dateStr);
+      }
+      
+      // Apply date range filter if set - using EST timezone for consistency
+      if (dateFromFilter) {
+        const dateFromStr = dateObjectToESTString(dateFromFilter);
+        query = query.gte('date', dateFromStr);
+      }
+      
+      if (dateToFilter) {
+        const dateToStr = dateObjectToESTString(dateToFilter);
+        query = query.lte('date', dateToStr);
       }
 
       const { data: dealFlowData, error } = await query;
@@ -115,10 +154,10 @@ const DailyDealFlowPage = () => {
     }
   };
 
-  // Initial data load
+  // Initial data load and refetch when date filters change
   useEffect(() => {
     fetchData();
-  }, [dateFilter]);
+  }, [dateFilter, dateFromFilter, dateToFilter]);
 
 
   // Filter data based on all filter criteria
@@ -273,7 +312,11 @@ const DailyDealFlowPage = () => {
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           dateFilter={dateFilter}
-          onDateFilterChange={setDateFilter}
+          onDateFilterChange={handleDateFilterChange}
+          dateFromFilter={dateFromFilter}
+          onDateFromFilterChange={handleDateFromFilterChange}
+          dateToFilter={dateToFilter}
+          onDateToFilterChange={handleDateToFilterChange}
           bufferAgentFilter={bufferAgentFilter}
           onBufferAgentFilterChange={setBufferAgentFilter}
           licensedAgentFilter={licensedAgentFilter}

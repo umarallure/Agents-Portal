@@ -13,6 +13,10 @@ interface GridToolbarProps {
   onSearchChange: (value: string) => void;
   dateFilter?: Date;
   onDateFilterChange: (date: Date | undefined) => void;
+  dateFromFilter?: Date;
+  onDateFromFilterChange: (date: Date | undefined) => void;
+  dateToFilter?: Date;
+  onDateToFilterChange: (date: Date | undefined) => void;
   bufferAgentFilter: string;
   onBufferAgentFilterChange: (value: string) => void;
   licensedAgentFilter: string;
@@ -33,6 +37,10 @@ export const GridToolbar = ({
   onSearchChange,
   dateFilter,
   onDateFilterChange,
+  dateFromFilter,
+  onDateFromFilterChange,
+  dateToFilter,
+  onDateToFilterChange,
   bufferAgentFilter,
   onBufferAgentFilterChange,
   licensedAgentFilter,
@@ -156,6 +164,20 @@ export const GridToolbar = ({
     onDateFilterChange(undefined);
   };
 
+  const clearDateFromFilter = () => {
+    onDateFromFilterChange(undefined);
+  };
+
+  const clearDateToFilter = () => {
+    onDateToFilterChange(undefined);
+  };
+
+  const clearAllDateFilters = () => {
+    onDateFilterChange(undefined);
+    onDateFromFilterChange(undefined);
+    onDateToFilterChange(undefined);
+  };
+
   const clearSearch = () => {
     onSearchChange("");
   };
@@ -163,6 +185,8 @@ export const GridToolbar = ({
   const clearAllFilters = () => {
     onSearchChange("");
     onDateFilterChange(undefined);
+    onDateFromFilterChange(undefined);
+    onDateToFilterChange(undefined);
     onBufferAgentFilterChange(ALL_OPTION);
     onLicensedAgentFilterChange(ALL_OPTION);
     onLeadVendorFilterChange(ALL_OPTION);
@@ -171,7 +195,7 @@ export const GridToolbar = ({
     onCallResultFilterChange(ALL_OPTION);
   };
 
-  const hasActiveFilters = searchTerm || dateFilter || 
+  const hasActiveFilters = searchTerm || dateFilter || dateFromFilter || dateToFilter ||
     (bufferAgentFilter && bufferAgentFilter !== ALL_OPTION) || 
     (licensedAgentFilter && licensedAgentFilter !== ALL_OPTION) || 
     (leadVendorFilter && leadVendorFilter !== ALL_OPTION) || 
@@ -251,6 +275,108 @@ export const GridToolbar = ({
             )}
           </div>
         </div>
+
+        {/* Date Range Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* From Date Filter */}
+          <div>
+            <Label className="text-sm font-medium">
+              From Date
+            </Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "justify-start text-left font-normal min-w-[140px]",
+                      !dateFromFilter && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateFromFilter ? format(dateFromFilter, "PPP") : "Select start date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateFromFilter}
+                    onSelect={onDateFromFilterChange}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              
+              {dateFromFilter && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearDateFromFilter}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* To Date Filter */}
+          <div>
+            <Label className="text-sm font-medium">
+              To Date
+            </Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "justify-start text-left font-normal min-w-[140px]",
+                      !dateToFilter && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateToFilter ? format(dateToFilter, "PPP") : "Select end date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateToFilter}
+                    onSelect={onDateToFilterChange}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              
+              {dateToFilter && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearDateToFilter}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Clear Date Range Button */}
+        {(dateFromFilter || dateToFilter) && (
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearAllDateFilters}
+              className="text-sm"
+            >
+              <X className="mr-1 h-3 w-3" />
+              Clear Date Range
+            </Button>
+          </div>
+        )}
 
         {/* Clear All Filters Button */}
         {hasActiveFilters && (
