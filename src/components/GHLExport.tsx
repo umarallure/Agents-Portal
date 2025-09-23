@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CalendarIcon, Upload, Download, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { parseESTDate } from "@/lib/dateUtils";
 
 interface GHLExportProps {
   className?: string;
@@ -93,6 +94,19 @@ export const GHLExport = ({ className }: GHLExportProps) => {
     }
   };
 
+  // Helper function to safely format dates avoiding timezone shifts
+  const formatDateSafeCSV = (dateStr: string | undefined): string => {
+    if (!dateStr) return 'N/A';
+    try {
+      // Parse the date string as EST to avoid timezone shifts
+      const estDate = parseESTDate(dateStr);
+      return format(estDate, "M/d/yyyy");
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return dateStr; // Return original string if parsing fails
+    }
+  };
+
   const convertToCSVRow = (row: DailyDealFlowData): string[] => {
     return [
       // Found in Carrier? - Default to N/A since this isn't in daily_deal_flow
@@ -107,8 +121,8 @@ export const GHLExport = ({ className }: GHLExportProps) => {
       // Lead Vender (keeping original spelling)
       row.lead_vendor || "N/A",
       
-      // Date - Format as M/d/yyyy
-      row.date ? format(new Date(row.date), "M/d/yyyy") : "N/A",
+      // Date - Format as M/d/yyyy with EST timezone handling
+      formatDateSafeCSV(row.date),
       
       // INSURED NAME
       row.insured_name || "N/A",
@@ -128,8 +142,8 @@ export const GHLExport = ({ className }: GHLExportProps) => {
       // Product Type
       row.product_type || "N/A",
       
-      // Draft Date - Format as M/d/yyyy
-      row.draft_date ? format(new Date(row.draft_date), "M/d/yyyy") : "N/A",
+      // Draft Date - Format as M/d/yyyy with EST timezone handling
+      formatDateSafeCSV(row.draft_date),
       
       // From Callback? - Convert boolean to Yes/No
       row.from_callback ? "Yes" : "No",

@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
+import { parseESTDate } from "@/lib/dateUtils";
 
 interface WeeklyReportsProps {
   className?: string;
@@ -133,17 +134,30 @@ export const WeeklyReports = ({ className }: WeeklyReportsProps) => {
     }
     headers.push(...customAdditionalColumns);
 
+    // Helper function to safely format dates avoiding timezone shifts
+    const formatDateSafe = (dateStr: string | undefined): string => {
+      if (!dateStr) return '';
+      try {
+        // Parse the date string as EST to avoid timezone shifts
+        const estDate = parseESTDate(dateStr);
+        return format(estDate, "MM/dd/yyyy");
+      } catch (error) {
+        console.error('Date formatting error:', error);
+        return dateStr; // Return original string if parsing fails
+      }
+    };
+
     // Convert data to Excel format
     const excelData = vendorData.map(row => {
       const baseRowData = [
-        row.date ? format(new Date(row.date), "MM/dd/yyyy") : '',
+        formatDateSafe(row.date),
         row.insured_name || '',
         row.buffer_agent || 'N/A',
         row.agent || 'N/A',
         row.status || '', // This becomes "GHL Status" in the header
         row.carrier || 'N/A',
         row.product_type || 'N/A',
-        row.draft_date ? format(new Date(row.draft_date), "MM/dd/yyyy") : '',
+        formatDateSafe(row.draft_date),
         row.from_callback ? 'Yes' : 'No',
         row.notes || ''
       ];
