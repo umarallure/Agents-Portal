@@ -6,6 +6,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
 
+// EST timezone utility functions
+const isDST = (date: Date): boolean => {
+  const year = date.getFullYear();
+  
+  // Second Sunday in March
+  const marchSecondSunday = new Date(year, 2, 1);
+  marchSecondSunday.setDate(1 + (7 - marchSecondSunday.getDay()) + 7);
+  
+  // First Sunday in November  
+  const novemberFirstSunday = new Date(year, 10, 1);
+  novemberFirstSunday.setDate(1 + (7 - novemberFirstSunday.getDay()) % 7);
+  
+  return date >= marchSecondSunday && date < novemberFirstSunday;
+};
+
+const getTodayDateEST = (): string => {
+  const now = new Date();
+  const estOffset = isDST(now) ? -4 : -5; // DST handling
+  const estDate = new Date(now.getTime() + (estOffset * 60 * 60 * 1000));
+  return estDate.toISOString().split('T')[0];
+};
+
+const getCurrentTimestampEST = (): string => {
+  const now = new Date();
+  const estOffset = isDST(now) ? -4 : -5; // DST handling
+  const estDate = new Date(now.getTime() + (estOffset * 60 * 60 * 1000));
+  return estDate.toISOString();
+};
+
 // Function to generate new submission ID for callback entries
 const generateCallbackSubmissionId = (originalSubmissionId: string): string => {
   const randomDigits = Math.floor(1000 + Math.random() * 9000); // 4-digit random number
@@ -127,8 +156,8 @@ serve(async (req) => {
 
     console.log('Updating daily deal flow for submission:', submission_id, 'call source:', call_source);
 
-    // Get today's date in UTC YYYY-MM-DD format
-    const todayDate = new Date().toISOString().split('T')[0];
+    // Get today's date in EST YYYY-MM-DD format
+    const todayDate = getTodayDateEST();
 
     // Fetch lead data for insertions
     const { data: leadData, error: leadError } = await supabase
@@ -250,7 +279,7 @@ serve(async (req) => {
               product_type_carrier,
               level_or_gi,
               from_callback,
-              updated_at: new Date().toISOString()
+              updated_at: getCurrentTimestampEST()
             })
             .eq('id', mostRecentEntry.id)
             .select()
@@ -404,7 +433,7 @@ serve(async (req) => {
               product_type_carrier,
               level_or_gi,
               from_callback,
-              updated_at: new Date().toISOString()
+              updated_at: getCurrentTimestampEST()
             })
             .eq('id', mostRecentEntry.id)
             .select()

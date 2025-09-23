@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { CalendarIcon, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { getTodayDateEST, getCurrentTimestampEST, formatDateESTLocale } from "@/lib/dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { logCallUpdate, getLeadInfo } from "@/lib/callLogging";
 
@@ -262,14 +263,7 @@ const checkExistingDailyDealFlowEntry = async (submissionId: string) => {
   }
 };
 
-// Function to get today's date in EST timezone
-const getTodayDateEST = (): string => {
-  const now = new Date();
-  // Convert to EST (UTC-5, or UTC-4 during DST)
-  const estOffset = now.getTimezoneOffset() === 300 ? -5 : -4; // EST is UTC-5, EDT is UTC-4
-  const estDate = new Date(now.getTime() + (estOffset * 60 * 60 * 1000));
-  return estDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-};
+// Using centralized EST utilities from dateUtils
 
 // Function to generate structured notes for submitted applications
 const generateSubmittedApplicationNotes = (
@@ -573,7 +567,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           .from("call_results")
           .update({
             ...callResultData,
-            updated_at: new Date().toISOString()
+            updated_at: getCurrentTimestampEST()
           })
           .eq('submission_id', submissionId);
       } else {
@@ -754,11 +748,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
 
       // Update Google Sheets based on Call Source selection
       try {
-        const todayDate = new Date().toLocaleDateString('en-US', {
-          month: 'numeric',
-          day: 'numeric',
-          year: '2-digit'
-        });
+        const todayDate = formatDateESTLocale();
         // Fetch lead data for sheet functions
         const { data: leadData, error: leadError } = await supabase
           .from("leads")

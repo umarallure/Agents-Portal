@@ -1,15 +1,32 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+// EST timezone utility functions
+const isDST = (date: Date): boolean => {
+  // DST in US: second Sunday in March to first Sunday in November
+  const year = date.getFullYear();
+  const marchSecondSunday = new Date(year, 2, 8 + (7 - new Date(year, 2, 8).getDay()) % 7);
+  const novemberFirstSunday = new Date(year, 10, 1 + (7 - new Date(year, 10, 1).getDay()) % 7);
+  
+  return date >= marchSecondSunday && date < novemberFirstSunday;
+};
+
+const getCurrentDateEST = (): Date => {
+  const now = new Date();
+  const estOffset = isDST(now) ? -4 : -5; // DST handling
+  return new Date(now.getTime() + (estOffset * 60 * 60 * 1000));
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
 
-// Helper function to format date as M/d/yy
+// Helper function to format EST date as M/d/yy
 const formatDate = (date) => {
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const year = date.getFullYear().toString().slice(-2);
+  const estDate = date instanceof Date ? date : getCurrentDateEST();
+  const month = estDate.getMonth() + 1;
+  const day = estDate.getDate();
+  const year = estDate.getFullYear().toString().slice(-2);
   return `${month}/${day}/${year}`;
 };
 
@@ -120,7 +137,7 @@ serve(async (req) => {
       customer_full_name: leadData.customer_full_name || '',
       phone_number: leadData.phone_number || '',
       lead_vendor: leadData.lead_vendor || 'N/A',
-      submission_date: leadData.submission_date || formatDate(new Date()),
+      submission_date: leadData.submission_date || formatDate(getCurrentDateEST()),
       carrier: callResult?.carrier || leadData.carrier || '',
       product_type: callResult?.product_type || leadData.product_type || '',
       coverage_amount: callResult?.face_amount || callResult?.coverage_amount || leadData.coverage_amount || '',

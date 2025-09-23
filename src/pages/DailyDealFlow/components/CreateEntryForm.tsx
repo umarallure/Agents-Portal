@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getTodayDateEST, getCurrentDateEST } from "@/lib/dateUtils";
 
 interface CreateEntryFormProps {
   onSuccess: () => void;
@@ -77,8 +78,7 @@ export const CreateEntryForm = ({ onSuccess }: CreateEntryFormProps) => {
 
   // Form state - Initialize with today's date and generated submission ID
   const [formData, setFormData] = useState(() => {
-    const today = new Date();
-    const todayDate = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+    const todayDate = getTodayDateEST();
     
     return {
       submission_id: generateCBSubmissionId(),
@@ -105,7 +105,7 @@ export const CreateEntryForm = ({ onSuccess }: CreateEntryFormProps) => {
     };
   });
 
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(getCurrentDateEST());
   const [selectedDraftDate, setSelectedDraftDate] = useState<Date | undefined>();
 
   const updateField = (field: string, value: any) => {
@@ -129,8 +129,7 @@ export const CreateEntryForm = ({ onSuccess }: CreateEntryFormProps) => {
   };
 
   const resetForm = () => {
-    const today = new Date();
-    const todayDate = today.toISOString().split('T')[0];
+    const todayDate = getTodayDateEST();
     
     setFormData({
       submission_id: generateCBSubmissionId(),
@@ -155,7 +154,7 @@ export const CreateEntryForm = ({ onSuccess }: CreateEntryFormProps) => {
       level_or_gi: '',
       from_callback: false
     });
-    setSelectedDate(new Date());
+    setSelectedDate(getCurrentDateEST());
     setSelectedDraftDate(undefined);
   };
 

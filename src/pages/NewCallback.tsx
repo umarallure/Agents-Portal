@@ -13,6 +13,7 @@ import { CalendarIcon, ArrowLeft, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentTimestampEST, formatDateToEST } from "@/lib/dateUtils";
 
 const leadVendorOptions = [
 "Ark Tech",
@@ -94,7 +95,7 @@ const NewCallback = () => {
       
       const leadData = {
         submission_id: submissionId,
-        submission_date: new Date().toISOString(),
+        submission_date: getCurrentTimestampEST(), // Using EST timezone for consistency
         customer_full_name: customerFullName,
         phone_number: phoneNumber,
         email: email || null,
@@ -102,7 +103,7 @@ const NewCallback = () => {
         city: city || null,
         state: state || null,
         zip_code: zipCode || null,
-        date_of_birth: dateOfBirth ? format(dateOfBirth, "yyyy-MM-dd") : null,
+        date_of_birth: dateOfBirth ? formatDateToEST(dateOfBirth) : null, // Using EST formatting
         age: age ? parseInt(age) : null,
         social_security: socialSecurity || null,
         health_conditions: healthConditions || null,

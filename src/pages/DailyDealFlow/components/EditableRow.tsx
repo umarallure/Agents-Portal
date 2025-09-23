@@ -14,6 +14,13 @@ import { cn } from "@/lib/utils";
 import { DailyDealFlowRow } from "../DailyDealFlowPage";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getCurrentTimestampEST } from "@/lib/dateUtils";
+
+// Helper function to create Date object from YYYY-MM-DD string without timezone conversion
+const createDateFromString = (dateString: string): Date => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day); // month is 0-indexed in Date constructor
+};
 
 // Utility function to format dates without timezone conversion
 const formatDateWithoutTimezone = (dateString: string): string => {
@@ -364,7 +371,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
         .from('daily_deal_flow')
         .update({
           ...finalEditData,
-          updated_at: new Date().toISOString()
+          updated_at: getCurrentTimestampEST()
         })
         .eq('id', row.id);
 
@@ -742,13 +749,13 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {editData.draft_date ? format(new Date(editData.draft_date), "PPP") : "Pick a date"}
+                      {editData.draft_date ? format(createDateFromString(editData.draft_date), "PPP") : "Pick a date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={editData.draft_date ? new Date(editData.draft_date) : undefined}
+                      selected={editData.draft_date ? createDateFromString(editData.draft_date) : undefined}
                       onSelect={(date) => updateField('draft_date', date ? format(date, "yyyy-MM-dd") : null)}
                       initialFocus
                     />
@@ -756,7 +763,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
                 </Popover>
               ) : (
                 <div className="mt-1 p-2 bg-muted rounded">
-                  {row.draft_date ? format(new Date(row.draft_date), "PPP") : 'N/A'}
+                  {row.draft_date ? format(createDateFromString(row.draft_date), "PPP") : 'N/A'}
                 </div>
               )}
             </div>
@@ -801,13 +808,13 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {editData.date ? format(new Date(editData.date), "PPP") : "Pick a date"}
+                      {editData.date ? format(createDateFromString(editData.date), "PPP") : "Pick a date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={editData.date ? new Date(editData.date) : undefined}
+                      selected={editData.date ? createDateFromString(editData.date) : undefined}
                       onSelect={(date) => updateField('date', date ? format(date, "yyyy-MM-dd") : null)}
                       initialFocus
                     />
@@ -815,7 +822,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
                 </Popover>
               ) : (
                 <div className="mt-1 p-2 bg-muted rounded">
-                  {row.date ? format(new Date(row.date), "PPP") : 'N/A'}
+                  {row.date ? format(createDateFromString(row.date), "PPP") : 'N/A'}
                 </div>
               )}
             </div>
@@ -961,13 +968,13 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
                   )}
                 >
                   <CalendarIcon className="mr-1 h-3 w-3" />
-                  {editData.date ? format(new Date(editData.date), "MMM dd") : "Date"}
+                  {editData.date ? format(createDateFromString(editData.date), "MMM dd") : "Date"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
-                  selected={editData.date ? new Date(editData.date) : undefined}
+                  selected={editData.date ? createDateFromString(editData.date) : undefined}
                   onSelect={(date) => updateField('date', date ? format(date, "yyyy-MM-dd") : null)}
                   initialFocus
                 />
@@ -1134,13 +1141,13 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
                   )}
                 >
                   <CalendarIcon className="mr-1 h-3 w-3" />
-                  {editData.draft_date ? format(new Date(editData.draft_date), "MMM dd") : "Draft Date"}
+                  {editData.draft_date ? format(createDateFromString(editData.draft_date), "MMM dd") : "Draft Date"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
-                  selected={editData.draft_date ? new Date(editData.draft_date) : undefined}
+                  selected={editData.draft_date ? createDateFromString(editData.draft_date) : undefined}
                   onSelect={(date) => updateField('draft_date', date ? format(date, "yyyy-MM-dd") : null)}
                   initialFocus
                 />

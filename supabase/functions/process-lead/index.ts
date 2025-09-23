@@ -1,5 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// EST timezone utility functions
+const isDST = (date: Date): boolean => {
+  // DST in US: second Sunday in March to first Sunday in November
+  const year = date.getFullYear();
+  const marchSecondSunday = new Date(year, 2, 8 + (7 - new Date(year, 2, 8).getDay()) % 7);
+  const novemberFirstSunday = new Date(year, 10, 1 + (7 - new Date(year, 10, 1).getDay()) % 7);
+  
+  return date >= marchSecondSunday && date < novemberFirstSunday;
+};
+
+const getCurrentTimestampEST = (): string => {
+  const now = new Date();
+  const estOffset = isDST(now) ? -4 : -5; // DST handling
+  const estDate = new Date(now.getTime() + (estOffset * 60 * 60 * 1000));
+  return estDate.toISOString();
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
@@ -100,7 +118,7 @@ serve(async (req)=>{
     };
     const leadData = {
       submission_id: submissionId,
-      submission_date: submission.created_at ? new Date(submission.created_at).toISOString() : new Date().toISOString(),
+      submission_date: submission.created_at ? new Date(submission.created_at).toISOString() : getCurrentTimestampEST(),
       customer_full_name: answers['4']?.answer ? `${answers['4'].answer.first} ${answers['4'].answer.last}` : '',
       street_address: answers['5']?.answer?.addr_line1 || '',
       city: answers['5']?.answer?.city || '',

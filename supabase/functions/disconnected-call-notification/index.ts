@@ -1,5 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+// EST timezone utility functions
+const isDST = (date: Date): boolean => {
+  // DST in US: second Sunday in March to first Sunday in November
+  const year = date.getFullYear();
+  const marchSecondSunday = new Date(year, 2, 8 + (7 - new Date(year, 2, 8).getDay()) % 7);
+  const novemberFirstSunday = new Date(year, 10, 1 + (7 - new Date(year, 10, 1).getDay()) % 7);
+  
+  return date >= marchSecondSunday && date < novemberFirstSunday;
+};
+
+const getCurrentDateTimeEST = (): string => {
+  const now = new Date();
+  const estOffset = isDST(now) ? -4 : -5; // DST handling
+  const estDate = new Date(now.getTime() + (estOffset * 60 * 60 * 1000));
+  return estDate.toLocaleString('en-US', { timeZone: 'America/New_York' });
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
@@ -117,7 +134,7 @@ serve(async (req) => {
           elements: [
             {
               type: 'mrkdwn',
-              text: `Submission ID: ${submissionId} | Time: ${new Date().toLocaleString()}`
+              text: `Submission ID: ${submissionId} | Time: ${getCurrentDateTimeEST()}`
             }
           ]
         }
