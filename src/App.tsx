@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AgentActivityDashboard } from "@/components/AgentActivityDashboard";
-import { AgentReportsAndLogs } from "@/components/AgentReportsAndLogs";
+import ReportsPage from "./pages/Reports";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -99,7 +99,7 @@ const App = () => (
               path="/reports" 
               element={
                 <ProtectedRoute>
-                  <AgentReportsAndLogs />
+                  <ReportsPage />
                 </ProtectedRoute>
               } 
             />
