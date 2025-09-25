@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
+import React from 'react';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { DailyDealFlowRow } from "../DailyDealFlowPage";
 import { EditableRow } from "./EditableRow";
 
@@ -26,6 +27,7 @@ export const DataGrid = ({
   onPageChange
 }: DataGridProps) => {
   const [groupBy, setGroupBy] = useState<string>('none');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const groupByOptions = [
     { value: 'none', label: 'No Grouping' },
@@ -34,7 +36,9 @@ export const DataGrid = ({
     { value: 'agent', label: 'Agent' },
     { value: 'licensed_agent_account', label: 'Licensed Agent' },
     { value: 'status', label: 'Status' },
-    { value: 'call_result', label: 'Call Result' }
+    { value: 'call_result', label: 'Call Result' },
+    { value: 'carrier', label: 'Carrier' },
+    { value: 'product_type', label: 'Product Type' }
   ];
 
   const columns = [
@@ -47,21 +51,40 @@ export const DataGrid = ({
     columns.push("Actions");
   }
 
-  // Sort data based on group by selection
-  const sortedData = useMemo(() => {
-    if (groupBy === 'none') return data;
+  // Group data based on group by selection
+  const groupedData = useMemo(() => {
+    if (groupBy === 'none') {
+      return { groups: [], ungroupedData: data };
+    }
 
-    return [...data].sort((a, b) => {
-      const aValue = a[groupBy as keyof DailyDealFlowRow] || '';
-      const bValue = b[groupBy as keyof DailyDealFlowRow] || '';
-
-      // Handle null/undefined values
-      if (!aValue && !bValue) return 0;
-      if (!aValue) return 1;
-      if (!bValue) return -1;
-
-      return String(aValue).localeCompare(String(bValue));
+    const groups: { [key: string]: DailyDealFlowRow[] } = {};
+    
+    data.forEach(row => {
+      const groupValue = row[groupBy as keyof DailyDealFlowRow] || 'N/A';
+      const groupKey = String(groupValue);
+      
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+      groups[groupKey].push(row);
     });
+
+    // Sort groups alphabetically and sort items within each group
+    const sortedGroups = Object.keys(groups)
+      .sort()
+      .map(groupKey => ({
+        key: groupKey,
+        label: groupKey,
+        items: groups[groupKey].sort((a, b) => {
+          // Sort within group by date (newest first)
+          const aDate = new Date(a.date || a.created_at || '1970-01-01');
+          const bDate = new Date(b.date || b.created_at || '1970-01-01');
+          return bDate.getTime() - aDate.getTime();
+        }),
+        count: groups[groupKey].length
+      }));
+
+    return { groups: sortedGroups, ungroupedData: [] };
   }, [data, groupBy]);
 
   // Detect duplicate rows based on insured_name, client_phone_number, and lead_vendor
@@ -69,7 +92,7 @@ export const DataGrid = ({
     const seen = new Map<string, number>();
     const duplicates = new Set<string>();
 
-    sortedData.forEach(row => {
+    data.forEach(row => {
       const key = `${row.insured_name || ''}|${row.client_phone_number || ''}|${row.lead_vendor || ''}`;
       const count = seen.get(key) || 0;
       seen.set(key, count + 1);
@@ -79,12 +102,33 @@ export const DataGrid = ({
     });
 
     return duplicates;
-  }, [sortedData]);
+  }, [data]);
 
   // Check if a row is duplicate
   const isRowDuplicate = (row: DailyDealFlowRow) => {
     const key = `${row.insured_name || ''}|${row.client_phone_number || ''}|${row.lead_vendor || ''}`;
     return duplicateRows.has(key);
+  };
+
+  // Toggle group expansion
+  const toggleGroup = (groupKey: string) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(groupKey)) {
+      newExpanded.delete(groupKey);
+    } else {
+      newExpanded.add(groupKey);
+    }
+    setExpandedGroups(newExpanded);
+  };
+
+  // Expand/collapse all groups
+  const toggleAllGroups = (expand: boolean) => {
+    if (expand) {
+      const allKeys = new Set(groupedData.groups.map(g => g.key));
+      setExpandedGroups(allKeys);
+    } else {
+      setExpandedGroups(new Set());
+    }
   };
 
   // Calculate pagination based on server-side data
@@ -109,12 +153,11 @@ export const DataGrid = ({
             <span className="text-sm font-medium">Group by:</span>
             <Select value={groupBy} onValueChange={(value) => {
               setGroupBy(value);
-              // Reset to first page when grouping changes (client-side grouping only)
-  useEffect(() => {
-    if (onPageChange) {
-      onPageChange(1);
-    }
-  }, [groupBy, onPageChange]);
+              setExpandedGroups(new Set()); // Reset expanded groups when changing grouping
+              // Reset to first page when grouping changes
+              if (onPageChange) {
+                onPageChange(1);
+              }
             }}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Select grouping field" />
@@ -128,6 +171,27 @@ export const DataGrid = ({
               </SelectContent>
             </Select>
           </div>
+          
+          {groupBy !== 'none' && groupedData.groups.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => toggleAllGroups(true)}
+                className="text-xs"
+              >
+                Expand All
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => toggleAllGroups(false)}
+                className="text-xs"
+              >
+                Collapse All
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -161,21 +225,72 @@ export const DataGrid = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((row, index) => (
-            <EditableRow 
-              key={row.id} 
-              row={row} 
-              rowIndex={startIndex + index} 
-              serialNumber={startIndex + index + 1}
-              onUpdate={onDataUpdate}
-              hasWritePermissions={hasWritePermissions}
-              isDuplicate={isRowDuplicate(row)}
-            />
-          ))}
+          {groupBy === 'none' ? (
+            // Render ungrouped data
+            data.map((row, index) => (
+              <EditableRow 
+                key={row.id} 
+                row={row} 
+                rowIndex={startIndex + index} 
+                serialNumber={startIndex + index + 1}
+                onUpdate={onDataUpdate}
+                hasWritePermissions={hasWritePermissions}
+                isDuplicate={isRowDuplicate(row)}
+              />
+            ))
+          ) : (
+            // Render grouped data
+            groupedData.groups.map((group) => (
+              <React.Fragment key={group.key}>
+                {/* Group Header */}
+                <TableRow className="bg-muted/50 hover:bg-muted/70">
+                  <td colSpan={columns.length} className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleGroup(group.key)}
+                        className="h-6 w-6 p-0"
+                      >
+                        {expandedGroups.has(group.key) ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRightIcon className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <span className="font-semibold text-sm">
+                        {group.label} ({group.count} {group.count === 1 ? 'entry' : 'entries'})
+                      </span>
+                    </div>
+                  </td>
+                </TableRow>
+                
+                {/* Group Items */}
+                {expandedGroups.has(group.key) && group.items.map((row, groupIndex) => {
+                  // Calculate global index for serial number
+                  const globalIndex = groupedData.groups
+                    .slice(0, groupedData.groups.findIndex(g => g.key === group.key))
+                    .reduce((sum, g) => sum + (expandedGroups.has(g.key) ? g.items.length : 0), 0) + groupIndex;
+                  
+                  return (
+                    <EditableRow 
+                      key={row.id} 
+                      row={row} 
+                      rowIndex={startIndex + globalIndex} 
+                      serialNumber={startIndex + globalIndex + 1}
+                      onUpdate={onDataUpdate}
+                      hasWritePermissions={hasWritePermissions}
+                      isDuplicate={isRowDuplicate(row)}
+                    />
+                  );
+                })}
+              </React.Fragment>
+            ))
+          )}
         </TableBody>
       </Table>
 
-      {data.length === 0 && (
+      {((groupBy === 'none' && data.length === 0) || (groupBy !== 'none' && groupedData.groups.length === 0)) && (
         <div className="text-center py-8 text-muted-foreground">
           No data available
         </div>
