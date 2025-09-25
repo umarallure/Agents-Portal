@@ -50,6 +50,8 @@ const DailyDealFlowPage = () => {
   const [data, setData] = useState<DailyDealFlowRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [dateFromFilter, setDateFromFilter] = useState<Date | undefined>(undefined);
@@ -60,6 +62,8 @@ const DailyDealFlowPage = () => {
   const [statusFilter, setStatusFilter] = useState(ALL_OPTION);
   const [carrierFilter, setCarrierFilter] = useState(ALL_OPTION);
   const [callResultFilter, setCallResultFilter] = useState(ALL_OPTION);
+  
+  const recordsPerPage = 100;
   
   const { toast } = useToast();
   const { user } = useAuth();
@@ -93,71 +97,87 @@ const DailyDealFlowPage = () => {
     }
   };
 
-  // Fetch data from Supabase with pagination to get all records
-  const fetchData = async (showRefreshToast = false) => {
+  // Fetch data from Supabase with lazy loading - only current page
+  const fetchData = async (page = 1, showRefreshToast = false) => {
     try {
       setRefreshing(true);
 
-      let allData: DailyDealFlowRow[] = [];
-      let from = 0;
-      const batchSize = 1000;
-      let hasMoreData = true;
+      const from = (page - 1) * recordsPerPage;
+      const to = from + recordsPerPage - 1;
 
-      while (hasMoreData) {
-        let query = supabase
-          .from('daily_deal_flow')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .range(from, from + batchSize - 1);
+      let query = supabase
+        .from('daily_deal_flow')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
-        // Apply date filter if set - using EST timezone for consistency
-        if (dateFilter) {
-          const dateStr = dateObjectToESTString(dateFilter);
-          query = query.eq('date', dateStr);
-        }
-
-        // Apply date range filter if set - using EST timezone for consistency
-        if (dateFromFilter) {
-          const dateFromStr = dateObjectToESTString(dateFromFilter);
-          query = query.gte('date', dateFromStr);
-        }
-
-        if (dateToFilter) {
-          const dateToStr = dateObjectToESTString(dateToFilter);
-          query = query.lte('date', dateToStr);
-        }
-
-        const { data: batchData, error } = await query;
-
-        if (error) {
-          console.error("Error fetching daily deal flow data:", error);
-          toast({
-            title: "Error",
-            description: "Failed to fetch deal flow data",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        if (batchData && batchData.length > 0) {
-          allData = [...allData, ...batchData];
-          from += batchSize;
-
-          // If we got less than batchSize, we've reached the end
-          if (batchData.length < batchSize) {
-            hasMoreData = false;
-          }
-        } else {
-          hasMoreData = false;
-        }
+      // Apply date filter if set - using EST timezone for consistency
+      if (dateFilter) {
+        const dateStr = dateObjectToESTString(dateFilter);
+        query = query.eq('date', dateStr);
       }
 
-      setData(allData);
+      // Apply date range filter if set - using EST timezone for consistency
+      if (dateFromFilter) {
+        const dateFromStr = dateObjectToESTString(dateFromFilter);
+        query = query.gte('date', dateFromStr);
+      }
+
+      if (dateToFilter) {
+        const dateToStr = dateObjectToESTString(dateToFilter);
+        query = query.lte('date', dateToStr);
+      }
+
+      // Apply other filters
+      if (bufferAgentFilter && bufferAgentFilter !== ALL_OPTION) {
+        query = query.eq('buffer_agent', bufferAgentFilter);
+      }
+
+      if (licensedAgentFilter && licensedAgentFilter !== ALL_OPTION) {
+        query = query.eq('licensed_agent_account', licensedAgentFilter);
+      }
+
+      if (leadVendorFilter && leadVendorFilter !== ALL_OPTION) {
+        query = query.eq('lead_vendor', leadVendorFilter);
+      }
+
+      if (statusFilter && statusFilter !== ALL_OPTION) {
+        query = query.eq('status', statusFilter);
+      }
+
+      if (carrierFilter && carrierFilter !== ALL_OPTION) {
+        query = query.eq('carrier', carrierFilter);
+      }
+
+      if (callResultFilter && callResultFilter !== ALL_OPTION) {
+        query = query.eq('call_result', callResultFilter);
+      }
+
+      // Apply search filter if set
+      if (searchTerm) {
+        query = query.or(`insured_name.ilike.%${searchTerm}%,client_phone_number.ilike.%${searchTerm}%,submission_id.ilike.%${searchTerm}%,lead_vendor.ilike.%${searchTerm}%,agent.ilike.%${searchTerm}%,status.ilike.%${searchTerm}%,carrier.ilike.%${searchTerm}%,licensed_agent_account.ilike.%${searchTerm}%,buffer_agent.ilike.%${searchTerm}%`);
+      }
+
+      const { data: pageData, error, count } = await query;
+
+      if (error) {
+        console.error("Error fetching daily deal flow data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch deal flow data",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setData(pageData || []);
+      setTotalRecords(count || 0);
+      setCurrentPage(page);
 
       if (showRefreshToast) {
         toast({
           title: "Success",
-          description: `Data refreshed successfully - loaded ${allData.length} records`,
+          description: `Data refreshed successfully - loaded ${pageData?.length || 0} records for page ${page}`,
         });
       }
     } catch (error) {
@@ -173,81 +193,30 @@ const DailyDealFlowPage = () => {
     }
   };
 
-  // Initial data load and refetch when date filters change
+  // Initial data load and refetch when filters change
   useEffect(() => {
-    fetchData();
-  }, [dateFilter, dateFromFilter, dateToFilter]);
+    setCurrentPage(1); // Reset to first page when filters change
+    fetchData(1);
+  }, [dateFilter, dateFromFilter, dateToFilter, bufferAgentFilter, licensedAgentFilter, leadVendorFilter, statusFilter, carrierFilter, callResultFilter]);
+
+  // Refetch when search term changes (debounced)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setCurrentPage(1);
+      fetchData(1);
+    }, 300); // Debounce search by 300ms
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  // Handle page changes
+  const handlePageChange = (page: number) => {
+    fetchData(page);
+  };
 
 
-  // Filter data based on all filter criteria
-  const filteredData = data.filter(row => {
-    // Search term filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = (
-        row.insured_name?.toLowerCase().includes(searchLower) ||
-        row.client_phone_number?.toLowerCase().includes(searchLower) ||
-        row.submission_id?.toLowerCase().includes(searchLower) ||
-        row.lead_vendor?.toLowerCase().includes(searchLower) ||
-        row.agent?.toLowerCase().includes(searchLower) ||
-        row.status?.toLowerCase().includes(searchLower) ||
-        row.carrier?.toLowerCase().includes(searchLower) ||
-        row.licensed_agent_account?.toLowerCase().includes(searchLower) ||
-        row.buffer_agent?.toLowerCase().includes(searchLower)
-      );
-      if (!matchesSearch) return false;
-    }
-
-    // Buffer Agent filter - handle null/undefined values and ALL_OPTION
-    if (bufferAgentFilter && bufferAgentFilter !== ALL_OPTION) {
-      const rowBufferAgent = row.buffer_agent || "N/A";
-      if (rowBufferAgent !== bufferAgentFilter) {
-        return false;
-      }
-    }
-
-    // Licensed Agent filter - handle null/undefined values and ALL_OPTION
-    if (licensedAgentFilter && licensedAgentFilter !== ALL_OPTION) {
-      const rowLicensedAgent = row.licensed_agent_account || "N/A";
-      if (rowLicensedAgent !== licensedAgentFilter) {
-        return false;
-      }
-    }
-
-    // Lead Vendor filter - handle null/undefined values and ALL_OPTION
-    if (leadVendorFilter && leadVendorFilter !== ALL_OPTION) {
-      const rowLeadVendor = row.lead_vendor || "N/A";
-      if (rowLeadVendor !== leadVendorFilter) {
-        return false;
-      }
-    }
-
-    // Status filter - handle null/undefined values and ALL_OPTION
-    if (statusFilter && statusFilter !== ALL_OPTION) {
-      const rowStatus = row.status || "N/A";
-      if (rowStatus !== statusFilter) {
-        return false;
-      }
-    }
-
-    // Carrier filter - handle null/undefined values and ALL_OPTION
-    if (carrierFilter && carrierFilter !== ALL_OPTION) {
-      const rowCarrier = row.carrier || "N/A";
-      if (rowCarrier !== carrierFilter) {
-        return false;
-      }
-    }
-
-    // Call Result filter - handle null/undefined values and ALL_OPTION
-    if (callResultFilter && callResultFilter !== ALL_OPTION) {
-      const rowCallResult = row.call_result || "N/A";
-      if (rowCallResult !== callResultFilter) {
-        return false;
-      }
-    }
-
-    return true;
-  });
+  // With server-side filtering, data is already filtered
+  const filteredData = data;
 
   const handleRefresh = () => {
     fetchData(true);
@@ -348,7 +317,7 @@ const DailyDealFlowPage = () => {
           onCarrierFilterChange={setCarrierFilter}
           callResultFilter={callResultFilter}
           onCallResultFilterChange={setCallResultFilter}
-          totalRows={filteredData.length}
+          totalRows={totalRecords}
         />
 
         {/* Data Grid */}
@@ -357,7 +326,7 @@ const DailyDealFlowPage = () => {
             <CardTitle className="flex items-center justify-between">
               <span>Deal Flow Data</span>
               <span className="text-sm font-normal text-muted-foreground">
-                {filteredData.length} records
+                {totalRecords} total records • Page {currentPage} of {Math.ceil(totalRecords / recordsPerPage)} • Showing {data.length} records
               </span>
             </CardTitle>
           </CardHeader>
@@ -366,6 +335,10 @@ const DailyDealFlowPage = () => {
               data={filteredData}
               onDataUpdate={fetchData}
               hasWritePermissions={hasWritePermissions}
+              currentPage={currentPage}
+              totalRecords={totalRecords}
+              recordsPerPage={recordsPerPage}
+              onPageChange={handlePageChange}
             />
           </CardContent>
         </Card>

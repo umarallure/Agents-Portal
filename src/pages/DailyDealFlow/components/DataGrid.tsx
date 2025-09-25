@@ -10,12 +10,22 @@ interface DataGridProps {
   data: DailyDealFlowRow[];
   onDataUpdate: () => void;
   hasWritePermissions?: boolean;
+  currentPage?: number;
+  totalRecords?: number;
+  recordsPerPage?: number;
+  onPageChange?: (page: number) => void;
 }
 
-export const DataGrid = ({ data, onDataUpdate, hasWritePermissions = true }: DataGridProps) => {
-  const [currentPage, setCurrentPage] = useState(1);
+export const DataGrid = ({ 
+  data, 
+  onDataUpdate, 
+  hasWritePermissions = true,
+  currentPage = 1,
+  totalRecords = 0,
+  recordsPerPage = 50,
+  onPageChange
+}: DataGridProps) => {
   const [groupBy, setGroupBy] = useState<string>('none');
-  const itemsPerPage = 50;
 
   const groupByOptions = [
     { value: 'none', label: 'No Grouping' },
@@ -77,17 +87,16 @@ export const DataGrid = ({ data, onDataUpdate, hasWritePermissions = true }: Dat
     return duplicateRows.has(key);
   };
 
-  // Calculate pagination
-  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentData = useMemo(() => sortedData.slice(startIndex, endIndex), [sortedData, startIndex, endIndex]);
+  // Calculate pagination based on server-side data
+  const totalPages = Math.ceil(totalRecords / recordsPerPage);
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + data.length;
 
   // Pagination handlers
-  const goToFirstPage = () => setCurrentPage(1);
-  const goToLastPage = () => setCurrentPage(totalPages);
-  const goToNextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
-  const goToPrevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
+  const goToFirstPage = () => onPageChange?.(1);
+  const goToLastPage = () => onPageChange?.(totalPages);
+  const goToNextPage = () => onPageChange?.(Math.min(currentPage + 1, totalPages));
+  const goToPrevPage = () => onPageChange?.(Math.max(currentPage - 1, 1));
 
   // Row editing and saving handled inside page-level EditableRow
 
@@ -100,7 +109,12 @@ export const DataGrid = ({ data, onDataUpdate, hasWritePermissions = true }: Dat
             <span className="text-sm font-medium">Group by:</span>
             <Select value={groupBy} onValueChange={(value) => {
               setGroupBy(value);
-              setCurrentPage(1); // Reset to first page when grouping changes
+              // Reset to first page when grouping changes (client-side grouping only)
+  useEffect(() => {
+    if (onPageChange) {
+      onPageChange(1);
+    }
+  }, [groupBy, onPageChange]);
             }}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Select grouping field" />
@@ -147,7 +161,7 @@ export const DataGrid = ({ data, onDataUpdate, hasWritePermissions = true }: Dat
           </TableRow>
         </TableHeader>
         <TableBody>
-          {currentData.map((row, index) => (
+          {data.map((row, index) => (
             <EditableRow 
               key={row.id} 
               row={row} 
@@ -168,10 +182,10 @@ export const DataGrid = ({ data, onDataUpdate, hasWritePermissions = true }: Dat
       )}
 
       {/* Pagination Controls */}
-      {sortedData.length > 0 && (
+      {totalRecords > 0 && (
         <div className="flex items-center justify-between px-4 py-4 border-t">
           <div className="text-sm text-muted-foreground">
-            Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
+            Showing {startIndex + 1} to {Math.min(endIndex, totalRecords)} of {totalRecords} entries
           </div>
           
           <div className="flex items-center space-x-2">
