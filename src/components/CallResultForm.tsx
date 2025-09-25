@@ -191,6 +191,8 @@ const mapStatusToSheetValue = (userSelectedStatus: string) => {
     "Needs callback": "Needs BPO Callback",
     "Call Never Sent": "Incomplete Transfer",
     "Not Interested": "Returned To Center - DQ",
+    "Fulfilled carrier requirements": "Pending Approval",
+    "Updated Banking/draft date":"Pending Failed Payment Fix",
     "DQ": "DQ'd Can't be sold",
     "Future Submission Date": "Application Withdrawn",
     "Call Back Fix": "Call Back Fix",

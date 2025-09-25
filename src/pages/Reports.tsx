@@ -53,245 +53,144 @@ export const ReportsPage = () => {
 
   const { toast } = useToast();
 
-  // Function to generate verification log summary showing complete call workflow
-  const generateVerificationLogSummary = (logs: any[], submission?: any): string => {
-    if (!logs || logs.length === 0) {
-      // Fallback to data from submission table if available
-      if (submission && (submission.buffer_agent || submission.licensed_agent_account)) {
-        const workflow = [];
-
-        if (submission.buffer_agent) {
-          workflow.push(`🟡 Buffer: ${submission.buffer_agent}`);
-        }
-
-        if (submission.agent && submission.agent !== submission.buffer_agent) {
-          workflow.push(`📞 Handled by: ${submission.agent}`);
-        }
-
-        if (submission.licensed_agent_account) {
-          if (submission.buffer_agent || submission.agent) {
-            workflow.push(`➡️ Transfer to Licensed`);
-          }
-          workflow.push(`🔵 Licensed: ${submission.licensed_agent_account}`);
-        }
-
-        if (workflow.length > 0) {
-          return workflow.join(' → ');
-        }
-      }
-
-      return "No call activity recorded";
-    }
-
-    const sortedLogs = logs.sort((a, b) =>
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
-
-    const workflow: string[] = [];
-    let initialAgent: string | null = null;
-    let currentAgent: string | null = null;
-    let bufferAgent: string | null = null;
-    let licensedAgent: string | null = null;
-    let hasTransfer = false;
-
-    for (const log of sortedLogs) {
-      const agentName = log.agent_name || `${log.agent_type} agent`;
-
-      switch (log.event_type) {
-        case 'verification_started':
-          if (!initialAgent) {
-            initialAgent = agentName;
-            currentAgent = agentName;
-
-            if (log.agent_type === 'buffer') {
-              bufferAgent = agentName;
-              workflow.push(`🟡 Buffer: ${agentName}`);
-            } else if (log.agent_type === 'licensed') {
-              licensedAgent = agentName;
-              workflow.push(`🔵 Licensed: ${agentName}`);
-            }
-          }
-          break;
-
-        case 'call_picked_up':
-          if (agentName !== currentAgent) {
-            if (log.agent_type === 'buffer') {
-              bufferAgent = agentName;
-              workflow.push(`🟡 Buffer: ${agentName}`);
-            } else {
-              licensedAgent = agentName;
-              workflow.push(`🔵 Licensed: ${agentName}`);
-            }
-            currentAgent = agentName;
-          }
-          break;
-
-        case 'call_claimed':
-          if (log.agent_type === 'buffer') {
-            bufferAgent = agentName;
-            workflow.push(`🟡 Buffer: ${agentName} (claimed)`);
-          } else {
-            licensedAgent = agentName;
-            workflow.push(`🔵 Licensed: ${agentName} (claimed)`);
-          }
-          currentAgent = agentName;
-          break;
-
-        case 'transferred_to_la':
-          hasTransfer = true;
-          workflow.push(`➡️ Transfer to Licensed`);
-          break;
-
-        case 'call_dropped':
-          workflow.push(`❌ ${agentName} dropped call`);
-          break;
-
-        case 'application_submitted':
-          workflow.push(`✅ Submitted by ${agentName}`);
-          break;
-
-        case 'application_not_submitted':
-          workflow.push(`❌ Not submitted`);
-          break;
-
-        case 'call_disconnected':
-          workflow.push(`📞 Disconnected from ${agentName}`);
-          break;
-      }
-    }
-
-    // If no workflow events, show basic structure
-    if (workflow.length === 0) {
-      return "No detailed workflow events recorded";
-    }
-
-    return workflow.join(" → ");
-  };
-
-  // Fetch and analyze submission portal data for agent stats
+  // Fetch agent stats from the simplified agent_stats_daily table
   const fetchAgentStats = async (showRefreshToast = false) => {
     try {
       setRefreshing(true);
 
-      // Fetch transfer portal data (base data)
-      let transferQuery = supabase
-        .from('transfer_portal')
+      // Build query for agent_stats_daily table
+      let query = supabase
+        .from('agent_stats_daily')
         .select('*')
-        .order('date', { ascending: false });
+        .order('log_date', { ascending: false });
 
       // Apply date filters
       if (dateFilter) {
-        transferQuery = transferQuery.eq('date', format(dateFilter, 'yyyy-MM-dd'));
+        query = query.eq('log_date', format(dateFilter, 'yyyy-MM-dd'));
       }
       if (dateFromFilter) {
-        transferQuery = transferQuery.gte('date', format(dateFromFilter, 'yyyy-MM-dd'));
+        query = query.gte('log_date', format(dateFromFilter, 'yyyy-MM-dd'));
       }
       if (dateToFilter) {
-        transferQuery = transferQuery.lte('date', format(dateToFilter, 'yyyy-MM-dd'));
+        query = query.lte('log_date', format(dateToFilter, 'yyyy-MM-dd'));
       }
 
-      const { data: transferData, error: transferError } = await transferQuery;
+      const { data: statsData, error } = await query;
 
-      if (transferError) {
-        console.error("Error fetching transfer data:", transferError);
+      if (error) {
+        console.error("Error fetching agent stats:", error);
         toast({
           title: "Error",
-          description: "Failed to fetch transfer data",
+          description: "Failed to fetch agent statistics",
           variant: "destructive",
         });
         return;
       }
 
-      // Fetch submission portal data for additional context
-      let submissionQuery = supabase
-        .from('submission_portal')
-        .select('*');
+      // Group data by agent type
+      const bufferAgents: AgentStats[] = [];
+      const licensedAgents: AgentStats[] = [];
+      const retentionAgents: AgentStats[] = [];
 
-      if (dateFilter) {
-        submissionQuery = submissionQuery.eq('date', format(dateFilter, 'yyyy-MM-dd'));
-      }
-      if (dateFromFilter) {
-        submissionQuery = submissionQuery.gte('date', format(dateFromFilter, 'yyyy-MM-dd'));
-      }
-      if (dateToFilter) {
-        submissionQuery = submissionQuery.lte('date', format(dateToFilter, 'yyyy-MM-dd'));
-      }
+      // Aggregate stats by agent (across all dates in the filter)
+      const agentMap = new Map<string, AgentStats>();
 
-      const { data: submissionData, error: submissionError } = await submissionQuery;
-
-      if (submissionError) {
-        console.error("Error fetching submission data:", submissionError);
-        toast({
-          title: "Error",
-          description: "Failed to fetch submission data",
-          variant: "destructive",
-        });
-        return;
-      }
-      const submissionIds = transferData?.map(t => t.submission_id) || [];
-      let callLogsData: any[] = [];
-
-      if (submissionIds.length > 0) {
-        const { data: logsData } = await supabase
-          .from('call_update_logs')
-          .select('*')
-          .in('submission_id', submissionIds)
-          .order('created_at', { ascending: true });
-
-        callLogsData = logsData || [];
-      }
-
-      // Group call logs by submission_id
-      const logsBySubmission = callLogsData.reduce((acc, log) => {
-        if (!acc[log.submission_id]) acc[log.submission_id] = [];
-        acc[log.submission_id].push(log);
-        return acc;
-      }, {} as { [key: string]: any[] });
-
-      // Generate verification logs for submissions that don't have them
-      const submissionsWithLogs = submissionData?.map(submission => {
-        if (submission.verification_logs) {
-          return submission;
+      (statsData || []).forEach(stat => {
+        const key = `${stat.agent_name}-${stat.agent_type}`;
+        if (!agentMap.has(key)) {
+          agentMap.set(key, {
+            agent_name: stat.agent_name,
+            agent_type: stat.agent_type as 'buffer' | 'licensed' | 'retention',
+            picked_up_calls: 0,
+            dropped_calls: 0,
+            submitted_calls: 0,
+            not_submitted_calls: 0,
+            transferred_calls: 0,
+            notes_count: 0,
+            success_rate: 0,
+            transfer_rate: 0
+          });
         }
 
-        const logs = logsBySubmission[submission.submission_id] || [];
-        let verificationLog = '';
+        const agent = agentMap.get(key)!;
+        agent.picked_up_calls += stat.picked_up_calls || 0;
+        agent.dropped_calls += stat.dropped_calls || 0;
+        agent.submitted_calls += stat.submitted_calls || 0;
+        agent.not_submitted_calls += stat.not_submitted_calls || 0;
+        agent.transferred_calls += stat.transferred_calls || 0;
+      });
 
-        if (logs.length > 0) {
-          // Generate from call logs
-          verificationLog = generateVerificationLogSummary(logs, submission);
-        } else if (submission.buffer_agent || submission.licensed_agent_account) {
-          // Fallback from submission data
-          const workflow = [];
-          if (submission.buffer_agent) {
-            workflow.push(`🟡 Buffer: ${submission.buffer_agent}`);
-          }
-          if (submission.agent && submission.agent !== submission.buffer_agent) {
-            workflow.push(`📞 Handled by: ${submission.agent}`);
-          }
-          if (submission.licensed_agent_account) {
-            if (submission.buffer_agent || submission.agent) {
-              workflow.push(`➡️ Transfer to Licensed`);
-            }
-            workflow.push(`🔵 Licensed: ${submission.licensed_agent_account}`);
-          }
-          verificationLog = workflow.join(' → ');
+      // Calculate rates and categorize agents
+      agentMap.forEach(agent => {
+        const totalCalls = agent.picked_up_calls;
+        agent.success_rate = totalCalls > 0 ? (agent.submitted_calls / totalCalls) * 100 : 0;
+        agent.transfer_rate = totalCalls > 0 ? (agent.transferred_calls / totalCalls) * 100 : 0;
+
+        switch (agent.agent_type) {
+          case 'buffer':
+            bufferAgents.push(agent);
+            break;
+          case 'licensed':
+            licensedAgents.push(agent);
+            break;
+          case 'retention':
+            retentionAgents.push(agent);
+            break;
         }
+      });
 
-        return {
-          ...submission,
-          verification_logs: verificationLog || 'No call activity recorded'
-        };
-      }) || [];
+      // Calculate team stats
+      const bufferTeam: TeamStats = {
+        total_calls: bufferAgents.reduce((sum, agent) => sum + agent.picked_up_calls, 0),
+        total_transfers: bufferAgents.reduce((sum, agent) => sum + agent.transferred_calls, 0),
+        total_submissions: bufferAgents.reduce((sum, agent) => sum + agent.submitted_calls, 0),
+        total_drops: bufferAgents.reduce((sum, agent) => sum + agent.dropped_calls, 0),
+        transfer_rate: 0,
+        submission_rate: 0,
+        active_agents: bufferAgents.length
+      };
 
-      // Analyze data to generate agent stats
-    const stats = analyzeAgentPerformance(transferData || [], submissionsWithLogs, callLogsData);
+      const licensedTeam: TeamStats = {
+        total_calls: licensedAgents.reduce((sum, agent) => sum + agent.picked_up_calls, 0),
+        total_transfers: 0, // Licensed agents don't transfer
+        total_submissions: licensedAgents.reduce((sum, agent) => sum + agent.submitted_calls, 0),
+        total_drops: licensedAgents.reduce((sum, agent) => sum + agent.dropped_calls, 0),
+        transfer_rate: 0,
+        submission_rate: 0,
+        active_agents: licensedAgents.length
+      };
 
-    setBufferStats(stats.bufferAgents);
-    setLicensedStats(stats.licensedAgents);
-    setRetentionStats(stats.retentionAgents);
-    setBufferTeamStats(stats.bufferTeam);
-    setLicensedTeamStats(stats.licensedTeam);      if (showRefreshToast) {
+      const retentionTeam: TeamStats = {
+        total_calls: retentionAgents.reduce((sum, agent) => sum + agent.picked_up_calls, 0),
+        total_transfers: retentionAgents.reduce((sum, agent) => sum + agent.transferred_calls, 0),
+        total_submissions: retentionAgents.reduce((sum, agent) => sum + agent.submitted_calls, 0),
+        total_drops: retentionAgents.reduce((sum, agent) => sum + agent.dropped_calls, 0),
+        transfer_rate: 0,
+        submission_rate: 0,
+        active_agents: retentionAgents.length
+      };
+
+      // Calculate team rates
+      bufferTeam.transfer_rate = bufferTeam.total_calls > 0 ? (bufferTeam.total_transfers / bufferTeam.total_calls) * 100 : 0;
+      bufferTeam.submission_rate = bufferTeam.total_calls > 0 ? (bufferTeam.total_submissions / bufferTeam.total_calls) * 100 : 0;
+
+      licensedTeam.submission_rate = licensedTeam.total_calls > 0 ? (licensedTeam.total_submissions / licensedTeam.total_calls) * 100 : 0;
+
+      retentionTeam.transfer_rate = retentionTeam.total_calls > 0 ? (retentionTeam.total_transfers / retentionTeam.total_calls) * 100 : 0;
+      retentionTeam.submission_rate = retentionTeam.total_calls > 0 ? (retentionTeam.total_submissions / retentionTeam.total_calls) * 100 : 0;
+
+      // Sort agents by picked up calls
+      bufferAgents.sort((a, b) => b.picked_up_calls - a.picked_up_calls);
+      licensedAgents.sort((a, b) => b.picked_up_calls - a.picked_up_calls);
+      retentionAgents.sort((a, b) => b.picked_up_calls - a.picked_up_calls);
+
+      setBufferStats(bufferAgents);
+      setLicensedStats(licensedAgents);
+      setRetentionStats(retentionAgents);
+      setBufferTeamStats(bufferTeam);
+      setLicensedTeamStats(licensedTeam);
+
+      if (showRefreshToast) {
         toast({
           title: "Success",
           description: "Reports data refreshed successfully",
