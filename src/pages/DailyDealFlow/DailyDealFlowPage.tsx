@@ -93,52 +93,71 @@ const DailyDealFlowPage = () => {
     }
   };
 
-  // Fetch data from Supabase
+  // Fetch data from Supabase with pagination to get all records
   const fetchData = async (showRefreshToast = false) => {
     try {
       setRefreshing(true);
-      
-      let query = supabase
-        .from('daily_deal_flow')
-        .select('*')
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false });
 
-      // Apply date filter if set - using EST timezone for consistency
-      if (dateFilter) {
-        const dateStr = dateObjectToESTString(dateFilter);
-        query = query.eq('date', dateStr);
-      }
-      
-      // Apply date range filter if set - using EST timezone for consistency
-      if (dateFromFilter) {
-        const dateFromStr = dateObjectToESTString(dateFromFilter);
-        query = query.gte('date', dateFromStr);
-      }
-      
-      if (dateToFilter) {
-        const dateToStr = dateObjectToESTString(dateToFilter);
-        query = query.lte('date', dateToStr);
+      let allData: DailyDealFlowRow[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMoreData = true;
+
+      while (hasMoreData) {
+        let query = supabase
+          .from('daily_deal_flow')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, from + batchSize - 1);
+
+        // Apply date filter if set - using EST timezone for consistency
+        if (dateFilter) {
+          const dateStr = dateObjectToESTString(dateFilter);
+          query = query.eq('date', dateStr);
+        }
+
+        // Apply date range filter if set - using EST timezone for consistency
+        if (dateFromFilter) {
+          const dateFromStr = dateObjectToESTString(dateFromFilter);
+          query = query.gte('date', dateFromStr);
+        }
+
+        if (dateToFilter) {
+          const dateToStr = dateObjectToESTString(dateToFilter);
+          query = query.lte('date', dateToStr);
+        }
+
+        const { data: batchData, error } = await query;
+
+        if (error) {
+          console.error("Error fetching daily deal flow data:", error);
+          toast({
+            title: "Error",
+            description: "Failed to fetch deal flow data",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (batchData && batchData.length > 0) {
+          allData = [...allData, ...batchData];
+          from += batchSize;
+
+          // If we got less than batchSize, we've reached the end
+          if (batchData.length < batchSize) {
+            hasMoreData = false;
+          }
+        } else {
+          hasMoreData = false;
+        }
       }
 
-      const { data: dealFlowData, error } = await query;
+      setData(allData);
 
-      if (error) {
-        console.error("Error fetching daily deal flow data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch deal flow data",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setData(dealFlowData || []);
-      
       if (showRefreshToast) {
         toast({
           title: "Success",
-          description: "Data refreshed successfully",
+          description: `Data refreshed successfully - loaded ${allData.length} records`,
         });
       }
     } catch (error) {

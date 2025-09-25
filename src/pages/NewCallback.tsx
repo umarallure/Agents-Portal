@@ -40,7 +40,7 @@ const leadVendorOptions = [
 "Trust Link",
 "Quotes BPO",
 "Zupax Marketing",
-"Argon Communications",
+"Argon Comm",
 "Care Solutions",
 "Crown Connect BPO",
 "Cutting Edge",

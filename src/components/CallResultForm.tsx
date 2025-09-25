@@ -122,7 +122,7 @@ const leadVendorOptions = [
 "Crown Connect BPO",
 "Quotes BPO",
 "Zupax Marketing",
-"Argon Communications",
+"Argon Comm",
 "Care Solutions",
 "Cutting Edge",
 "Next Era",

@@ -28,7 +28,7 @@ export const DataGrid = ({ data, onDataUpdate, hasWritePermissions = true }: Dat
   ];
 
   const columns = [
-    "S.No", "Date", "Lead Vendor", "Insured Name", "Buffer Agent", "Agent", "Licensed Account", "Status",
+    "S.No", "Date", "Lead Vendor", "Insured Name", "Phone Number", "Buffer Agent", "Agent", "Licensed Account", "Status",
     "Call Result", "Carrier", "Product Type", "Draft Date", "MP", "Face Amount", "Notes"
   ];
   
@@ -53,6 +53,29 @@ export const DataGrid = ({ data, onDataUpdate, hasWritePermissions = true }: Dat
       return String(aValue).localeCompare(String(bValue));
     });
   }, [data, groupBy]);
+
+  // Detect duplicate rows based on insured_name, client_phone_number, and lead_vendor
+  const duplicateRows = useMemo(() => {
+    const seen = new Map<string, number>();
+    const duplicates = new Set<string>();
+
+    sortedData.forEach(row => {
+      const key = `${row.insured_name || ''}|${row.client_phone_number || ''}|${row.lead_vendor || ''}`;
+      const count = seen.get(key) || 0;
+      seen.set(key, count + 1);
+      if (count + 1 > 1) {
+        duplicates.add(key);
+      }
+    });
+
+    return duplicates;
+  }, [sortedData]);
+
+  // Check if a row is duplicate
+  const isRowDuplicate = (row: DailyDealFlowRow) => {
+    const key = `${row.insured_name || ''}|${row.client_phone_number || ''}|${row.lead_vendor || ''}`;
+    return duplicateRows.has(key);
+  };
 
   // Calculate pagination
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
@@ -104,6 +127,7 @@ export const DataGrid = ({ data, onDataUpdate, hasWritePermissions = true }: Dat
                 column === 'Date' ? 'w-20' :
                 column === 'Lead Vendor' ? 'w-20' :
                 column === 'Insured Name' ? 'w-32' :
+                column === 'Phone Number' ? 'w-28' :
                 column === 'Buffer Agent' ? 'w-24' :
                 column === 'Agent' ? 'w-20' :
                 column === 'Licensed Account' ? 'w-24' :
@@ -131,6 +155,7 @@ export const DataGrid = ({ data, onDataUpdate, hasWritePermissions = true }: Dat
               serialNumber={startIndex + index + 1}
               onUpdate={onDataUpdate}
               hasWritePermissions={hasWritePermissions}
+              isDuplicate={isRowDuplicate(row)}
             />
           ))}
         </TableBody>

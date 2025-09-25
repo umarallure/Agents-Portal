@@ -111,7 +111,6 @@ const Dashboard = () => {
       }));
 
       // Show all leads (no user-based filtering)
-      console.log('All leads with data:', leadsWithData);
       setLeads(leadsWithData || []);
     } catch (error) {
       console.error('Error fetching leads:', error);
@@ -456,6 +455,9 @@ const Dashboard = () => {
                                 <span className="font-medium">Phone:</span> {lead.phone_number || 'N/A'}
                               </div>
                               <div>
+                                <span className="font-medium">Lead Vendor:</span> {lead.call_results[0]?.lead_vendor || lead.lead_vendor || 'N/A'}
+                              </div>
+                              <div>
                                 <span className="font-medium">Coverage:</span> ${lead.coverage_amount?.toLocaleString() || 'N/A'}
                               </div>
                               <div>
@@ -464,6 +466,10 @@ const Dashboard = () => {
                               <div>
                                 <span className="font-medium">Date:</span>{' '}
                                 {lead.created_at ? format(new Date(lead.created_at), 'MMM dd, yyyy') : 'N/A'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Draft Date:</span>{' '}
+                                {lead.call_results[0]?.draft_date ? format(new Date(lead.call_results[0].draft_date), 'MMM dd, yyyy') : 'N/A'}
                               </div>
                             </div>
 

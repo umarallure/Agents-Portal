@@ -40,6 +40,7 @@ interface EditableRowProps {
   serialNumber: number;
   onUpdate: () => void;
   hasWritePermissions?: boolean;
+  isDuplicate?: boolean;
 }
 
 // Dropdown options (same as CallResultForm)
@@ -89,7 +90,7 @@ const leadVendorOptions = [
   "AJ BPO", "Pro Solutions BPO", "Emperor BPO"
 ];
 
-export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePermissions = true }: EditableRowProps) => {
+export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePermissions = true, isDuplicate = false }: EditableRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<DailyDealFlowRow>(row);
   const [isSaving, setIsSaving] = useState(false);
@@ -950,7 +951,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
   if (isEditing) {
     return (
       <>
-        <tr className="bg-blue-50 border-2 border-blue-200">
+        <tr className={`bg-blue-50 ${isDuplicate ? 'bg-yellow-50' : ''} border-2 border-blue-200`}>
           {/* Serial Number */}
           <td className="border border-border px-3 py-2 text-center font-medium">
             {serialNumber}
@@ -1007,6 +1008,16 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
               className="min-h-[2.5rem] text-xs resize-none"
               placeholder="Customer name"
               rows={2}
+            />
+          </td>
+
+          {/* Phone Number */}
+          <td className="border border-border px-3 py-2">
+            <Input
+              value={editData.client_phone_number || ''}
+              onChange={(e) => updateField('client_phone_number', e.target.value)}
+              className="h-8 text-xs"
+              placeholder="Phone number"
             />
           </td>
 
@@ -1230,7 +1241,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
   // Display mode
   return (
     <>
-      <tr className={`${getStatusColor(row.status)} hover:bg-muted/50 transition-colors border`}>
+      <tr className={`${getStatusColor(row.status)} ${isDuplicate ? 'bg-yellow-50' : ''} hover:bg-muted/50 transition-colors border`}>
         {/* Serial Number */}
         <td className="border border-border px-3 py-2 text-sm text-center font-medium">
           {serialNumber}
@@ -1254,6 +1265,13 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
         <td className="border border-border px-2 py-3 text-sm w-32 align-top">
           <div className="font-medium text-gray-800 whitespace-normal break-words leading-tight min-h-[2.5rem]">
             {row.insured_name || ''}
+          </div>
+        </td>
+
+        {/* Phone Number */}
+        <td className="border border-border px-3 py-2 text-sm w-28">
+          <div className="font-mono text-gray-700">
+            {row.client_phone_number || ''}
           </div>
         </td>
 
