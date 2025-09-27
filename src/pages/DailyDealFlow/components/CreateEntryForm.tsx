@@ -61,7 +61,12 @@ const leadVendorOptions = [
   "NanoTech", "Optimum BPO", "Ethos BPO", "Trust Link", "Crown Connect BPO",
   "Quotes BPO", "Zupax Marketing", "Argon Comm", "Care Solutions",
   "Cutting Edge", "Next Era", "Rock BPO", "Avenue Consultancy",
-  "AJ BPO", "Pro Solutions BPO", "Emperor BPO"
+  "AJ BPO", "Pro Solutions BPO", "Emperor BPO",
+  "Networkize",
+  "LightVerse BPO",
+  "Leads BPO",
+  "Helix BPO",
+  "Exito BPO"
 ];
 
 // Function to generate unique CB submission ID

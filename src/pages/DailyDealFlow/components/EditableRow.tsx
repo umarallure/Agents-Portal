@@ -87,7 +87,12 @@ const leadVendorOptions = [
   "NanoTech", "Optimum BPO", "Ethos BPO", "Trust Link", "Crown Connect BPO",
   "Quotes BPO", "Zupax Marketing", "Argon Communications", "Care Solutions",
   "Cutting Edge", "Next Era", "Rock BPO", "Avenue Consultancy",
-  "AJ BPO", "Pro Solutions BPO", "Emperor BPO"
+  "AJ BPO", "Pro Solutions BPO", "Emperor BPO",
+  "Networkize",
+  "LightVerse BPO",
+  "Leads BPO",
+  "Helix BPO",
+  "Exito BPO"
 ];
 
 export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePermissions = true, isDuplicate = false }: EditableRowProps) => {

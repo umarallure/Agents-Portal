@@ -56,7 +56,12 @@ export const WeeklyReports = ({ className }: WeeklyReportsProps) => {
     "Rock BPO", "Avenue Consultancy",
     "AJ BPO",
     "Pro Solutions BPO",
-    "Emperor BPO"
+    "Emperor BPO",
+    "Networkize",
+    "LightVerse BPO",
+    "Leads BPO",
+    "Helix BPO",
+    "Exito BPO"
   ];
 
   // Base columns for all reports

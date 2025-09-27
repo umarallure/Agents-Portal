@@ -138,6 +138,7 @@ serve(async (req) => {
       product_type_carrier,
       level_or_gi,
       from_callback,
+      is_callback = false,
       create_new_entry = false,
       original_submission_id = null,
       // Add these for proper status determination

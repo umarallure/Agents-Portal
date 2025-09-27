@@ -46,7 +46,12 @@ const leadVendorOptions = [
 "Cutting Edge",
 "Next Era",
 "Rock BPO",
-"Avenue Consultancy"
+"Avenue Consultancy",
+"Networkize",
+"LightVerse BPO",
+"Leads BPO",
+"Helix BPO",
+"Exito BPO"
 ];
 
 const NewCallback = () => {
@@ -68,6 +73,7 @@ const NewCallback = () => {
   const [healthConditions, setHealthConditions] = useState("");
   const [leadVendor, setLeadVendor] = useState("");
   const [additionalNotes, setAdditionalNotes] = useState("");
+  const [submissionDate, setSubmissionDate] = useState<Date>();
 
   // Generate unique submission ID
   const generateSubmissionId = () => {
@@ -82,10 +88,10 @@ const NewCallback = () => {
 
     try {
       // Validate required fields
-      if (!customerFullName || !phoneNumber || !leadVendor) {
+      if (!customerFullName || !phoneNumber || !leadVendor || !submissionDate) {
         toast({
           title: "Validation Error",
-          description: "Please fill in all required fields (Name, Phone, Lead Vendor)",
+          description: "Please fill in all required fields (Name, Phone, Lead Vendor, Submission Date)",
           variant: "destructive",
         });
         return;
@@ -95,7 +101,7 @@ const NewCallback = () => {
       
       const leadData = {
         submission_id: submissionId,
-        submission_date: getCurrentTimestampEST(), // Using EST timezone for consistency
+        submission_date: formatDateToEST(submissionDate), // Using selected submission date
         customer_full_name: customerFullName,
         phone_number: phoneNumber,
         email: email || null,
@@ -109,6 +115,7 @@ const NewCallback = () => {
         health_conditions: healthConditions || null,
         lead_vendor: leadVendor,
         additional_notes: additionalNotes || null,
+        is_callback: true, // Mark as callback since submission ID starts with CB
       };
 
       // Insert into leads table
@@ -213,6 +220,33 @@ const NewCallback = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <Label>Submission Date *</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !submissionDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {submissionDate ? format(submissionDate, "PPP") : "Pick a submission date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={submissionDate}
+                          onSelect={setSubmissionDate}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
               </div>

@@ -55,7 +55,12 @@ export const EODReports = ({ className }: EODReportsProps) => {
     "Rock BPO", "Avenue Consultancy",
     "AJ BPO",
     "Pro Solutions BPO",
-    "Emperor BPO"
+    "Emperor BPO",
+    "Networkize",
+    "LightVerse BPO",
+    "Leads BPO",
+    "Helix BPO",
+    "Exito BPO"
   ];
 
   // Base columns for all reports
@@ -139,8 +144,8 @@ export const EODReports = ({ className }: EODReportsProps) => {
       }
     };
 
-    // Convert data to Excel format
-    const excelData = vendorData.map(row => {
+    // Helper function to convert row data to Excel format
+    const convertRowToExcelData = (row: DailyDealFlowData) => {
       const baseRowData = [
         formatDateSafe(row.date),
         row.insured_name || '',
@@ -169,11 +174,52 @@ export const EODReports = ({ className }: EODReportsProps) => {
       );
 
       return baseRowData;
-    });
+    };
+
+    // Separate data into BPO Transfers and Internal Callbacks
+    const bpoTransfers = vendorData.filter(row => !row.from_callback);
+    const internalCallbacks = vendorData.filter(row => row.from_callback);
+
+    // Build the worksheet data array
+    const worksheetData: any[][] = [];
+
+    // Add BPO Transfers section
+    if (bpoTransfers.length > 0) {
+      // Add section header
+      worksheetData.push(['BPO Transfers']);
+      worksheetData.push([]); // Empty row for spacing
+      
+      // Add column headers
+      worksheetData.push(headers);
+      
+      // Add BPO transfer data
+      bpoTransfers.forEach(row => {
+        worksheetData.push(convertRowToExcelData(row));
+      });
+      
+      // Add spacing between sections
+      worksheetData.push([]);
+      worksheetData.push([]);
+    }
+
+    // Add Internal Callbacks section
+    if (internalCallbacks.length > 0) {
+      // Add section header
+      worksheetData.push(['Internal Callbacks']);
+      worksheetData.push([]); // Empty row for spacing
+      
+      // Add column headers
+      worksheetData.push(headers);
+      
+      // Add internal callback data
+      internalCallbacks.forEach(row => {
+        worksheetData.push(convertRowToExcelData(row));
+      });
+    }
 
     // Create workbook with better formatting
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...excelData]);
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
     
     // Auto-size columns with better widths
     const colWidths = headers.map((header, index) => {
@@ -199,17 +245,62 @@ export const EODReports = ({ className }: EODReportsProps) => {
     });
     ws['!cols'] = colWidths;
 
-    // Add some basic formatting
+    // Add formatting for section headers and column headers
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
     
-    // Style header row
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      const headerCell = XLSX.utils.encode_cell({ r: 0, c: C });
-      if (!ws[headerCell]) continue;
-      ws[headerCell].s = {
-        font: { bold: true },
-        fill: { fgColor: { rgb: "CCCCCC" } }
-      };
+    // Track row positions for styling
+    let currentRow = 0;
+    
+    // Style BPO Transfers section
+    if (bpoTransfers.length > 0) {
+      // Section header styling
+      const sectionHeaderCell = XLSX.utils.encode_cell({ r: currentRow, c: 0 });
+      if (ws[sectionHeaderCell]) {
+        ws[sectionHeaderCell].s = {
+          font: { bold: true, sz: 14 },
+          fill: { fgColor: { rgb: "E6F3FF" } }
+        };
+      }
+      
+      currentRow += 2; // Skip section header and empty row
+      
+      // Column headers styling
+      for (let C = 0; C < headers.length; ++C) {
+        const headerCell = XLSX.utils.encode_cell({ r: currentRow, c: C });
+        if (ws[headerCell]) {
+          ws[headerCell].s = {
+            font: { bold: true },
+            fill: { fgColor: { rgb: "CCCCCC" } }
+          };
+        }
+      }
+      
+      currentRow += bpoTransfers.length + 3; // Skip data rows and spacing
+    }
+
+    // Style Internal Callbacks section
+    if (internalCallbacks.length > 0) {
+      // Section header styling
+      const sectionHeaderCell = XLSX.utils.encode_cell({ r: currentRow, c: 0 });
+      if (ws[sectionHeaderCell]) {
+        ws[sectionHeaderCell].s = {
+          font: { bold: true, sz: 14 },
+          fill: { fgColor: { rgb: "E6F3FF" } }
+        };
+      }
+      
+      currentRow += 2; // Skip section header and empty row
+      
+      // Column headers styling
+      for (let C = 0; C < headers.length; ++C) {
+        const headerCell = XLSX.utils.encode_cell({ r: currentRow, c: C });
+        if (ws[headerCell]) {
+          ws[headerCell].s = {
+            font: { bold: true },
+            fill: { fgColor: { rgb: "CCCCCC" } }
+          };
+        }
+      }
     }
 
     // Add worksheet to workbook
@@ -374,6 +465,7 @@ export const EODReports = ({ className }: EODReportsProps) => {
               <p>• Reports will be generated by lead vendor</p>
               <p>• Each vendor gets a separate Excel file</p>
               <p>• All files will be packaged in a ZIP file</p>
+              <p>• Data split into "BPO Transfers" and "Internal Callbacks" sections</p>
               <p>• Premium vendors include MP and Face Amount columns</p>
               <p>• Includes: Date, Name, Agents, Status, Carrier, Product Type, Draft Date, Notes</p>
             </div>

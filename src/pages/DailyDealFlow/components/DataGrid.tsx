@@ -38,7 +38,8 @@ export const DataGrid = ({
     { value: 'status', label: 'Status' },
     { value: 'call_result', label: 'Call Result' },
     { value: 'carrier', label: 'Carrier' },
-    { value: 'product_type', label: 'Product Type' }
+    { value: 'product_type', label: 'Product Type' },
+    { value: 'is_callback', label: 'Callback' }
   ];
 
   const columns = [
@@ -60,7 +61,15 @@ export const DataGrid = ({
     const groups: { [key: string]: DailyDealFlowRow[] } = {};
     
     data.forEach(row => {
-      const groupValue = row[groupBy as keyof DailyDealFlowRow] || 'N/A';
+      let groupValue: string | boolean | undefined;
+      
+      if (groupBy === 'is_callback') {
+        // Special handling for callback field
+        groupValue = row.is_callback ? 'Callback' : 'Regular Lead';
+      } else {
+        groupValue = row[groupBy as keyof DailyDealFlowRow] || 'N/A';
+      }
+      
       const groupKey = String(groupValue);
       
       if (!groups[groupKey]) {

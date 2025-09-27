@@ -34,6 +34,7 @@ export interface DailyDealFlowRow {
   monthly_premium?: number;
   face_amount?: number;
   from_callback?: boolean;
+  is_callback?: boolean;
   notes?: string;
   policy_number?: string;
   carrier_audit?: string;

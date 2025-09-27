@@ -127,7 +127,15 @@ const leadVendorOptions = [
 "Cutting Edge",
 "Next Era",
 "Rock BPO",
-"Avenue Consultancy"
+"Avenue Consultancy",
+"AJ BPO",
+"Pro Solutions BPO",
+"Emperor BPO",
+"Networkize",
+"LightVerse BPO",
+"Leads BPO",
+"Helix BPO",
+"Exito BPO"
 ];
 
 const dqReasonOptions = [
@@ -539,6 +547,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         agent_who_took_call: agentWhoTookCall,
         sent_to_underwriting: sentToUnderwriting,
         new_draft_date: status === "Updated Banking/draft date" && newDraftDate ? format(newDraftDate, "yyyy-MM-dd") : null,
+        is_callback: submissionId.startsWith('CB'), // Track if this is a callback based on submission ID
         ...(showSubmittedFields || showCarrierApplicationFields ? {
           carrier,
           product_type: productType,
@@ -694,6 +703,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 product_type_carrier: null,
                 level_or_gi: null,
                 from_callback: callSource === "Agent Callback",
+                is_callback: submissionId.startsWith('CB'), // Track if this is a callback
                 // Add the new parameters for proper status determination
                 application_submitted: applicationSubmitted,
                 sent_to_underwriting: sentToUnderwriting

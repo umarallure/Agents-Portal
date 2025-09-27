@@ -118,7 +118,12 @@ export const GridToolbar = ({
     "Cutting Edge",
     "Next Era",
     "Rock BPO",
-    "Avenue Consultancy"
+    "Avenue Consultancy",
+    "Networkize",
+    "LightVerse BPO",
+    "Leads BPO",
+    "Helix BPO",
+    "Exito BPO"
   ];
 
   const statusOptions = [
