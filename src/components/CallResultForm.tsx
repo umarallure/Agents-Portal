@@ -25,10 +25,10 @@ const statusOptions = [
   "Needs callback",
   "Not Interested",
   "⁠DQ",
+  "Chargeback DQ",
   "Future Submission Date",
   "Updated Banking/draft date",
   "Fulfilled carrier requirements",
-  "Call Back Fix",
   "Call Never Sent",
   "Disconnected"
 ];
@@ -140,6 +140,7 @@ const leadVendorOptions = [
 
 const dqReasonOptions = [
   "Multiple Chargebacks",
+  "Chargeback DQ",
   "Not Cognatively Functional",
   "Transferred Many Times Without Success",
   "TCPA",
@@ -177,6 +178,7 @@ const fulfilledCarrierReasonOptions = [
 const getReasonOptions = (status: string) => {
   switch (status) {
     case "⁠DQ":
+    case "Chargeback DQ":
       return dqReasonOptions;
     case "Needs callback":
       return needsCallbackReasonOptions;
@@ -202,8 +204,8 @@ const mapStatusToSheetValue = (userSelectedStatus: string) => {
     "Fulfilled carrier requirements": "Pending Approval",
     "Updated Banking/draft date":"Pending Failed Payment Fix",
     "DQ": "DQ'd Can't be sold",
+    "Chargeback DQ": "DQ'd Can't be sold",
     "Future Submission Date": "Application Withdrawn",
-    "Call Back Fix": "Call Back Fix",
     "Disconnected": "Incomplete Transfer",
     "Disconnected - Never Retransferred": "Incomplete Transfer"
   };
@@ -213,6 +215,16 @@ const mapStatusToSheetValue = (userSelectedStatus: string) => {
 const getNoteText = (status: string, reason: string, clientName: string = "[Client Name]", newDraftDate?: Date) => {
   const statusReasonMapping: { [status: string]: { [reason: string]: string } } = {
     "⁠DQ": {
+      "Multiple Chargebacks": `${clientName} has been DQ'd. They have caused multiple chargebacks in our agency, so we cannot submit another application for them`,
+      "Not Cognatively Functional": `${clientName} has been DQ'd. They are not mentally able to make financial decisions. We cannot submit an application for them`,
+      "Transferred Many Times Without Success": `We have spoken with ${clientName} more than 5 times and have not been able to successfully submit an application. We should move on from this caller`,
+      "TCPA": `${clientName} IS A TCPA LITIGATOR. PLEASE REMOVE FROM YOUR SYSTEM IMMEDIATELY`,
+      "Decline All Available Carriers": `${clientName} was denied through all carriers they are elligible to apply for`,
+      "Already a DQ in our System": `${clientName} is already a DQ in our system. We will not accept this caller again.`,
+      "Other": "Custom message if none of the above fit"
+    },
+    "Chargeback DQ": {
+      "Chargeback DQ": `${clientName} has caused multiple chargebacks. We will not accept this caller into our agency`,
       "Multiple Chargebacks": `${clientName} has been DQ'd. They have caused multiple chargebacks in our agency, so we cannot submit another application for them`,
       "Not Cognatively Functional": `${clientName} has been DQ'd. They are not mentally able to make financial decisions. We cannot submit an application for them`,
       "Transferred Many Times Without Success": `We have spoken with ${clientName} more than 5 times and have not been able to successfully submit an application. We should move on from this caller`,
@@ -244,10 +256,10 @@ const getNoteText = (status: string, reason: string, clientName: string = "[Clie
   return statusReasonMapping[status]?.[reason] || "";
 };
 
-// Function to generate new submission ID for callback entries
+//  Function to generate new submission ID for callback entries with CBB prefix
 const generateCallbackSubmissionId = (originalSubmissionId: string): string => {
   const randomDigits = Math.floor(1000 + Math.random() * 9000); // 4-digit random number
-  return `CB${randomDigits}${originalSubmissionId}`;
+  return `CBB${randomDigits}${originalSubmissionId}`;
 };
 
 // Function to check if entry exists and get its date
@@ -465,15 +477,22 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
     if (status !== "Updated Banking/draft date") {
       setNewDraftDate(undefined);
     }
-    // Reset status reason when status changes
-    setStatusReason("");
-    setNotes("");
-  }, [status]);
+    // Reset status reason when status changes, but auto-select for Chargeback DQ
+    if (status === "Chargeback DQ") {
+      setStatusReason("Chargeback DQ");
+      // Auto-populate notes for Chargeback DQ
+      const clientName = customerName || "[Client Name]";
+      setNotes(getNoteText(status, "Chargeback DQ", clientName));
+    } else {
+      setStatusReason("");
+      setNotes("");
+    }
+  }, [status, customerName]);
 
   const showCarrierApplicationFields = status === "Needs Carrier Application";
   const showSubmittedFields = applicationSubmitted === true;
   const showNotSubmittedFields = applicationSubmitted === false;
-  const showStatusReasonDropdown = applicationSubmitted === false && ["⁠DQ", "Needs callback", "Not Interested", "Future Submission Date", "Updated Banking/draft date", "Fulfilled carrier requirements"].includes(status);
+  const showStatusReasonDropdown = applicationSubmitted === false && ["⁠DQ", "Chargeback DQ", "Needs callback", "Not Interested", "Future Submission Date", "Updated Banking/draft date", "Fulfilled carrier requirements"].includes(status);
   const showNewDraftDateField = applicationSubmitted === false && status === "Updated Banking/draft date" && statusReason;
   const currentReasonOptions = getReasonOptions(status);
 
@@ -547,7 +566,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         agent_who_took_call: agentWhoTookCall,
         sent_to_underwriting: sentToUnderwriting,
         new_draft_date: status === "Updated Banking/draft date" && newDraftDate ? format(newDraftDate, "yyyy-MM-dd") : null,
-        is_callback: submissionId.startsWith('CB'), // Track if this is a callback based on submission ID
+        is_callback: submissionId.startsWith('CBB'), // Track if this is a callback based on submission ID
         ...(showSubmittedFields || showCarrierApplicationFields ? {
           carrier,
           product_type: productType,
@@ -703,7 +722,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 product_type_carrier: null,
                 level_or_gi: null,
                 from_callback: callSource === "Agent Callback",
-                is_callback: submissionId.startsWith('CB'), // Track if this is a callback
+                is_callback: submissionId.startsWith('CBB'), // Track if this is a callback with CBB prefix
                 // Add the new parameters for proper status determination
                 application_submitted: applicationSubmitted,
                 sent_to_underwriting: sentToUnderwriting
@@ -758,7 +777,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         }
       }
 
-      // Update Google Sheets based on Call Source selection
+      // Simplified Google Sheets update logic - works for both BPO Transfer and Agent Callback
       try {
         const todayDate = formatDateESTLocale();
         // Fetch lead data for sheet functions
@@ -771,88 +790,11 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         if (leadError || !leadData) {
           console.error("Error fetching lead data:", leadError);
         } else {
-            // This was the start of the problematic nested try
-            if (callSource === "First Time Transfer" || callSource === "Reconnected Transfer") {
-              // Use the finalSubmissionId from the Edge function
-              console.log(`DEBUG: Google Sheets - ${callSource}, finalSubmissionId:`, finalSubmissionId, 'original:', submissionId);
+          // Use the finalSubmissionId from the Edge function (which handles creating new entries or updating existing ones)
+          console.log(`DEBUG: Google Sheets - ${callSource}, finalSubmissionId:`, finalSubmissionId, 'original:', submissionId);
 
-              if (finalSubmissionId !== submissionId) {
-                // New entry was created
-                console.log(`DEBUG: Google Sheets - Creating new entry for submission ${submissionId} -> ${finalSubmissionId}`);
-
-                // Prepare lead data with new submission_id
-                const newEntryLeadData = {
-                  ...leadData,
-                  submission_id: finalSubmissionId,
-                  submission_date: todayDate,
-                  lead_vendor: leadData.lead_vendor || leadVendor || 'N/A'
-                };
-
-                // Prepare call result data
-                const newEntryCallResult = {
-                  application_submitted: applicationSubmitted,
-                  status: applicationSubmitted === true ? "Pending Approval" : mapStatusToSheetValue(finalStatus),
-                  buffer_agent: bufferAgent || '',
-                  agent_who_took_call: agentWhoTookCall || '',
-                  licensed_agent_account: licensedAgentAccount || '',
-                  carrier: carrier || '',
-                  product_type: productType || '',
-                  draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
-                  monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-                  face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
-                  notes: finalNotes || '',
-                  dq_reason: showStatusReasonDropdown ? statusReason : null,
-                  sent_to_underwriting: sentToUnderwriting,
-                  from_callback: callSource === "Reconnected Transfer",
-                  call_source: callSource
-                };
-
-                // Create new entry in Google Sheets
-                const { error: sheetsError } = await supabase.functions.invoke('create-new-callback-sheet', {
-                  body: {
-                    leadData: newEntryLeadData,
-                    callResult: newEntryCallResult
-                  }
-                });
-
-                if (sheetsError) {
-                  console.error(`Error creating new Google Sheets entry for ${callSource}:`, sheetsError);
-                } else {
-                  console.log(`New Google Sheets entry created successfully for submission ${finalSubmissionId}`);
-                }
-              } else {
-                // Update existing entry
-                console.log('DEBUG: Google Sheets - Updating existing entry');
-
-                const { error: sheetsError } = await supabase.functions.invoke('google-sheets-update', {
-                  body: {
-                    submissionId: submissionId,
-                    callResult: {
-                      application_submitted: applicationSubmitted,
-                      status: applicationSubmitted === true ? "Pending Approval" : mapStatusToSheetValue(finalStatus),
-                      buffer_agent: bufferAgent,
-                      agent_who_took_call: agentWhoTookCall,
-                      licensed_agent_account: licensedAgentAccount,
-                      carrier: carrier,
-                      product_type: productType,
-                      draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
-                      monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-                      face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
-                      notes: finalNotes,
-                      dq_reason: showStatusReasonDropdown ? statusReason : null,
-                      sent_to_underwriting: sentToUnderwriting,
-                      from_callback: callSource === "Reconnected Transfer",
-                      call_source: callSource
-                    }
-                  }
-                });
-                if (sheetsError) {
-                  console.error("Error updating Google Sheets:", sheetsError);
-                }
-              }
-            } else if (callSource === "Agent Callback") {
           // Generate combined notes for Google Sheets
-          let finalNotes = notes;
+          let finalNotesForSheets = notes;
           if (applicationSubmitted === true) {
             const structuredNotes = generateSubmittedApplicationNotes(
               licensedAgentAccount,
@@ -863,47 +805,84 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
               draftDate,
               sentToUnderwriting
             );
-            finalNotes = combineNotes(structuredNotes, notes);
+            finalNotesForSheets = combineNotes(structuredNotes, notes);
           }
 
-          // Prepare lead data with all necessary fields
-          const callbackLeadData = {
-            ...leadData,
-            submission_date: todayDate,
-            lead_vendor: leadData.lead_vendor || leadVendor || 'N/A'
-          };
+          if (finalSubmissionId !== submissionId) {
+            // New entry was created - use the new callback submission ID
+            console.log(`DEBUG: Google Sheets - Creating new entry for submission ${submissionId} -> ${finalSubmissionId}`);
 
-          // Prepare call result data
-          const callbackCallResult = {
-            application_submitted: applicationSubmitted,
-            status: applicationSubmitted === true ? "Pending Approval" : mapStatusToSheetValue(finalStatus),
-            buffer_agent: bufferAgent || '',
-            agent_who_took_call: agentWhoTookCall || '',
-            licensed_agent_account: licensedAgentAccount || '',
-            carrier: carrier || '',
-            product_type: productType || '',
-            draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
-            monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
-            face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
-            notes: finalNotes || '',
-            dq_reason: showStatusReasonDropdown ? statusReason : null,
-            sent_to_underwriting: sentToUnderwriting,
-            from_callback: callSource === "Agent Callback",
-            call_source: callSource
-          };
+            // Prepare lead data with new submission_id
+            const newEntryLeadData = {
+              ...leadData,
+              submission_id: finalSubmissionId,
+              submission_date: todayDate,
+              lead_vendor: leadData.lead_vendor || leadVendor || 'N/A'
+            };
 
-          // Create new entry in daily deal flow with today's date
-          const { error: sheetsError } = await supabase.functions.invoke('create-new-callback-sheet', {
-            body: {
-              leadData: callbackLeadData,
-              callResult: callbackCallResult
+            // Prepare call result data
+            const newEntryCallResult = {
+              application_submitted: applicationSubmitted,
+              status: applicationSubmitted === true ? "Pending Approval" : mapStatusToSheetValue(finalStatus),
+              buffer_agent: bufferAgent || '',
+              agent_who_took_call: agentWhoTookCall || '',
+              licensed_agent_account: licensedAgentAccount || '',
+              carrier: carrier || '',
+              product_type: productType || '',
+              draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
+              monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
+              face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
+              notes: finalNotesForSheets || '',
+              dq_reason: showStatusReasonDropdown ? statusReason : null,
+              sent_to_underwriting: sentToUnderwriting,
+              from_callback: callSource === "Agent Callback",
+              call_source: callSource
+            };
+
+            // Create new entry in Google Sheets
+            const { error: sheetsError } = await supabase.functions.invoke('create-new-callback-sheet', {
+              body: {
+                leadData: newEntryLeadData,
+                callResult: newEntryCallResult
+              }
+            });
+
+            if (sheetsError) {
+              console.error(`Error creating new Google Sheets entry for ${callSource}:`, sheetsError);
+            } else {
+              console.log(`New Google Sheets entry created successfully for submission ${finalSubmissionId}`);
             }
-          });
-          
-          if (sheetsError) {
-            console.error("Error creating new Google Sheets entry:", sheetsError);
+          } else {
+            // Update existing entry
+            console.log('DEBUG: Google Sheets - Updating existing entry');
+
+            const { error: sheetsError } = await supabase.functions.invoke('google-sheets-update', {
+              body: {
+                submissionId: submissionId,
+                callResult: {
+                  application_submitted: applicationSubmitted,
+                  status: applicationSubmitted === true ? "Pending Approval" : mapStatusToSheetValue(finalStatus),
+                  buffer_agent: bufferAgent,
+                  agent_who_took_call: agentWhoTookCall,
+                  licensed_agent_account: licensedAgentAccount,
+                  carrier: carrier,
+                  product_type: productType,
+                  draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
+                  monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
+                  face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
+                  notes: finalNotesForSheets,
+                  dq_reason: showStatusReasonDropdown ? statusReason : null,
+                  sent_to_underwriting: sentToUnderwriting,
+                  from_callback: callSource === "Agent Callback",
+                  call_source: callSource
+                }
+              }
+            });
+            
+            if (sheetsError) {
+              console.error("Error updating Google Sheets:", sheetsError);
+            }
           }
-        }
         }
       } catch (sheetsError) {
         console.error("Google Sheets operation failed:", sheetsError);
@@ -1078,6 +1057,68 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         }
       }
 
+      // Send personal sales portal notification if there's a licensed agent
+      if (licensedAgentAccount && licensedAgentAccount !== 'N/A') {
+        try {
+          console.log('Posting notes to personal sales portal for:', licensedAgentAccount);
+
+          // Get verification items for the submission if they exist
+          // First, get the verification session, then get the verified items
+          const { data: verificationSession } = await supabase
+            .from('verification_sessions')
+            .select('id')
+            .eq('submission_id', submissionId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          let verificationItems: any[] = [];
+          
+          if (verificationSession) {
+            const { data: items, error: verificationError } = await supabase
+              .from('verification_items')
+              .select('*')
+              .eq('session_id', verificationSession.id)
+              .eq('is_verified', true); // Only get verified items (with checkmarks)
+
+            if (verificationError) {
+              console.error("Error fetching verification items:", verificationError);
+            } else {
+              verificationItems = items || [];
+              console.log(`Found ${verificationItems.length} verified items for submission ${submissionId}`);
+            }
+          } else {
+            console.log('No verification session found for submission:', submissionId);
+          }
+
+          // Prepare call result data for the portal
+          const callResultData = {
+            submission_id: submissionId,
+            customer_full_name: customerName,
+            status: finalStatus,
+            status_reason: statusReason,
+            notes: finalNotes,
+            licensed_agent_account: licensedAgentAccount
+          };
+
+          const { data: portalResult, error: portalError } = await supabase.functions.invoke('personal-sales-portal-notification', {
+            body: {
+              callResultData,
+              verificationItems: verificationItems || []
+            }
+          });
+
+          if (portalError) {
+            console.error("Error sending personal sales portal notification:", portalError);
+          } else {
+            console.log("Personal sales portal notification sent successfully:", portalResult);
+          }
+        } catch (portalError) {
+          console.error("Personal sales portal notification failed:", portalError);
+          // Don't fail the entire process if portal notification fails
+        }
+      }
+
       toast({
         title: "Success",
         description: existingResult ? "Call result updated successfully" : "Call result saved successfully",
@@ -1176,8 +1217,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 <SelectValue placeholder="Select call source (required)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="First Time Transfer">First Time Transfer</SelectItem>
-                <SelectItem value="Reconnected Transfer">Reconnected Transfer</SelectItem>
+                <SelectItem value="BPO Transfer">BPO Transfer</SelectItem>
                 <SelectItem value="Agent Callback">Agent Callback</SelectItem>
               </SelectContent>
             </Select>

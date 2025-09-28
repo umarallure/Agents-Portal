@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Filter, LogOut, Phone, User, DollarSign, CheckCircle, BarChart3, Eye, Clock, Grid3X3, Search, Menu, ChevronDown } from 'lucide-react';
+import { Calendar, Filter, LogOut, Phone, User, DollarSign, CheckCircle, BarChart3, Eye, Clock, Grid3X3, Search, Menu, ChevronDown, UserPlus } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +17,9 @@ import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { VerificationDashboard } from '@/components/VerificationDashboard';
+import { ClaimDroppedCallModal } from '@/components/ClaimDroppedCallModal';
+import { ClaimLicensedAgentModal } from '@/components/ClaimLicensedAgentModal';
+import { logCallUpdate, getLeadInfo } from '@/lib/callLogging';
 
 type Lead = Database['public']['Tables']['leads']['Row'];
 type CallResult = Database['public']['Tables']['call_results']['Row'];
@@ -41,6 +44,20 @@ const Dashboard = () => {
   const [itemsPerPage] = useState(10);
   const isBen = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79';
   const isAuthorizedUser = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79' || user?.id === '9c004d97-b5fb-4ed6-805e-e2c383fe8b6f' || user?.id === 'c2f07638-d3d2-4fe9-9a65-f57395745695' || user?.id === '30b23a3f-df6b-40af-85d1-84d3e6f0b8b4';
+
+  // Claim call modal state
+  const [modalType, setModalType] = useState<'dropped' | 'licensed' | null>(null);
+  const [claimModalOpen, setClaimModalOpen] = useState(false);
+  const [claimSessionId, setClaimSessionId] = useState<string | null>(null);
+  const [claimSubmissionId, setClaimSubmissionId] = useState<string | null>(null);
+  const [claimAgentType, setClaimAgentType] = useState<'buffer' | 'licensed'>('buffer');
+  const [claimBufferAgent, setClaimBufferAgent] = useState<string>("");
+  const [claimLicensedAgent, setClaimLicensedAgent] = useState<string>("");
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [claimLead, setClaimLead] = useState<any>(null);
+  const [bufferAgents, setBufferAgents] = useState<any[]>([]);
+  const [licensedAgents, setLicensedAgents] = useState<any[]>([]);
+  const [fetchingAgents, setFetchingAgents] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -205,6 +222,262 @@ const Dashboard = () => {
   if (page < 1) page = 1;
   if (page > total) page = total;
   setCurrentPage(page);
+  };
+
+  // Claim call functions
+  const openClaimModal = async (submissionId: string, agentTypeOverride?: 'licensed') => {
+    // Look for existing verification session with verification items (total_fields > 0)
+    let { data: existingSession } = await supabase
+      .from('verification_sessions')
+      .select('id, status, total_fields')
+      .eq('submission_id', submissionId)
+      .gt('total_fields', 0)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(); // Use maybeSingle to avoid error if no records found
+
+    let sessionId = existingSession?.id;
+
+    // If no session with items exists, create one and initialize verification items
+    if (!sessionId) {
+      // First, get the lead data to create verification items
+      const { data: leadData, error: leadError } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('submission_id', submissionId)
+        .single();
+
+      if (leadError || !leadData) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch lead data",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create the verification session
+      const { data: newSession, error } = await supabase
+        .from('verification_sessions')
+        .insert({
+          submission_id: submissionId,
+          status: 'pending',
+          progress_percentage: 0,
+          total_fields: 0,
+          verified_fields: 0
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to create verification session",
+          variant: "destructive",
+        });
+        return;
+      }
+      sessionId = newSession.id;
+
+      // Create verification items from lead data
+      const verificationItems = [];
+      const leadFields = [
+        'lead_vendor', 'customer_full_name', 'street_address', 'beneficiary_information',
+        'billing_and_mailing_address_is_the_same', 'date_of_birth', 'age', 'phone_number',
+        'social_security', 'driver_license', 'exp', 'existing_coverage',
+        'applied_to_life_insurance_last_two_years', 'height', 'weight', 'doctors_name',
+        'tobacco_use', 'health_conditions', 'medications', 'insurance_application_details',
+        'carrier', 'monthly_premium', 'coverage_amount', 'draft_date', 'first_draft',
+        'institution_name', 'beneficiary_routing', 'beneficiary_account', 'account_type',
+        'city', 'state', 'zip_code', 'birth_state', 'call_phone_landline', 'additional_notes'
+      ];
+
+      for (const field of leadFields) {
+        const value = leadData[field as keyof typeof leadData];
+        if (value !== null && value !== undefined) {
+          verificationItems.push({
+            session_id: sessionId, // Fixed: use session_id instead of verification_session_id
+            field_name: field,
+            original_value: String(value),
+            verified_value: String(value),
+            is_verified: false,
+            is_modified: false
+          });
+        }
+      }
+
+      // Insert verification items in batches
+      if (verificationItems.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('verification_items')
+          .insert(verificationItems);
+
+        if (itemsError) {
+          console.error('Error creating verification items:', itemsError);
+        }
+
+        // Update the session with the correct total fields count
+        await supabase
+          .from('verification_sessions')
+          .update({ total_fields: verificationItems.length })
+          .eq('id', sessionId);
+      }
+    }
+
+    setClaimSessionId(sessionId);
+    setClaimSubmissionId(submissionId);
+    setClaimModalOpen(true);
+    
+    // Fetch lead info
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('lead_vendor, customer_full_name')
+      .eq('submission_id', submissionId)
+      .single();
+    setClaimLead(lead);
+    
+    if (agentTypeOverride === 'licensed') {
+      setModalType('licensed');
+      setClaimAgentType('licensed');
+      setClaimLicensedAgent("");
+      fetchAgents('licensed');
+    } else {
+      setModalType('dropped');
+      setClaimAgentType('buffer');
+      setClaimBufferAgent("");
+      setClaimLicensedAgent("");
+      fetchAgents('buffer');
+    }
+  };
+
+  // Fetch agents for dropdowns
+  const fetchAgents = async (type: 'buffer' | 'licensed') => {
+    setFetchingAgents(true);
+    try {
+      const { data: agentStatus } = await supabase
+        .from('agent_status')
+        .select('user_id')
+        .eq('agent_type', type);
+      const ids = agentStatus?.map(a => a.user_id) || [];
+      let profiles = [];
+      if (ids.length > 0) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('user_id, display_name')
+          .in('user_id', ids);
+        profiles = data || [];
+      }
+      if (type === 'buffer') setBufferAgents(profiles);
+      else setLicensedAgents(profiles);
+    } catch (error) {
+      // Optionally handle error
+    } finally {
+      setFetchingAgents(false);
+    }
+  };
+
+  // Handle workflow type change
+  const handleAgentTypeChange = (type: 'buffer' | 'licensed') => {
+    setClaimAgentType(type);
+    setClaimBufferAgent("");
+    setClaimLicensedAgent("");
+    fetchAgents(type);
+  };
+
+  const handleClaimCall = async () => {
+    setClaimLoading(true);
+    try {
+      let agentId = claimAgentType === 'buffer' ? claimBufferAgent : claimLicensedAgent;
+      if (!agentId) {
+        toast({
+          title: "Error",
+          description: "Please select an agent",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update verification session
+      const updateFields: any = {
+        status: 'in_progress'
+      };
+      if (claimAgentType === 'buffer') {
+        updateFields.buffer_agent_id = agentId;
+      } else {
+        updateFields.licensed_agent_id = agentId;
+      }
+
+      await supabase
+        .from('verification_sessions')
+        .update(updateFields)
+        .eq('id', claimSessionId);
+
+      // Log the call claim event
+      const agentName = claimAgentType === 'buffer'
+        ? bufferAgents.find(a => a.user_id === agentId)?.display_name || 'Buffer Agent'
+        : licensedAgents.find(a => a.user_id === agentId)?.display_name || 'Licensed Agent';
+
+      const { customerName, leadVendor } = await getLeadInfo(claimSubmissionId!);
+      
+      await logCallUpdate({
+        submissionId: claimSubmissionId!,
+        agentId: agentId,
+        agentType: claimAgentType,
+        agentName: agentName,
+        eventType: 'call_claimed',
+        eventDetails: {
+          verification_session_id: claimSessionId,
+          claimed_at: new Date().toISOString(),
+          claimed_from_dashboard: true,
+          claim_type: 'manual_claim'
+        },
+        verificationSessionId: claimSessionId!,
+        customerName,
+        leadVendor
+      });
+
+      // Send notification
+      await supabase.functions.invoke('center-transfer-notification', {
+        body: {
+          type: 'reconnected',
+          submissionId: claimSubmissionId,
+          agentType: claimAgentType,
+          agentName: agentName,
+          leadData: claimLead
+        }
+      });
+
+      // Store submissionId before clearing state for redirect
+      const submissionIdForRedirect = claimSubmissionId;
+
+      setClaimModalOpen(false);
+      setClaimSessionId(null);
+      setClaimSubmissionId(null);
+      setClaimLead(null);
+      setClaimBufferAgent("");
+      setClaimLicensedAgent("");
+      
+      toast({
+        title: "Success",
+        description: `Call claimed by ${agentName}`,
+      });
+      
+      // Refresh leads data
+      fetchLeads();
+      
+      // Auto-redirect to the detailed session page - this will open existing session or create new one
+      navigate(`/call-result-update?submissionId=${submissionIdForRedirect}`);
+      
+    } catch (error) {
+      console.error('Error claiming call:', error);
+      toast({
+        title: "Error",
+        description: "Failed to claim call",
+        variant: "destructive",
+      });
+    } finally {
+      setClaimLoading(false);
+    }
   };
 
   const paginatedLeads = getPaginatedLeads();
@@ -559,24 +832,24 @@ const Dashboard = () => {
                           {/* Action Buttons */}
                           <div className="flex flex-col gap-2 ml-4">
                             <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => openClaimModal(lead.submission_id)}
+                              className="flex items-center gap-2"
+                            >
+                              <UserPlus className="h-4 w-4" />
+                              Claim Call
+                            </Button>
+                            
+                            <Button
                               variant="outline"
                               size="sm"
                               onClick={() => navigate(`/call-result-update?submissionId=${lead.submission_id}`)}
+                              className="flex items-center gap-2"
                             >
-                              {lead.call_results.length > 0 ? 'View/Edit' : 'Update Result'}
+                              <Eye className="h-4 w-4" />
+                              View Lead
                             </Button>
-                            
-                            {lead.verification_sessions && lead.verification_sessions.length > 0 && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => navigate(`/call-result-update?submissionId=${lead.submission_id}`)}
-                                className="flex items-center gap-2"
-                              >
-                                <Eye className="h-4 w-4" />
-                                View Session
-                              </Button>
-                            )}
                           </div>
                         </div>
                       </CardContent>
@@ -664,6 +937,34 @@ const Dashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+      
+      {/* Claim Call Modals */}
+      <ClaimDroppedCallModal
+        open={claimModalOpen && modalType === 'dropped'}
+        loading={claimLoading}
+        agentType={claimAgentType}
+        bufferAgents={bufferAgents}
+        licensedAgents={licensedAgents}
+        fetchingAgents={fetchingAgents}
+        claimBufferAgent={claimBufferAgent}
+        claimLicensedAgent={claimLicensedAgent}
+        onAgentTypeChange={handleAgentTypeChange}
+        onBufferAgentChange={setClaimBufferAgent}
+        onLicensedAgentChange={setClaimLicensedAgent}
+        onCancel={() => setClaimModalOpen(false)}
+        onClaim={handleClaimCall}
+      />
+      
+      <ClaimLicensedAgentModal
+        open={claimModalOpen && modalType === 'licensed'}
+        loading={claimLoading}
+        licensedAgents={licensedAgents}
+        fetchingAgents={fetchingAgents}
+        claimLicensedAgent={claimLicensedAgent}
+        onLicensedAgentChange={setClaimLicensedAgent}
+        onCancel={() => setClaimModalOpen(false)}
+        onClaim={handleClaimCall}
+      />
     </div>
   );
 };

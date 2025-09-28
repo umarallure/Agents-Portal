@@ -27,7 +27,9 @@ export const DataGrid = ({
   onPageChange
 }: DataGridProps) => {
   const [groupBy, setGroupBy] = useState<string>('none');
+  const [groupBySecondary, setGroupBySecondary] = useState<string>('none');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc' | 'desc'} | null>(null);
 
   const groupByOptions = [
     { value: 'none', label: 'No Grouping' },
@@ -58,43 +60,107 @@ export const DataGrid = ({
       return { groups: [], ungroupedData: data };
     }
 
-    const groups: { [key: string]: DailyDealFlowRow[] } = {};
-    
-    data.forEach(row => {
-      let groupValue: string | boolean | undefined;
-      
-      if (groupBy === 'is_callback') {
-        // Special handling for callback field
-        groupValue = row.is_callback ? 'Callback' : 'Regular Lead';
-      } else {
-        groupValue = row[groupBy as keyof DailyDealFlowRow] || 'N/A';
+    // Helper function to get group value
+    const getGroupValue = (row: DailyDealFlowRow, groupField: string) => {
+      if (groupField === 'is_callback') {
+        return row.is_callback ? 'Callback' : 'Regular Lead';
       }
-      
-      const groupKey = String(groupValue);
-      
-      if (!groups[groupKey]) {
-        groups[groupKey] = [];
-      }
-      groups[groupKey].push(row);
-    });
+      return String(row[groupField as keyof DailyDealFlowRow] || 'N/A');
+    };
 
-    // Sort groups alphabetically and sort items within each group
-    const sortedGroups = Object.keys(groups)
-      .sort()
-      .map(groupKey => ({
-        key: groupKey,
-        label: groupKey,
-        items: groups[groupKey].sort((a, b) => {
-          // Sort within group by date (newest first)
+    // Helper function to sort items within groups
+    const sortItems = (items: DailyDealFlowRow[]) => {
+      if (!sortConfig) {
+        // Default sort by date (newest first)
+        return items.sort((a, b) => {
           const aDate = new Date(a.date || a.created_at || '1970-01-01');
           const bDate = new Date(b.date || b.created_at || '1970-01-01');
           return bDate.getTime() - aDate.getTime();
-        }),
-        count: groups[groupKey].length
-      }));
+        });
+      }
 
-    return { groups: sortedGroups, ungroupedData: [] };
-  }, [data, groupBy]);
+      return items.sort((a, b) => {
+        let aValue: any = a[sortConfig.key as keyof DailyDealFlowRow];
+        let bValue: any = b[sortConfig.key as keyof DailyDealFlowRow];
+
+        // Handle different data types
+        if (sortConfig.key === 'date' || sortConfig.key === 'created_at' || sortConfig.key === 'updated_at' || sortConfig.key === 'draft_date') {
+          aValue = new Date(aValue || '1970-01-01');
+          bValue = new Date(bValue || '1970-01-01');
+        } else if (sortConfig.key === 'monthly_premium' || sortConfig.key === 'face_amount') {
+          aValue = Number(aValue) || 0;
+          bValue = Number(bValue) || 0;
+        } else {
+          aValue = String(aValue || '').toLowerCase();
+          bValue = String(bValue || '').toLowerCase();
+        }
+
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    };
+
+    if (groupBySecondary === 'none') {
+      // Single level grouping
+      const groups: { [key: string]: DailyDealFlowRow[] } = {};
+
+      data.forEach(row => {
+        const groupKey = getGroupValue(row, groupBy);
+        if (!groups[groupKey]) {
+          groups[groupKey] = [];
+        }
+        groups[groupKey].push(row);
+      });
+
+      const sortedGroups = Object.keys(groups)
+        .sort()
+        .map(groupKey => ({
+          key: groupKey,
+          label: groupKey,
+          items: sortItems(groups[groupKey]),
+          count: groups[groupKey].length,
+          subgroups: []
+        }));
+
+      return { groups: sortedGroups, ungroupedData: [] };
+    } else {
+      // Two level grouping
+      const primaryGroups: { [key: string]: { [key: string]: DailyDealFlowRow[] } } = {};
+
+      data.forEach(row => {
+        const primaryKey = getGroupValue(row, groupBy);
+        const secondaryKey = getGroupValue(row, groupBySecondary);
+
+        if (!primaryGroups[primaryKey]) {
+          primaryGroups[primaryKey] = {};
+        }
+        if (!primaryGroups[primaryKey][secondaryKey]) {
+          primaryGroups[primaryKey][secondaryKey] = [];
+        }
+        primaryGroups[primaryKey][secondaryKey].push(row);
+      });
+
+      const sortedGroups = Object.keys(primaryGroups)
+        .sort()
+        .map(primaryKey => ({
+          key: primaryKey,
+          label: primaryKey,
+          items: [], // Not used in nested structure
+          count: Object.values(primaryGroups[primaryKey]).flat().length,
+          subgroups: Object.keys(primaryGroups[primaryKey])
+            .sort()
+            .map(secondaryKey => ({
+              key: `${primaryKey}::${secondaryKey}`,
+              label: secondaryKey,
+              items: sortItems(primaryGroups[primaryKey][secondaryKey]),
+              count: primaryGroups[primaryKey][secondaryKey].length
+            }))
+        }));
+
+      return { groups: sortedGroups, ungroupedData: [] };
+    }
+  }, [data, groupBy, groupBySecondary, sortConfig]);
 
   // Detect duplicate rows based on insured_name, client_phone_number, and lead_vendor
   const duplicateRows = useMemo(() => {
@@ -132,12 +198,22 @@ export const DataGrid = ({
 
   // Expand/collapse all groups
   const toggleAllGroups = (expand: boolean) => {
+    const newExpanded = new Set<string>();
     if (expand) {
-      const allKeys = new Set(groupedData.groups.map(g => g.key));
-      setExpandedGroups(allKeys);
-    } else {
-      setExpandedGroups(new Set());
+      if (groupBySecondary === 'none') {
+        // Single level - expand all primary groups
+        groupedData.groups.forEach(g => newExpanded.add(g.key));
+      } else {
+        // Two level - expand all primary and secondary groups
+        groupedData.groups.forEach(primaryGroup => {
+          newExpanded.add(primaryGroup.key);
+          primaryGroup.subgroups?.forEach(subgroup => {
+            newExpanded.add(subgroup.key);
+          });
+        });
+      }
     }
+    setExpandedGroups(newExpanded);
   };
 
   // Calculate pagination based on server-side data
@@ -169,7 +245,7 @@ export const DataGrid = ({
               }
             }}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select grouping field" />
+                <SelectValue placeholder="Select primary grouping field" />
               </SelectTrigger>
               <SelectContent>
                 {groupByOptions.map((option) => (
@@ -180,6 +256,31 @@ export const DataGrid = ({
               </SelectContent>
             </Select>
           </div>
+
+          {groupBy !== 'none' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Then by:</span>
+              <Select value={groupBySecondary} onValueChange={(value) => {
+                setGroupBySecondary(value);
+                setExpandedGroups(new Set()); // Reset expanded groups when changing grouping
+                // Reset to first page when grouping changes
+                if (onPageChange) {
+                  onPageChange(1);
+                }
+              }}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Select secondary grouping field" />
+                </SelectTrigger>
+                <SelectContent>
+                  {groupByOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           
           {groupBy !== 'none' && groupedData.groups.length > 0 && (
             <div className="flex items-center gap-2">
@@ -208,29 +309,80 @@ export const DataGrid = ({
         <Table className="min-w-full">
         <TableHeader className="sticky top-0 z-10 bg-background">
           <TableRow>
-            {columns.map((column) => (
-              <TableHead key={column} className={
-                column === 'S.No' ? 'w-12' :
-                column === 'Date' ? 'w-20' :
-                column === 'Lead Vendor' ? 'w-20' :
-                column === 'Insured Name' ? 'w-32' :
-                column === 'Phone Number' ? 'w-28' :
-                column === 'Buffer Agent' ? 'w-24' :
-                column === 'Agent' ? 'w-20' :
-                column === 'Licensed Account' ? 'w-24' :
-                column === 'Status' ? 'w-32' :
-                column === 'Call Result' ? 'w-24' :
-                column === 'Carrier' ? 'w-16' :
-                column === 'Product Type' ? 'w-20' :
-                column === 'Draft Date' ? 'w-20' :
-                column === 'MP' ? 'w-16' :
-                column === 'Face Amount' ? 'w-20' :
-                column === 'Notes' ? 'w-32' :
-                column === 'Actions' ? 'w-20' : ''
-              }>
-                {column}
-              </TableHead>
-            ))}
+            {columns.map((column) => {
+              const getSortKey = (col: string) => {
+                switch (col) {
+                  case 'Date': return 'date';
+                  case 'Lead Vendor': return 'lead_vendor';
+                  case 'Insured Name': return 'insured_name';
+                  case 'Phone Number': return 'client_phone_number';
+                  case 'Buffer Agent': return 'buffer_agent';
+                  case 'Agent': return 'agent';
+                  case 'Licensed Account': return 'licensed_agent_account';
+                  case 'Status': return 'status';
+                  case 'Call Result': return 'call_result';
+                  case 'Carrier': return 'carrier';
+                  case 'Product Type': return 'product_type';
+                  case 'Draft Date': return 'draft_date';
+                  case 'MP': return 'monthly_premium';
+                  case 'Face Amount': return 'face_amount';
+                  case 'Notes': return 'notes';
+                  default: return null;
+                }
+              };
+
+              const sortKey = getSortKey(column);
+              const isSortable = sortKey !== null && groupBy !== 'none';
+
+              return (
+                <TableHead key={column} className={
+                  column === 'S.No' ? 'w-12' :
+                  column === 'Date' ? 'w-20' :
+                  column === 'Lead Vendor' ? 'w-20' :
+                  column === 'Insured Name' ? 'w-32' :
+                  column === 'Phone Number' ? 'w-28' :
+                  column === 'Buffer Agent' ? 'w-24' :
+                  column === 'Agent' ? 'w-20' :
+                  column === 'Licensed Account' ? 'w-24' :
+                  column === 'Status' ? 'w-32' :
+                  column === 'Call Result' ? 'w-24' :
+                  column === 'Carrier' ? 'w-16' :
+                  column === 'Product Type' ? 'w-20' :
+                  column === 'Draft Date' ? 'w-20' :
+                  column === 'MP' ? 'w-16' :
+                  column === 'Face Amount' ? 'w-20' :
+                  column === 'Notes' ? 'w-32' :
+                  column === 'Actions' ? 'w-20' : ''
+                }>
+                  {isSortable ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 font-medium hover:bg-transparent"
+                      onClick={() => {
+                        if (sortConfig?.key === sortKey) {
+                          setSortConfig({
+                            key: sortKey,
+                            direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                          });
+                        } else {
+                          setSortConfig({ key: sortKey, direction: 'asc' });
+                        }
+                      }}
+                    >
+                      {column}
+                      {sortConfig?.key === sortKey && (
+                        <span className="ml-1">
+                          {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </Button>
+                  ) : (
+                    column
+                  )}
+                </TableHead>
+              );
+            })}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -251,7 +403,7 @@ export const DataGrid = ({
             // Render grouped data
             groupedData.groups.map((group) => (
               <React.Fragment key={group.key}>
-                {/* Group Header */}
+                {/* Primary Group Header */}
                 <TableRow className="bg-muted/50 hover:bg-muted/70">
                   <td colSpan={columns.length} className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -273,26 +425,83 @@ export const DataGrid = ({
                     </div>
                   </td>
                 </TableRow>
-                
-                {/* Group Items */}
-                {expandedGroups.has(group.key) && group.items.map((row, groupIndex) => {
-                  // Calculate global index for serial number
-                  const globalIndex = groupedData.groups
-                    .slice(0, groupedData.groups.findIndex(g => g.key === group.key))
-                    .reduce((sum, g) => sum + (expandedGroups.has(g.key) ? g.items.length : 0), 0) + groupIndex;
-                  
-                  return (
-                    <EditableRow 
-                      key={row.id} 
-                      row={row} 
-                      rowIndex={startIndex + globalIndex} 
-                      serialNumber={startIndex + globalIndex + 1}
-                      onUpdate={onDataUpdate}
-                      hasWritePermissions={hasWritePermissions}
-                      isDuplicate={isRowDuplicate(row)}
-                    />
-                  );
-                })}
+
+                {/* Primary Group Items or Subgroups */}
+                {expandedGroups.has(group.key) && (
+                  groupBySecondary === 'none' ? (
+                    // Single level - render items directly
+                    group.items.map((row, groupIndex) => {
+                      const globalIndex = groupedData.groups
+                        .slice(0, groupedData.groups.findIndex(g => g.key === group.key))
+                        .reduce((sum, g) => sum + (expandedGroups.has(g.key) ? g.items.length : 0), 0) + groupIndex;
+
+                      return (
+                        <EditableRow
+                          key={row.id}
+                          row={row}
+                          rowIndex={startIndex + globalIndex}
+                          serialNumber={startIndex + globalIndex + 1}
+                          onUpdate={onDataUpdate}
+                          hasWritePermissions={hasWritePermissions}
+                          isDuplicate={isRowDuplicate(row)}
+                        />
+                      );
+                    })
+                  ) : (
+                    // Two level - render subgroups
+                    group.subgroups?.map((subgroup) => (
+                      <React.Fragment key={subgroup.key}>
+                        {/* Secondary Group Header */}
+                        <TableRow className="bg-muted/30 hover:bg-muted/50">
+                          <td colSpan={columns.length} className="px-8 py-2">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleGroup(subgroup.key)}
+                                className="h-5 w-5 p-0 ml-4"
+                              >
+                                {expandedGroups.has(subgroup.key) ? (
+                                  <ChevronDown className="h-3 w-3" />
+                                ) : (
+                                  <ChevronRightIcon className="h-3 w-3" />
+                                )}
+                              </Button>
+                              <span className="font-medium text-xs text-muted-foreground">
+                                {subgroup.label} ({subgroup.count} {subgroup.count === 1 ? 'entry' : 'entries'})
+                              </span>
+                            </div>
+                          </td>
+                        </TableRow>
+
+                        {/* Subgroup Items */}
+                        {expandedGroups.has(subgroup.key) && subgroup.items.map((row, subgroupIndex) => {
+                          const globalIndex = groupedData.groups
+                            .slice(0, groupedData.groups.findIndex(g => g.key === group.key))
+                            .reduce((sum, g) => {
+                              if (expandedGroups.has(g.key) && g.subgroups) {
+                                return sum + g.subgroups.reduce((subSum, sg) =>
+                                  subSum + (expandedGroups.has(sg.key) ? sg.items.length : 0), 0);
+                              }
+                              return sum;
+                            }, 0) + subgroupIndex;
+
+                          return (
+                            <EditableRow
+                              key={row.id}
+                              row={row}
+                              rowIndex={startIndex + globalIndex}
+                              serialNumber={startIndex + globalIndex + 1}
+                              onUpdate={onDataUpdate}
+                              hasWritePermissions={hasWritePermissions}
+                              isDuplicate={isRowDuplicate(row)}
+                            />
+                          );
+                        })}
+                      </React.Fragment>
+                    ))
+                  )
+                )}
               </React.Fragment>
             ))
           )}
