@@ -226,6 +226,7 @@ export const ReportsPage = () => {
     const bufferAgentOptions = [
       "N/A",
       "Ira",
+      "Syed Kazmi",
       "Angy",
       "Kyla",
       "Bryan",

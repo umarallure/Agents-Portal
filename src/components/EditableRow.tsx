@@ -48,7 +48,7 @@ interface EditableRowProps {
 
 // Dropdown options matching the existing system
 const BUFFER_AGENT_OPTIONS = [
-  "N/A", "Ira", "Burney","Angy", "Kyla", "Bryan","Justine", "Isaac", "Landon", "Juan"
+  "N/A", "Ira", "Burney","Angy", "Syed Kazmi","Kyla", "Bryan","Justine", "Isaac", "Landon", "Juan"
 ];
 
 const AGENT_OPTIONS = [

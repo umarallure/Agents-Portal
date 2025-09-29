@@ -19,7 +19,7 @@ interface CreateEntryFormProps {
 
 // Same dropdown options as EditableRow
 const bufferAgentOptions = [
-  "N/A", "Ira", "Burney", "Tatumn", "Kyla","Angy", "Bryan", "Justine", "Isaac", "Landon", "Juan"
+  "N/A", "Ira", "Burney", "Syed Kazmi","Tatumn", "Kyla","Angy", "Bryan", "Justine", "Isaac", "Landon", "Juan"
 ];
 
 const agentOptions = [
