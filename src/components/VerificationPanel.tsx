@@ -173,7 +173,7 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
     if (verificationItems) {
       const newInputValues: Record<string, string> = {};
       verificationItems.forEach(item => {
-        if (!inputValues[item.id]) {
+        if (!(item.id in inputValues)) {
           newInputValues[item.id] = item.verified_value || item.original_value || '';
         }
       });
