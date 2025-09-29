@@ -1,4 +1,4 @@
-export const RESTRICTED_USER_ID = 'adda1255-2a0b-41da-9df0-3100d01b8649';
+export const RESTRICTED_USER_IDS = ['adda1255-2a0b-41da-9df0-3100d01b8649', 'eceb7ac0-0e4a-44ad-bb70-ba66010d0baa'];
 
 /**
  * Check if the current user has restricted access (read-only view)
@@ -6,7 +6,7 @@ export const RESTRICTED_USER_ID = 'adda1255-2a0b-41da-9df0-3100d01b8649';
  * @returns boolean indicating if user has restricted access
  */
 export const isRestrictedUser = (userId: string | undefined): boolean => {
-  return userId === RESTRICTED_USER_ID;
+  return userId ? RESTRICTED_USER_IDS.includes(userId) : false;
 };
 
 /**
