@@ -79,6 +79,7 @@ export const GridToolbar = ({
     "Claudia",
     "Lydia",
     "Isaac",
+    "Trinity",
     "Benjamin",
     "Tatumn",
     "Noah",

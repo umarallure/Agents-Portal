@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import React from 'react';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { DailyDealFlowRow } from "../DailyDealFlowPage";
 import { EditableRow } from "./EditableRow";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DataGridProps {
   data: DailyDealFlowRow[];
@@ -30,6 +31,39 @@ export const DataGrid = ({
   const [groupBySecondary, setGroupBySecondary] = useState<string>('none');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc' | 'desc'} | null>(null);
+  const [allDistinctValues, setAllDistinctValues] = useState<{[key: string]: string[]}>({});
+
+  // Fetch all distinct values for grouping fields when component mounts
+  useEffect(() => {
+    const fetchDistinctValues = async () => {
+      try {
+        const fields = ['lead_vendor', 'buffer_agent', 'agent', 'licensed_agent_account'];
+        const distinctValues: {[key: string]: string[]} = {};
+
+        for (const field of fields) {
+          const { data: values, error } = await supabase
+            .from('daily_deal_flow')
+            .select(field)
+            .not(field, 'is', null)
+            .order(field);
+
+          if (!error && values) {
+            // Get unique values
+            const uniqueValues = [...new Set(values.map((v: any) => v[field]).filter(Boolean))];
+            distinctValues[field] = uniqueValues;
+          } else {
+            distinctValues[field] = [];
+          }
+        }
+
+        setAllDistinctValues(distinctValues);
+      } catch (error) {
+        console.error('Error fetching distinct values:', error);
+      }
+    };
+
+    fetchDistinctValues();
+  }, []);
 
   const groupByOptions = [
     { value: 'none', label: 'No Grouping' },
@@ -105,6 +139,13 @@ export const DataGrid = ({
       // Single level grouping
       const groups: { [key: string]: DailyDealFlowRow[] } = {};
 
+      // Initialize groups with all distinct values (including those with 0 entries)
+      const distinctValuesForField = allDistinctValues[groupBy] || [];
+      distinctValuesForField.forEach(value => {
+        groups[value] = [];
+      });
+
+      // Add data to groups
       data.forEach(row => {
         const groupKey = getGroupValue(row, groupBy);
         if (!groups[groupKey]) {
@@ -128,6 +169,19 @@ export const DataGrid = ({
       // Two level grouping
       const primaryGroups: { [key: string]: { [key: string]: DailyDealFlowRow[] } } = {};
 
+      // Initialize primary groups with all distinct values
+      const distinctPrimaryValues = allDistinctValues[groupBy] || [];
+      const distinctSecondaryValues = allDistinctValues[groupBySecondary] || [];
+      
+      distinctPrimaryValues.forEach(primaryValue => {
+        primaryGroups[primaryValue] = {};
+        // Initialize secondary groups for each primary group
+        distinctSecondaryValues.forEach(secondaryValue => {
+          primaryGroups[primaryValue][secondaryValue] = [];
+        });
+      });
+
+      // Add data to groups
       data.forEach(row => {
         const primaryKey = getGroupValue(row, groupBy);
         const secondaryKey = getGroupValue(row, groupBySecondary);
@@ -160,7 +214,7 @@ export const DataGrid = ({
 
       return { groups: sortedGroups, ungroupedData: [] };
     }
-  }, [data, groupBy, groupBySecondary, sortConfig]);
+  }, [data, groupBy, groupBySecondary, sortConfig, allDistinctValues]);
 
   // Detect duplicate rows based on insured_name, client_phone_number, and lead_vendor
   const duplicateRows = useMemo(() => {

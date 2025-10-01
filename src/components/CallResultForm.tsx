@@ -93,6 +93,7 @@ const licensedAccountOptions = [
   "Claudia",
   "Lydia",
   "Isaac",
+  "Trinity",
   "Benjamin",
   "Tatumn",
   "Noah",
@@ -567,7 +568,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         agent_who_took_call: agentWhoTookCall,
         sent_to_underwriting: sentToUnderwriting,
         new_draft_date: status === "Updated Banking/draft date" && newDraftDate ? format(newDraftDate, "yyyy-MM-dd") : null,
-        is_callback: submissionId.startsWith('CBB'), // Track if this is a callback based on submission ID
+        is_callback: submissionId.startsWith('CB') || submissionId.startsWith('CBB'), // Track if this is a callback based on submission ID
         ...(showSubmittedFields || showCarrierApplicationFields ? {
           carrier,
           product_type: productType,
@@ -723,7 +724,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 product_type_carrier: null,
                 level_or_gi: null,
                 from_callback: callSource === "Agent Callback",
-                is_callback: submissionId.startsWith('CBB'), // Track if this is a callback with CBB prefix
+                is_callback: submissionId.startsWith('CB') || submissionId.startsWith('CBB'), // Track if this is a callback with CB or CBB prefix
                 // Add the new parameters for proper status determination
                 application_submitted: applicationSubmitted,
                 sent_to_underwriting: sentToUnderwriting

@@ -56,7 +56,7 @@ const AGENT_OPTIONS = [
 ];
 
 const LICENSED_ACCOUNT_OPTIONS = [
-  "Claudia", "Lydia", "Isaac", "Juan", "Benjamin", "Erica", "N/A","Tatumn"
+  "Claudia", "Lydia","Trinity", "Isaac", "Juan", "Benjamin", "Erica", "N/A","Tatumn"
 ];
 
 const CARRIER_OPTIONS = [

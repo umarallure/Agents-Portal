@@ -218,6 +218,7 @@ export const ReportsPage = () => {
       "Isaac",
       "Benjamin",
       "Tatumn",
+      "Trinity",
       "Noah",
       "Erica",
       "N/A"

@@ -53,7 +53,7 @@ const agentOptions = [
 ];
 
 const licensedAccountOptions = [
-  "Claudia", "Lydia", "Isaac", "Juan", "Benjamin", "Erica", "N/A","Tatumn"
+  "Claudia", "Lydia", "Isaac", "Juan","Trinity", "Benjamin", "Erica", "N/A","Tatumn"
 ];
 
 const carrierOptions = [
