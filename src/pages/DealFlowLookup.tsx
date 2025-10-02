@@ -6,11 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Phone, Calendar, DollarSign, FileText, Building2 } from 'lucide-react';
+import { Search, Phone, Calendar, DollarSign, FileText, Building2, User } from 'lucide-react';
 
 interface DealFlowResult {
   id: string;
@@ -71,7 +72,9 @@ export default function DealFlowLookup() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
+  const [searchMode, setSearchMode] = useState<'phone' | 'name'>('phone');
   const [phone, setPhone] = useState('');
+  const [name, setName] = useState('');
   const [results, setResults] = useState<DealFlowResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchPerformed, setSearchPerformed] = useState(false);
@@ -84,6 +87,74 @@ export default function DealFlowLookup() {
       navigate('/auth', { replace: true });
     }
   }, [user, authLoading, navigate]);
+
+  // Name normalization utilities
+  const normalizeNameForSearch = (inputName: string): string[] => {
+    const trimmed = inputName.trim();
+    if (!trimmed) return [];
+
+    const nameParts = trimmed.split(/\s+/);
+    const variations: string[] = [];
+
+    if (nameParts.length === 1) {
+      // Single name - search as is
+      variations.push(trimmed.toLowerCase());
+    } else if (nameParts.length === 2) {
+      const [first, last] = nameParts;
+      
+      // Format 1: "Julia Jordan" (First Last)
+      variations.push(`${first} ${last}`.toLowerCase());
+      
+      // Format 2: "JORDAN, JULIA" (LAST, FIRST)
+      variations.push(`${last}, ${first}`.toLowerCase());
+      variations.push(`${last},${first}`.toLowerCase()); // without space
+      
+      // Format 3: "Jordan Julia" (Last First)
+      variations.push(`${last} ${first}`.toLowerCase());
+      
+      // Format 4: Capitalized variations
+      variations.push(`${last.toUpperCase()}, ${first.toUpperCase()}`);
+      variations.push(`${last.toUpperCase()},${first.toUpperCase()}`);
+      
+      // Format 5: Mixed case common format
+      const capitalizeFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+      variations.push(`${capitalizeFirst(last)}, ${capitalizeFirst(first)}`);
+    } else if (nameParts.length >= 3) {
+      // Handle middle names/initials
+      const first = nameParts[0];
+      const middle = nameParts.slice(1, -1).join(' ');
+      const last = nameParts[nameParts.length - 1];
+      
+      // Various formats with middle name
+      variations.push(`${first} ${middle} ${last}`.toLowerCase());
+      variations.push(`${last}, ${first} ${middle}`.toLowerCase());
+      variations.push(`${last}, ${first}`.toLowerCase()); // Skip middle
+      variations.push(`${first} ${last}`.toLowerCase()); // Skip middle
+      variations.push(`${last.toUpperCase()}, ${first.toUpperCase()}`);
+    }
+
+    // Add original input
+    variations.push(trimmed.toLowerCase());
+    variations.push(trimmed.toUpperCase());
+    variations.push(trimmed);
+
+    // Remove duplicates
+    return [...new Set(variations)];
+  };
+
+  const normalizeNameForMonday = (inputName: string): string => {
+    // For Monday.com, we'll convert to "LAST, FIRST" format
+    const trimmed = inputName.trim();
+    const nameParts = trimmed.split(/\s+/);
+    
+    if (nameParts.length >= 2) {
+      const first = nameParts[0];
+      const last = nameParts[nameParts.length - 1];
+      return `${last.toUpperCase()}, ${first.toUpperCase()}`;
+    }
+    
+    return trimmed.toUpperCase();
+  };
 
   const normalizePhoneNumber = (phoneNumber: string): string[] => {
     // Remove all non-digit characters
@@ -113,8 +184,14 @@ export default function DealFlowLookup() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone) {
+    
+    if (searchMode === 'phone' && !phone) {
       toast.error('Please enter a phone number.');
+      return;
+    }
+    
+    if (searchMode === 'name' && !name) {
+      toast.error('Please enter a name.');
       return;
     }
 
@@ -125,27 +202,66 @@ export default function DealFlowLookup() {
     setPolicyInfoLoading({});
 
     try {
-      // Get all possible phone formats
-      const phoneFormats = normalizePhoneNumber(phone);
-      
-      console.log('Searching for phone formats:', phoneFormats);
-      
-      // Query daily_deal_flow table with multiple phone formats
-      const { data, error } = await supabase
-        .from('daily_deal_flow')
-        .select('*')
-        .in('client_phone_number', phoneFormats)
-        .order('date', { ascending: false });
+      if (searchMode === 'phone') {
+        // Phone search logic
+        const phoneFormats = normalizePhoneNumber(phone);
+        console.log('Searching for phone formats:', phoneFormats);
+        
+        const { data, error } = await supabase
+          .from('daily_deal_flow')
+          .select('*')
+          .in('client_phone_number', phoneFormats)
+          .order('date', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching data:', error);
-        toast.error('An error occurred while searching.');
-      } else {
-        setResults(data || []);
-        if (data && data.length === 0) {
-          toast.info('No records found for this phone number.');
+        if (error) {
+          console.error('Error fetching data:', error);
+          toast.error('An error occurred while searching.');
         } else {
-          toast.success(`Found ${data?.length || 0} record(s)`);
+          setResults(data || []);
+          if (data && data.length === 0) {
+            toast.info('No records found for this phone number.');
+          } else {
+            toast.success(`Found ${data?.length || 0} record(s)`);
+          }
+        }
+      } else {
+        // Name search logic
+        const nameVariations = normalizeNameForSearch(name);
+        console.log('Searching for name variations:', nameVariations);
+        
+        // Use OR conditions with ilike for fuzzy matching
+        let query = supabase
+          .from('daily_deal_flow')
+          .select('*');
+        
+        // Build a complex query for name matching
+        // We'll use a filter that matches any of our variations
+        const { data, error } = await supabase
+          .from('daily_deal_flow')
+          .select('*')
+          .or(nameVariations.map(v => `insured_name.ilike.%${v}%`).join(','))
+          .order('date', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching data:', error);
+          toast.error('An error occurred while searching.');
+        } else {
+          // Additional client-side filtering for better accuracy
+          const filtered = data?.filter(record => {
+            if (!record.insured_name) return false;
+            const recordName = record.insured_name.toLowerCase();
+            return nameVariations.some(variation => 
+              recordName.includes(variation.toLowerCase()) ||
+              variation.toLowerCase().includes(recordName)
+            );
+          }) || [];
+          
+          setResults(filtered);
+          if (filtered.length === 0) {
+            toast.info('No records found for this name. Try different formats like "First Last" or "Last, First"');
+          } else {
+            toast.success(`Found ${filtered.length} record(s)`);
+          }
         }
       }
     } catch (error) {
@@ -156,18 +272,41 @@ export default function DealFlowLookup() {
     }
   };
 
-  const handleFetchPolicyInfo = async (clientPhone: string | null, resultIdentifier: string) => {
-    if (!clientPhone || policyInfo[resultIdentifier]) return;
+  const handleFetchPolicyInfo = async (clientPhone: string | null, clientName: string | null, resultIdentifier: string) => {
+    if (policyInfo[resultIdentifier]) return;
+    
+    // Determine which search method to use
+    const usePhoneSearch = searchMode === 'phone' && clientPhone;
+    const useNameSearch = searchMode === 'name' && clientName;
+    
+    if (!usePhoneSearch && !useNameSearch) {
+      toast.error('Unable to fetch policy info: missing search criteria');
+      return;
+    }
 
     setPolicyInfoLoading(prev => ({ ...prev, [resultIdentifier]: true }));
     try {
-      const { data, error } = await supabase.functions.invoke('get-monday-policy-info', {
-        body: { phone: clientPhone }
-      });
+      let data, error;
+      
+      if (usePhoneSearch) {
+        // Search by phone
+        const response = await supabase.functions.invoke('get-monday-policy-info', {
+          body: { phone: clientPhone }
+        });
+        data = response.data;
+        error = response.error;
+      } else if (useNameSearch) {
+        // Search by name
+        const response = await supabase.functions.invoke('get-monday-policy-by-name', {
+          body: { name: clientName }
+        });
+        data = response.data;
+        error = response.error;
+      }
 
       if (error) throw error;
 
-      setPolicyInfo(prev => ({ ...prev, [resultIdentifier]: data.items || [] }));
+      setPolicyInfo(prev => ({ ...prev, [resultIdentifier]: data?.items || [] }));
     } catch (error: any) {
       toast.error(`Failed to fetch policy info: ${error.message}`);
       console.error('Monday.com fetch error:', error);
@@ -205,26 +344,76 @@ export default function DealFlowLookup() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Search by Phone Number</CardTitle>
-              <CardDescription>Enter a phone number to find all associated records</CardDescription>
+              <CardTitle>Search by Phone or Name</CardTitle>
+              <CardDescription>Choose your search method and enter the information</CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSearch} className="flex gap-4 items-end">
-                <div className="flex-1 space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="(555) 123-4567 or 5551234567"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="pl-10"
-                    />
+            <CardContent className="space-y-6">
+              {/* Search Mode Toggle */}
+              <div className="space-y-3">
+                <Label>Search Method</Label>
+                <RadioGroup 
+                  value={searchMode} 
+                  onValueChange={(value: 'phone' | 'name') => setSearchMode(value)}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="phone" id="phone" />
+                    <Label htmlFor="phone" className="cursor-pointer flex items-center gap-2">
+                      <Phone className="h-4 w-4" />
+                      Phone Number
+                    </Label>
                   </div>
-                </div>
-                <Button type="submit" disabled={isLoading} className="min-w-[120px]">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="name" id="name" />
+                    <Label htmlFor="name" className="cursor-pointer flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Client Name
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {/* Search Form */}
+              <form onSubmit={handleSearch} className="space-y-4">
+                {searchMode === 'phone' ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneInput">Phone Number</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="phoneInput"
+                        type="tel"
+                        placeholder="(555) 123-4567 or 5551234567"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Accepts any format: (555) 123-4567, 555-123-4567, or 5551234567
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="nameInput">Client Name</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="nameInput"
+                        type="text"
+                        placeholder="Julia Jordan or JORDAN, JULIA"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Works with multiple formats: "First Last", "LAST, FIRST", or "Last First"
+                    </p>
+                  </div>
+                )}
+                
+                <Button type="submit" disabled={isLoading} className="w-full">
                   {isLoading ? (
                     <>
                       <span className="animate-spin mr-2">⏳</span>
@@ -233,7 +422,7 @@ export default function DealFlowLookup() {
                   ) : (
                     <>
                       <Search className="mr-2 h-4 w-4" />
-                      Search
+                      Search {searchMode === 'phone' ? 'by Phone' : 'by Name'}
                     </>
                   )}
                 </Button>
@@ -391,7 +580,11 @@ export default function DealFlowLookup() {
                           <AccordionItem value={`policy-info-${result.id}`}>
                             <AccordionTrigger
                               className={cn(buttonVariants({ variant: 'outline' }), 'w-full justify-between')}
-                              onClick={() => handleFetchPolicyInfo(result.client_phone_number, result.id)}
+                              onClick={() => handleFetchPolicyInfo(
+                                result.client_phone_number, 
+                                result.insured_name,
+                                result.id
+                              )}
                             >
                               <span className="flex items-center gap-2">
                                 <Building2 className="h-4 w-4" />
