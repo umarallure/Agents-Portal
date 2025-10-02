@@ -229,31 +229,73 @@ export default function DealFlowLookup() {
         const nameVariations = normalizeNameForSearch(name);
         console.log('Searching for name variations:', nameVariations);
         
-        // Use OR conditions with ilike for fuzzy matching
-        let query = supabase
-          .from('daily_deal_flow')
-          .select('*');
+        // Use textSearch or multiple ilike queries in sequence
+        // We'll try each variation and combine results
+        const allResults: DealFlowResult[] = [];
+        const seenIds = new Set<string>();
         
-        // Build a complex query for name matching
-        // We'll use a filter that matches any of our variations
-        const { data, error } = await supabase
-          .from('daily_deal_flow')
-          .select('*')
-          .or(nameVariations.map(v => `insured_name.ilike.%${v}%`).join(','))
-          .order('date', { ascending: false });
+        // Search with each variation to maximize matches
+        for (const variation of nameVariations.slice(0, 5)) { // Limit to first 5 variations to avoid too many queries
+          try {
+            const { data, error } = await supabase
+              .from('daily_deal_flow')
+              .select('*')
+              .ilike('insured_name', `%${variation}%`)
+              .order('date', { ascending: false });
+            
+            if (!error && data) {
+              // Add unique results
+              data.forEach(record => {
+                if (!seenIds.has(record.id)) {
+                  seenIds.add(record.id);
+                  allResults.push(record);
+                }
+              });
+            }
+          } catch (err) {
+            console.warn(`Search failed for variation: ${variation}`, err);
+          }
+        }
 
-        if (error) {
-          console.error('Error fetching data:', error);
-          toast.error('An error occurred while searching.');
-        } else {
-          // Additional client-side filtering for better accuracy
+        if (allResults.length === 0) {
+          // If no results from direct queries, fall back to client-side filtering
+          const { data, error } = await supabase
+            .from('daily_deal_flow')
+            .select('*')
+            .not('insured_name', 'is', null)
+            .order('date', { ascending: false })
+            .limit(500); // Limit to prevent overload
+
+          if (error) {
+            console.error('Error fetching data:', error);
+            toast.error('An error occurred while searching.');
+            return;
+          }
+
+          // Client-side filtering with fuzzy matching
           const filtered = data?.filter(record => {
             if (!record.insured_name) return false;
             const recordName = record.insured_name.toLowerCase();
-            return nameVariations.some(variation => 
-              recordName.includes(variation.toLowerCase()) ||
-              variation.toLowerCase().includes(recordName)
-            );
+            
+            return nameVariations.some(variation => {
+              const varLower = variation.toLowerCase();
+              
+              // Exact match
+              if (recordName === varLower) return true;
+              
+              // Contains match
+              if (recordName.includes(varLower)) return true;
+              
+              // Part-by-part matching
+              const recordParts = recordName.split(/[\s,]+/).filter(p => p.length > 1);
+              const varParts = varLower.split(/[\s,]+/).filter(p => p.length > 1);
+              
+              const allVarPartsInRecord = varParts.every(vp => 
+                recordParts.some(rp => rp.includes(vp) || vp.includes(rp))
+              );
+              
+              return allVarPartsInRecord;
+            });
           }) || [];
           
           setResults(filtered);
@@ -262,6 +304,10 @@ export default function DealFlowLookup() {
           } else {
             toast.success(`Found ${filtered.length} record(s)`);
           }
+        } else {
+          // Use results from direct queries
+          setResults(allResults);
+          toast.success(`Found ${allResults.length} record(s)`);
         }
       }
     } catch (error) {
@@ -275,34 +321,22 @@ export default function DealFlowLookup() {
   const handleFetchPolicyInfo = async (clientPhone: string | null, clientName: string | null, resultIdentifier: string) => {
     if (policyInfo[resultIdentifier]) return;
     
-    // Determine which search method to use
-    const usePhoneSearch = searchMode === 'phone' && clientPhone;
-    const useNameSearch = searchMode === 'name' && clientName;
-    
-    if (!usePhoneSearch && !useNameSearch) {
-      toast.error('Unable to fetch policy info: missing search criteria');
+    // Always prefer phone search for Monday.com as it's more reliable
+    // Even when searching by name, we use the phone from the Daily Deal Flow record
+    if (!clientPhone) {
+      toast.error('Unable to fetch policy info: phone number not available for this record');
       return;
     }
 
     setPolicyInfoLoading(prev => ({ ...prev, [resultIdentifier]: true }));
     try {
-      let data, error;
+      // Always search Monday.com by phone (more reliable than name)
+      const response = await supabase.functions.invoke('get-monday-policy-info', {
+        body: { phone: clientPhone }
+      });
       
-      if (usePhoneSearch) {
-        // Search by phone
-        const response = await supabase.functions.invoke('get-monday-policy-info', {
-          body: { phone: clientPhone }
-        });
-        data = response.data;
-        error = response.error;
-      } else if (useNameSearch) {
-        // Search by name
-        const response = await supabase.functions.invoke('get-monday-policy-by-name', {
-          body: { name: clientName }
-        });
-        data = response.data;
-        error = response.error;
-      }
+      const data = response.data;
+      const error = response.error;
 
       if (error) throw error;
 
@@ -445,7 +479,7 @@ export default function DealFlowLookup() {
                   
                   {results.map((result, index) => (
                     <Card key={result.id} className="border-l-4 border-l-primary">
-                      <CardHeader>
+                      <CardHeader className="pb-3">
                         <CardTitle className="flex items-center justify-between">
                           <span>{result.insured_name || 'N/A'}</span>
                           <span className="text-sm font-normal text-muted-foreground">
@@ -458,122 +492,134 @@ export default function DealFlowLookup() {
                         </CardDescription>
                       </CardHeader>
                       
-                      <CardContent className="space-y-4">
-                        {/* Contact & Basic Info */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <p className="text-muted-foreground flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              Phone
-                            </p>
-                            <p className="font-medium">{result.client_phone_number || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground flex items-center gap-1">
-                              <Building2 className="h-3 w-3" />
-                              Lead Vendor
-                            </p>
-                            <p className="font-medium">{result.lead_vendor || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Status</p>
-                            <p className="font-medium">
-                              <span className={cn(
-                                "px-2 py-1 rounded text-xs",
-                                result.status === 'Pending Approval' && "bg-yellow-100 text-yellow-800",
-                                result.status === 'Submitted' && "bg-green-100 text-green-800"
-                              )}>
-                                {result.status || 'N/A'}
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Agent Info */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm border-t pt-4">
-                          <div>
-                            <p className="text-muted-foreground">Buffer Agent</p>
-                            <p className="font-medium">{result.buffer_agent || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Agent</p>
-                            <p className="font-medium">{result.agent || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Licensed Account</p>
-                            <p className="font-medium">{result.licensed_agent_account || 'N/A'}</p>
-                          </div>
-                        </div>
-
-                        {/* Policy Info */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-t pt-4">
-                          <div>
-                            <p className="text-muted-foreground">Carrier</p>
-                            <p className="font-medium">{result.carrier || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Product Type</p>
-                            <p className="font-medium">{result.product_type || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground flex items-center gap-1">
-                              <DollarSign className="h-3 w-3" />
-                              Monthly Premium
-                            </p>
-                            <p className="font-medium">
-                              {result.monthly_premium ? `$${result.monthly_premium.toFixed(2)}` : 'N/A'}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground flex items-center gap-1">
-                              <DollarSign className="h-3 w-3" />
-                              Face Amount
-                            </p>
-                            <p className="font-medium">
-                              {result.face_amount ? `$${result.face_amount.toLocaleString()}` : 'N/A'}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Additional Details */}
-                        {(result.draft_date || result.call_result || result.policy_number) && (
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm border-t pt-4">
-                            {result.draft_date && (
-                              <div>
-                                <p className="text-muted-foreground flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  Draft Date
-                                </p>
-                                <p className="font-medium">
-                                  {new Date(result.draft_date).toLocaleDateString()}
-                                </p>
+                      <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value={`details-${result.id}`} className="border-0">
+                          <AccordionTrigger className="px-6 py-2 hover:no-underline">
+                            <span className="text-sm font-medium flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              View Full Details
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <CardContent className="space-y-4 pt-2">
+                              {/* Contact & Basic Info */}
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                  <p className="text-muted-foreground flex items-center gap-1">
+                                    <Phone className="h-3 w-3" />
+                                    Phone
+                                  </p>
+                                  <p className="font-medium">{result.client_phone_number || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground flex items-center gap-1">
+                                    <Building2 className="h-3 w-3" />
+                                    Lead Vendor
+                                  </p>
+                                  <p className="font-medium">{result.lead_vendor || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Status</p>
+                                  <p className="font-medium">
+                                    <span className={cn(
+                                      "px-2 py-1 rounded text-xs",
+                                      result.status === 'Pending Approval' && "bg-yellow-100 text-yellow-800",
+                                      result.status === 'Submitted' && "bg-green-100 text-green-800"
+                                    )}>
+                                      {result.status || 'N/A'}
+                                    </span>
+                                  </p>
+                                </div>
                               </div>
-                            )}
-                            {result.call_result && (
-                              <div>
-                                <p className="text-muted-foreground">Call Result</p>
-                                <p className="font-medium">{result.call_result}</p>
-                              </div>
-                            )}
-                            {result.policy_number && (
-                              <div>
-                                <p className="text-muted-foreground">Policy Number</p>
-                                <p className="font-medium">{result.policy_number}</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
 
-                        {/* Notes */}
-                        {result.notes && (
-                          <div className="border-t pt-4">
-                            <p className="text-sm font-medium mb-2">Notes:</p>
-                            <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted p-3 rounded">
-                              {result.notes}
-                            </p>
-                          </div>
-                        )}
-                      </CardContent>
+                              {/* Agent Info */}
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm border-t pt-4">
+                                <div>
+                                  <p className="text-muted-foreground">Buffer Agent</p>
+                                  <p className="font-medium">{result.buffer_agent || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Agent</p>
+                                  <p className="font-medium">{result.agent || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Licensed Account</p>
+                                  <p className="font-medium">{result.licensed_agent_account || 'N/A'}</p>
+                                </div>
+                              </div>
+
+                              {/* Policy Info */}
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-t pt-4">
+                                <div>
+                                  <p className="text-muted-foreground">Carrier</p>
+                                  <p className="font-medium">{result.carrier || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Product Type</p>
+                                  <p className="font-medium">{result.product_type || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground flex items-center gap-1">
+                                    <DollarSign className="h-3 w-3" />
+                                    Monthly Premium
+                                  </p>
+                                  <p className="font-medium">
+                                    {result.monthly_premium ? `$${result.monthly_premium.toFixed(2)}` : 'N/A'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground flex items-center gap-1">
+                                    <DollarSign className="h-3 w-3" />
+                                    Face Amount
+                                  </p>
+                                  <p className="font-medium">
+                                    {result.face_amount ? `$${result.face_amount.toLocaleString()}` : 'N/A'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Additional Details */}
+                              {(result.draft_date || result.call_result || result.policy_number) && (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm border-t pt-4">
+                                  {result.draft_date && (
+                                    <div>
+                                      <p className="text-muted-foreground flex items-center gap-1">
+                                        <Calendar className="h-3 w-3" />
+                                        Draft Date
+                                      </p>
+                                      <p className="font-medium">
+                                        {new Date(result.draft_date).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {result.call_result && (
+                                    <div>
+                                      <p className="text-muted-foreground">Call Result</p>
+                                      <p className="font-medium">{result.call_result}</p>
+                                    </div>
+                                  )}
+                                  {result.policy_number && (
+                                    <div>
+                                      <p className="text-muted-foreground">Policy Number</p>
+                                      <p className="font-medium">{result.policy_number}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Notes */}
+                              {result.notes && (
+                                <div className="border-t pt-4">
+                                  <p className="text-sm font-medium mb-2">Notes:</p>
+                                  <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted p-3 rounded">
+                                    {result.notes}
+                                  </p>
+                                </div>
+                              )}
+                            </CardContent>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
 
                       <CardFooter className="flex flex-col gap-2">
                         <Accordion type="single" collapsible className="w-full">
