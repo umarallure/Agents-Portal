@@ -89,6 +89,10 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                   <Search className="mr-2 h-4 w-4" />
                   Bulk Lookup
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/deal-flow-lookup')}>
+                  <Search className="mr-2 h-4 w-4" />
+                  Deal Flow & Policy Lookup
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                   <User className="mr-2 h-4 w-4" />
                   Dashboard

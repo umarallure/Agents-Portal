@@ -17,6 +17,7 @@ import DailyDealFlowPage from "./pages/DailyDealFlow/DailyDealFlowPage";
 import TransferPortalPage from "./pages/TransferPortalPage";
 import SubmissionPortalPage from "./pages/SubmissionPortalPage";
 import BulkLookupPage from "./pages/BulkLookupPage";
+import DealFlowLookup from "./pages/DealFlowLookup";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -108,6 +109,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <BulkLookupPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/deal-flow-lookup" 
+              element={
+                <ProtectedRoute>
+                  <DealFlowLookup />
                 </ProtectedRoute>
               } 
             />

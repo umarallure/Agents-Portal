@@ -1,0 +1,471 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { NavigationHeader } from '@/components/NavigationHeader';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { Search, Phone, Calendar, DollarSign, FileText, Building2 } from 'lucide-react';
+
+interface DealFlowResult {
+  id: string;
+  submission_id: string;
+  client_phone_number: string | null;
+  lead_vendor: string | null;
+  date: string | null;
+  insured_name: string | null;
+  buffer_agent: string | null;
+  agent: string | null;
+  licensed_agent_account: string | null;
+  status: string | null;
+  call_result: string | null;
+  carrier: string | null;
+  product_type: string | null;
+  draft_date: string | null;
+  monthly_premium: number | null;
+  face_amount: number | null;
+  from_callback: boolean | null;
+  notes: string | null;
+  policy_number: string | null;
+  carrier_audit: string | null;
+  product_type_carrier: string | null;
+  level_or_gi: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+interface MondayColumnValue {
+  id: string;
+  text: string | null;
+  value: string | null;
+}
+
+interface MondayItem {
+  id: string;
+  name: string;
+  column_values: MondayColumnValue[];
+}
+
+const MONDAY_COLUMN_MAP: Record<string, string> = {
+  "status": "Stage",
+  "date1": "Deal creation date",
+  "text_mkpx3j6w": "Policy Number",
+  "color_mknkq2qd": "Carrier",
+  "numbers": "Deal Value",
+  "text_mknk5m2r": "Notes",
+  "color_mkp5sj20": "Status",
+  "pulse_updated_mknkqf59": "Last updated",
+  "color_mkq0rkaw": "Sales Agent",
+  "text_mkq196kp": "Policy Type",
+  "date_mkq1d86z": "Effective Date",
+  "dropdown_mkq2x0kx": "Call Center",
+  "long_text_mksd6zg1": "Deal Summary",
+};
+
+export default function DealFlowLookup() {
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+
+  const [phone, setPhone] = useState('');
+  const [results, setResults] = useState<DealFlowResult[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchPerformed, setSearchPerformed] = useState(false);
+  
+  const [policyInfo, setPolicyInfo] = useState<Record<string, MondayItem[]>>({});
+  const [policyInfoLoading, setPolicyInfoLoading] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!user && !authLoading) {
+      navigate('/auth', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
+
+  const normalizePhoneNumber = (phoneNumber: string): string[] => {
+    // Remove all non-digit characters
+    const digitsOnly = phoneNumber.replace(/\D/g, '');
+    
+    // Generate multiple possible formats
+    const formats = [];
+    
+    // Format 1: As-is with parentheses and dash: (XXX) XXX-XXXX
+    if (digitsOnly.length === 10) {
+      formats.push(`(${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6)}`);
+    }
+    
+    // Format 2: Just digits
+    formats.push(digitsOnly);
+    
+    // Format 3: With country code if 10 digits
+    if (digitsOnly.length === 10) {
+      formats.push(`1${digitsOnly}`);
+    }
+    
+    // Format 4: Original input
+    formats.push(phoneNumber);
+    
+    return [...new Set(formats)]; // Remove duplicates
+  };
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phone) {
+      toast.error('Please enter a phone number.');
+      return;
+    }
+
+    setIsLoading(true);
+    setSearchPerformed(true);
+    setResults([]);
+    setPolicyInfo({});
+    setPolicyInfoLoading({});
+
+    try {
+      // Get all possible phone formats
+      const phoneFormats = normalizePhoneNumber(phone);
+      
+      console.log('Searching for phone formats:', phoneFormats);
+      
+      // Query daily_deal_flow table with multiple phone formats
+      const { data, error } = await supabase
+        .from('daily_deal_flow')
+        .select('*')
+        .in('client_phone_number', phoneFormats)
+        .order('date', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching data:', error);
+        toast.error('An error occurred while searching.');
+      } else {
+        setResults(data || []);
+        if (data && data.length === 0) {
+          toast.info('No records found for this phone number.');
+        } else {
+          toast.success(`Found ${data?.length || 0} record(s)`);
+        }
+      }
+    } catch (error) {
+      toast.error('An error occurred while searching.');
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFetchPolicyInfo = async (clientPhone: string | null, resultIdentifier: string) => {
+    if (!clientPhone || policyInfo[resultIdentifier]) return;
+
+    setPolicyInfoLoading(prev => ({ ...prev, [resultIdentifier]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('get-monday-policy-info', {
+        body: { phone: clientPhone }
+      });
+
+      if (error) throw error;
+
+      setPolicyInfo(prev => ({ ...prev, [resultIdentifier]: data.items || [] }));
+    } catch (error: any) {
+      toast.error(`Failed to fetch policy info: ${error.message}`);
+      console.error('Monday.com fetch error:', error);
+    } finally {
+      setPolicyInfoLoading(prev => ({ ...prev, [resultIdentifier]: false }));
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <NavigationHeader title="Deal Flow & Policy Lookup" />
+      <main className="container mx-auto py-12 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold tracking-tight flex items-center justify-center gap-3">
+              <Search className="h-10 w-10" />
+              Deal Flow & Policy Lookup
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              Search Daily Deal Flow records and Monday.com policies by phone number
+            </p>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Search by Phone Number</CardTitle>
+              <CardDescription>Enter a phone number to find all associated records</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSearch} className="flex gap-4 items-end">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="(555) 123-4567 or 5551234567"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <Button type="submit" disabled={isLoading} className="min-w-[120px]">
+                  {isLoading ? (
+                    <>
+                      <span className="animate-spin mr-2">⏳</span>
+                      Searching...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      Search
+                    </>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {searchPerformed && (
+            <div className="mt-8">
+              {isLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-4 text-muted-foreground">Searching records...</p>
+                </div>
+              ) : results.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold">Found {results.length} Record(s)</h2>
+                  </div>
+                  
+                  {results.map((result, index) => (
+                    <Card key={result.id} className="border-l-4 border-l-primary">
+                      <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                          <span>{result.insured_name || 'N/A'}</span>
+                          <span className="text-sm font-normal text-muted-foreground">
+                            {result.date ? new Date(result.date).toLocaleDateString() : 'N/A'}
+                          </span>
+                        </CardTitle>
+                        <CardDescription className="flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          Submission ID: {result.submission_id}
+                        </CardDescription>
+                      </CardHeader>
+                      
+                      <CardContent className="space-y-4">
+                        {/* Contact & Basic Info */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              Phone
+                            </p>
+                            <p className="font-medium">{result.client_phone_number || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground flex items-center gap-1">
+                              <Building2 className="h-3 w-3" />
+                              Lead Vendor
+                            </p>
+                            <p className="font-medium">{result.lead_vendor || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Status</p>
+                            <p className="font-medium">
+                              <span className={cn(
+                                "px-2 py-1 rounded text-xs",
+                                result.status === 'Pending Approval' && "bg-yellow-100 text-yellow-800",
+                                result.status === 'Submitted' && "bg-green-100 text-green-800"
+                              )}>
+                                {result.status || 'N/A'}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Agent Info */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm border-t pt-4">
+                          <div>
+                            <p className="text-muted-foreground">Buffer Agent</p>
+                            <p className="font-medium">{result.buffer_agent || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Agent</p>
+                            <p className="font-medium">{result.agent || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Licensed Account</p>
+                            <p className="font-medium">{result.licensed_agent_account || 'N/A'}</p>
+                          </div>
+                        </div>
+
+                        {/* Policy Info */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-t pt-4">
+                          <div>
+                            <p className="text-muted-foreground">Carrier</p>
+                            <p className="font-medium">{result.carrier || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Product Type</p>
+                            <p className="font-medium">{result.product_type || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground flex items-center gap-1">
+                              <DollarSign className="h-3 w-3" />
+                              Monthly Premium
+                            </p>
+                            <p className="font-medium">
+                              {result.monthly_premium ? `$${result.monthly_premium.toFixed(2)}` : 'N/A'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground flex items-center gap-1">
+                              <DollarSign className="h-3 w-3" />
+                              Face Amount
+                            </p>
+                            <p className="font-medium">
+                              {result.face_amount ? `$${result.face_amount.toLocaleString()}` : 'N/A'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Additional Details */}
+                        {(result.draft_date || result.call_result || result.policy_number) && (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm border-t pt-4">
+                            {result.draft_date && (
+                              <div>
+                                <p className="text-muted-foreground flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  Draft Date
+                                </p>
+                                <p className="font-medium">
+                                  {new Date(result.draft_date).toLocaleDateString()}
+                                </p>
+                              </div>
+                            )}
+                            {result.call_result && (
+                              <div>
+                                <p className="text-muted-foreground">Call Result</p>
+                                <p className="font-medium">{result.call_result}</p>
+                              </div>
+                            )}
+                            {result.policy_number && (
+                              <div>
+                                <p className="text-muted-foreground">Policy Number</p>
+                                <p className="font-medium">{result.policy_number}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Notes */}
+                        {result.notes && (
+                          <div className="border-t pt-4">
+                            <p className="text-sm font-medium mb-2">Notes:</p>
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted p-3 rounded">
+                              {result.notes}
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+
+                      <CardFooter className="flex flex-col gap-2">
+                        <Accordion type="single" collapsible className="w-full">
+                          <AccordionItem value={`policy-info-${result.id}`}>
+                            <AccordionTrigger
+                              className={cn(buttonVariants({ variant: 'outline' }), 'w-full justify-between')}
+                              onClick={() => handleFetchPolicyInfo(result.client_phone_number, result.id)}
+                            >
+                              <span className="flex items-center gap-2">
+                                <Building2 className="h-4 w-4" />
+                                {policyInfoLoading[result.id] ? 'Fetching Monday.com Policy Info...' : 'View Monday.com Policy Info'}
+                              </span>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-4">
+                              {policyInfoLoading[result.id] ? (
+                                <div className="flex items-center justify-center py-4">
+                                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                                  <p className="ml-3">Loading policy info...</p>
+                                </div>
+                              ) : policyInfo[result.id] ? (
+                                policyInfo[result.id].length > 0 ? (
+                                  <div className="space-y-4">
+                                    {policyInfo[result.id].map((item, idx) => (
+                                      <div key={item.id} className="border rounded-lg p-4 space-y-2 bg-muted/30">
+                                        <h4 className="font-semibold text-sm mb-3 pb-2 border-b">
+                                          Policy {idx + 1}: {item.name}
+                                        </h4>
+                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                          {item.column_values
+                                            .filter(col => MONDAY_COLUMN_MAP[col.id] && col.text)
+                                            .map(col => (
+                                              <div key={col.id} className="flex flex-col">
+                                                <span className="font-medium text-muted-foreground text-xs">
+                                                  {MONDAY_COLUMN_MAP[col.id]}:
+                                                </span>
+                                                <span className="font-medium">{col.text}</span>
+                                              </div>
+                                            ))}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-muted-foreground text-center py-4">
+                                    No Monday.com policy information found.
+                                  </p>
+                                )
+                              ) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">
+                                  Click to load Monday.com policy information.
+                                </p>
+                              )}
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className="text-center py-12">
+                  <CardContent>
+                    <div className="flex flex-col items-center gap-4">
+                      <Search className="h-16 w-16 text-muted-foreground" />
+                      <div>
+                        <h3 className="text-lg font-medium">No Results Found</h3>
+                        <p className="text-muted-foreground mt-1">
+                          No records found for the provided phone number.
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Try searching with different formats like: (555) 123-4567 or 5551234567
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
