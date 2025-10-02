@@ -97,7 +97,7 @@ export const DataGrid = ({
     // Helper function to get group value
     const getGroupValue = (row: DailyDealFlowRow, groupField: string) => {
       if (groupField === 'is_callback') {
-        return row.is_callback ? 'Callback' : 'Regular Lead';
+        return (row.is_callback || row.from_callback) ? 'Callback' : 'Regular Lead';
       }
       return String(row[groupField as keyof DailyDealFlowRow] || 'N/A');
     };

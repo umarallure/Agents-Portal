@@ -19,15 +19,15 @@ interface CreateEntryFormProps {
 
 // Same dropdown options as EditableRow
 const bufferAgentOptions = [
-  "N/A", "Ira", "Burney", "Syed Kazmi","Tatumn", "Kyla","Angy", "Bryan", "Justine", "Isaac", "Landon", "Juan"
+  "N/A", "Ira", "Burney", "Syed Kazmi","Tatumn", "Kyla","Angy", "Justine", "Isaac", "Landon", "Juan"
 ];
 
 const agentOptions = [
-  "Claudia", "Lydia", "Juan", "Tatumn","Angy", "Benjamin", "Erica", "N/A", "Isaac"
+  "Claudia", "Lydia", "Juan", "Tatumn","Angy", "Benjamin", "N/A", "Isaac"
 ];
 
 const licensedAccountOptions = [
-  "Claudia", "Lydia", "Isaac", "Juan","Trinity", "Benjamin", "Erica", "N/A","Tatumn"
+  "Claudia", "Lydia", "Isaac", "Juan","Trinity", "Benjamin", "N/A","Tatumn"
 ];
 
 const carrierOptions = [
