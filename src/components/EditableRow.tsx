@@ -69,8 +69,14 @@ const PRODUCT_TYPE_OPTIONS = [
 ];
 
 const STATUS_OPTIONS = [
-  "Needs callback", "Not Interested", "⁠DQ", "Future Submission Date",
-  "Call Back Fix", "Call Never Sent", "Disconnected"
+  "Needs BPO Callback",
+  "Pending Approval",
+  "Incomplete Transfer",
+  "DQ'd Can't be sold",
+  "Returned To Center - DQ",
+  "Future Submission Date",
+  "Application Withdrawn",
+  "Call Never Sent"
 ];
 
 const CALL_RESULT_OPTIONS = [
