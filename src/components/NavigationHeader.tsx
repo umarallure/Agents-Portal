@@ -2,8 +2,9 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, Search, ArrowLeft } from 'lucide-react';
+import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, Search, ArrowLeft, DollarSign } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useLicensedAgent } from '@/hooks/useLicensedAgent';
 import { canAccessNavigation } from '@/lib/userPermissions';
 
 interface NavigationHeaderProps {
@@ -14,11 +15,25 @@ interface NavigationHeaderProps {
 
 export const NavigationHeader = ({ title, showBackButton = false, backTo }: NavigationHeaderProps) => {
   const { user, signOut } = useAuth();
+  const { isLicensedAgent, loading: licensedLoading } = useLicensedAgent();
   const navigate = useNavigate();
   
   const isBen = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79';
   const isAuthorizedUser = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79' || user?.id === '9c004d97-b5fb-4ed6-805e-e2c383fe8b6f' || user?.id === 'c2f07638-d3d2-4fe9-9a65-f57395745695' || user?.id === '30b23a3f-df6b-40af-85d1-84d3e6f0b8b4';
   const hasNavigationAccess = canAccessNavigation(user?.id);
+  
+  // Licensed agents should see navigation menu for commission portal access
+  const shouldShowNavigation = (isAuthorizedUser && hasNavigationAccess) || (isLicensedAgent && !licensedLoading);
+
+  console.log('[NavigationHeader] Navigation visibility:', {
+    userId: user?.id,
+    email: user?.email,
+    isLicensedAgent,
+    licensedLoading,
+    isAuthorizedUser,
+    hasNavigationAccess,
+    shouldShowNavigation
+  });
 
   const handleSignOut = async () => {
     await signOut();
@@ -47,8 +62,8 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
           </Badge>
         </div>
         <div className="flex items-center space-x-2">
-          {/* Main Navigation Menu - Only show for users with navigation access */}
-          {isAuthorizedUser && hasNavigationAccess && (
+          {/* Main Navigation Menu - Show for authorized users OR licensed agents */}
+          {shouldShowNavigation && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="flex items-center gap-2">
@@ -58,45 +73,72 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Lead Management</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => navigate('/daily-deal-flow')}>
-                  <Grid3X3 className="mr-2 h-4 w-4" />
-                  Daily Deal Flow
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/transfer-portal')}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Transfer Portal
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/submission-portal')}>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Submission Portal
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Reports & Analytics</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => navigate('/reports')}>
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Agent Reports & Logs
-                </DropdownMenuItem>
-                {isBen && (
-                  <DropdownMenuItem onClick={() => navigate('/analytics')}>
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Analytics Dashboard
-                  </DropdownMenuItem>
+                {/* Only show Lead Management section for authorized users */}
+                {isAuthorizedUser && hasNavigationAccess && (
+                  <>
+                    <DropdownMenuLabel>Lead Management</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => navigate('/daily-deal-flow')}>
+                      <Grid3X3 className="mr-2 h-4 w-4" />
+                      Daily Deal Flow
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/transfer-portal')}>
+                      <Eye className="mr-2 h-4 w-4" />
+                      Transfer Portal
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/submission-portal')}>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Submission Portal
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
                 )}
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Tools</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => navigate('/bulk-lookup')}>
-                  <Search className="mr-2 h-4 w-4" />
-                  Bulk Lookup
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/deal-flow-lookup')}>
-                  <Search className="mr-2 h-4 w-4" />
-                  Deal Flow & Policy Lookup
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/dashboard')}>
-                  <User className="mr-2 h-4 w-4" />
-                  Dashboard
-                </DropdownMenuItem>
+                
+                {/* Commission Portal - Available for all licensed agents */}
+                {isLicensedAgent && !licensedLoading && (
+                  <>
+                    <DropdownMenuLabel>Licensed Agent</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => navigate('/commission-portal')}>
+                      <DollarSign className="mr-2 h-4 w-4" />
+                      Commission Portal
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                      <User className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                
+                {/* Reports & Analytics - Only for authorized users */}
+                {isAuthorizedUser && hasNavigationAccess && (
+                  <>
+                    <DropdownMenuLabel>Reports & Analytics</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => navigate('/reports')}>
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Agent Reports & Logs
+                    </DropdownMenuItem>
+                    {isBen && (
+                      <DropdownMenuItem onClick={() => navigate('/analytics')}>
+                        <BarChart3 className="mr-2 h-4 w-4" />
+                        Analytics Dashboard
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Tools</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => navigate('/bulk-lookup')}>
+                      <Search className="mr-2 h-4 w-4" />
+                      Bulk Lookup
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/deal-flow-lookup')}>
+                      <Search className="mr-2 h-4 w-4" />
+                      Deal Flow & Policy Lookup
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                      <User className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,8 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Filter, LogOut, Phone, User, DollarSign, CheckCircle, BarChart3, Eye, Clock, Grid3X3, Search, Menu, ChevronDown, UserPlus } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Calendar, Filter, Phone, User, DollarSign, CheckCircle, BarChart3, Eye, Clock, Grid3X3, Search, UserPlus } from 'lucide-react';
+import { NavigationHeader } from '@/components/NavigationHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { isRestrictedUser } from '@/lib/userPermissions';
@@ -31,7 +30,7 @@ interface LeadWithCallResult extends Lead {
 }
 
 const Dashboard = () => {
-  const { user, signOut, loading } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [leads, setLeads] = useState<LeadWithCallResult[]>([]);
@@ -199,11 +198,6 @@ const Dashboard = () => {
       case 'No Result': return 'bg-muted text-muted-foreground';
       default: return 'bg-red-500 text-white';
     }
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/auth');
   };
 
   // Pagination functions
@@ -497,70 +491,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold text-foreground">Agent Dashboard</h1>
-            <Badge variant="outline" className="flex items-center space-x-1">
-              <User className="h-3 w-3" />
-              <span>{user?.email}</span>
-            </Badge>
-          </div>
-          <div className="flex items-center space-x-2">
-            {/* Main Navigation Menu */}
-            {isAuthorizedUser && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <Menu className="h-4 w-4" />
-                    Menue
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>Lead Management</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => navigate('/daily-deal-flow')}>
-                    <Grid3X3 className="mr-2 h-4 w-4" />
-                    Daily Deal Flow
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/transfer-portal')}>
-                    <Eye className="mr-2 h-4 w-4" />
-                    Transfer Portal
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/submission-portal')}>
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Submission Portal
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Reports & Analytics</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => navigate('/reports')}>
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Agent Reports & Logs
-                  </DropdownMenuItem>
-                  {isBen && (
-                    <DropdownMenuItem onClick={() => navigate('/analytics')}>
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      Analytics Dashboard
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Tools</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => navigate('/bulk-lookup')}>
-                    <Search className="mr-2 h-4 w-4" />
-                    Bulk Lookup
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            
-            {/* Sign Out Button */}
-            <Button variant="outline" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </div>
+      <NavigationHeader title="Agent Dashboard" />
 
       <div className="container mx-auto px-4 py-8">
         {/* Filters */}
@@ -728,7 +659,7 @@ const Dashboard = () => {
                                 <span className="font-medium">Phone:</span> {lead.phone_number || 'N/A'}
                               </div>
                               <div>
-                                <span className="font-medium">Lead Vendor:</span> {lead.call_results[0]?.lead_vendor || lead.lead_vendor || 'N/A'}
+                                <span className="font-medium">Lead Source:</span> {lead.call_results[0]?.call_source || 'N/A'}
                               </div>
                               <div>
                                 <span className="font-medium">Coverage:</span> ${lead.coverage_amount?.toLocaleString() || 'N/A'}

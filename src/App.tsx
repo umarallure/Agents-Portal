@@ -5,11 +5,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import CenterProtectedRoute from "@/components/CenterProtectedRoute";
+import LicensedAgentProtectedRoute from "@/components/LicensedAgentProtectedRoute";
 import { AgentActivityDashboard } from "@/components/AgentActivityDashboard";
 import ReportsPage from "./pages/Reports";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import CenterAuth from "./pages/CenterAuth";
 import Dashboard from "./pages/Dashboard";
+import CenterLeadPortal from "./pages/CenterLeadPortal";
+import CallbackRequestPage from "./pages/CallbackRequestPage";
+import CommissionPortal from "./pages/CommissionPortal";
 import CallResultUpdate from "./pages/CallResultUpdate";
 import CallResultJourney from "./pages/CallResultJourney";
 import NewCallback from "./pages/NewCallback";
@@ -32,12 +38,37 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/center-auth" element={<CenterAuth />} />
             <Route 
               path="/dashboard" 
               element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/center-lead-portal" 
+              element={
+                <CenterProtectedRoute>
+                  <CenterLeadPortal />
+                </CenterProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/center-callback-request" 
+              element={
+                <CenterProtectedRoute>
+                  <CallbackRequestPage />
+                </CenterProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/commission-portal" 
+              element={
+                <LicensedAgentProtectedRoute>
+                  <CommissionPortal />
+                </LicensedAgentProtectedRoute>
               } 
             />
             <Route 

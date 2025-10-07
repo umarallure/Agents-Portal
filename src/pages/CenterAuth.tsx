@@ -5,30 +5,27 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
-import { isCenterUser } from '@/lib/userPermissions';
+import { useCenterUser } from '@/hooks/useCenterUser';
 import { Loader2 } from 'lucide-react';
 
-const Auth = () => {
+const CenterAuth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { signIn, user } = useAuth();
+  const { isCenterUser, loading: centerLoading } = useCenterUser();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const checkUserRedirect = async () => {
-      if (user) {
-        const isCenter = await isCenterUser(user.id);
-        if (isCenter) {
-          navigate('/center-lead-portal');
-        } else {
-          navigate('/dashboard');
-        }
+    if (user && !centerLoading) {
+      if (isCenterUser) {
+        navigate('/center-lead-portal');
+      } else {
+        // If logged in but not a center user, redirect to regular auth
+        navigate('/auth');
       }
-    };
-
-    checkUserRedirect();
-  }, [user, navigate]);
+    }
+  }, [user, isCenterUser, centerLoading, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,21 +38,21 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-foreground">Agent Portal</h1>
-          <p className="text-muted-foreground mt-2">Access your lead management dashboard</p>
+          <h1 className="text-3xl font-bold text-foreground">Center Lead Portal</h1>
+          <p className="text-muted-foreground mt-2">Access your lead vendor dashboard</p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Sign In</CardTitle>
-            <CardDescription>Enter your credentials to access your dashboard</CardDescription>
+            <CardTitle>Center Sign In</CardTitle>
+            <CardDescription>Enter your center credentials to access your leads</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSignIn} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="signin-email">Email</Label>
+                <Label htmlFor="center-email">Email</Label>
                 <Input
-                  id="signin-email"
+                  id="center-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -63,9 +60,9 @@ const Auth = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="signin-password">Password</Label>
+                <Label htmlFor="center-password">Password</Label>
                 <Input
-                  id="signin-password"
+                  id="center-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -79,9 +76,22 @@ const Auth = () => {
             </form>
           </CardContent>
         </Card>
+
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground">
+            Not a center user?{' '}
+            <Button
+              variant="link"
+              className="p-0 h-auto font-normal"
+              onClick={() => navigate('/auth')}
+            >
+              Go to Agent Portal
+            </Button>
+          </p>
+        </div>
       </div>
     </div>
   );
 };
 
-export default Auth;
+export default CenterAuth;

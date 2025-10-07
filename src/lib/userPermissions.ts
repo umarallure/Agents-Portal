@@ -26,3 +26,27 @@ export const canPerformWriteOperations = (userId: string | undefined): boolean =
 export const canAccessNavigation = (userId: string | undefined): boolean => {
   return !isRestrictedUser(userId);
 };
+
+/**
+ * Check if the current user is a center user (lead vendor)
+ * @param userId - The current user's ID
+ * @returns boolean indicating if user is a center user
+ */
+export const isCenterUser = async (userId: string | undefined): Promise<boolean> => {
+  if (!userId) return false;
+
+  try {
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data, error } = await supabase
+      .from('centers')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    return !error && !!data;
+  } catch (error) {
+    console.error('Error checking center user:', error);
+    return false;
+  }
+};
