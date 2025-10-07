@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Filter, LogOut, Phone, User, DollarSign, Send } from 'lucide-react';
+import { Calendar, Filter, LogOut, Phone, User, DollarSign, Send, Plus } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCenterUser } from '@/hooks/useCenterUser';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CallbackRequestForm } from '@/components/CallbackRequestForm';
+import { CenterCreateLeadModal } from '@/components/CenterCreateLeadModal';
 
 type Lead = {
   id: string;
@@ -39,6 +40,7 @@ const CenterLeadPortal = () => {
   const [nameFilter, setNameFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [createLeadModalOpen, setCreateLeadModalOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !centerLoading && (!user || !centerInfo)) {
@@ -115,6 +117,14 @@ const CenterLeadPortal = () => {
     const url = `/center-callback-request?submissionId=${lead.submission_id}`;
     console.log('[DEBUG] Navigating to:', url);
     navigate(url);
+  };
+
+  const handleLeadCreated = () => {
+    fetchLeads(); // Refresh the leads list
+    toast({
+      title: "Success",
+      description: "Lead has been created and added to your portal.",
+    });
   };
 
   // Pagination functions
@@ -270,11 +280,20 @@ const CenterLeadPortal = () => {
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Your Leads ({filteredLeads.length})</h2>
-            {totalPages > 1 && (
-              <div className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages}
-              </div>
-            )}
+            <div className="flex items-center space-x-4">
+              {totalPages > 1 && (
+                <div className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </div>
+              )}
+              <Button 
+                onClick={() => setCreateLeadModalOpen(true)}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Lead
+              </Button>
+            </div>
           </div>
 
           {filteredLeads.length === 0 ? (
@@ -423,6 +442,16 @@ const CenterLeadPortal = () => {
           )}
         </div>
       </div>
+
+      {/* Create Lead Modal */}
+      {leadVendor && (
+        <CenterCreateLeadModal
+          open={createLeadModalOpen}
+          onClose={() => setCreateLeadModalOpen(false)}
+          onLeadCreated={handleLeadCreated}
+          leadVendor={leadVendor}
+        />
+      )}
 
       {/* Callback Request Form Dialog - Removed, now using separate page */}
     </div>
