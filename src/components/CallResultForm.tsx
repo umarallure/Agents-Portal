@@ -63,12 +63,10 @@ const productTypeOptions = [
 const bufferAgentOptions = [
   "N/A",
   "Ira",
-  "Angy",
   "Kyla",
   "Syed Kazmi",
   "Justine",
   "Isaac",
-  "Juan",
   "Kaye",
   "Laiza Batain"
 ];
@@ -76,8 +74,6 @@ const bufferAgentOptions = [
 const agentOptions = [
   "Claudia",
   "Lydia",
-  "Angy",
-  "Juan",
   "Tatumn",
   "Benjamin",
   "N/A",
