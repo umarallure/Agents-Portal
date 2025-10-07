@@ -64,11 +64,10 @@ export const GridToolbar = ({
     "Ira",
     "Syed Kazmi",
     "Tatumn",
-    "Angy",
     "Kyla", 
     "Justine",
     "Isaac",
-    "Juan",
+    "Noah",
     "Kaye",
     "Laiza Batain"
   ];

@@ -52,11 +52,13 @@ const BUFFER_AGENT_OPTIONS = [
 ];
 
 const AGENT_OPTIONS = [
-  "Claudia", "Lydia", "Juan", "Angy","Benjamin", "N/A", "Isaac", "Tatumn"
+  "Claudia", "Lydia", "Juan", "Angy","Benjamin", "N/A", "Isaac",
+   "Tatumn",
+   "Noah"
 ];
 
 const LICENSED_ACCOUNT_OPTIONS = [
-  "Claudia", "Lydia","Trinity", "Isaac", "Juan", "Benjamin", "N/A","Tatumn"
+  "Claudia", "Lydia","Trinity", "Isaac", "Noah", "Benjamin", "N/A","Tatumn"
 ];
 
 const CARRIER_OPTIONS = [

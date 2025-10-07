@@ -49,11 +49,11 @@ const bufferAgentOptions = [
 ];
 
 const agentOptions = [
-  "Claudia", "Lydia", "Juan","Tatumn","Angy", "Benjamin", "Erica", "N/A", "Isaac"
+  "Claudia", "Lydia", "Noah","Tatumn","Angy", "Benjamin", "Erica", "N/A", "Isaac"
 ];
 
 const licensedAccountOptions = [
-  "Claudia", "Lydia", "Isaac", "Juan","Trinity", "Benjamin", "Erica", "N/A","Tatumn"
+  "Claudia", "Lydia", "Isaac", "Noah","Trinity", "Benjamin", "Erica", "N/A","Tatumn"
 ];
 
 const carrierOptions = [
