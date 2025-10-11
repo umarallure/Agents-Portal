@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CallbackRequestForm } from '@/components/CallbackRequestForm';
 import { CenterCreateLeadModal } from '@/components/CenterCreateLeadModal';
+import { NavigationHeader } from '@/components/NavigationHeader';
 
 type Lead = {
   id: string;
@@ -172,25 +173,19 @@ const CenterLeadPortal = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold text-foreground">Center Lead Portal</h1>
-            <Badge variant="outline" className="flex items-center space-x-1">
-              <User className="h-3 w-3" />
-              <span>{centerInfo.center_name}</span>
-            </Badge>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </div>
+      <NavigationHeader title="Center Lead Portal" />
 
       <div className="container mx-auto px-4 py-8">
+        {/* Center Info Badge */}
+        <div className="mb-6">
+          <Badge variant="outline" className="flex items-center space-x-2 w-fit px-4 py-2">
+            <User className="h-4 w-4" />
+            <span className="font-medium">{centerInfo.center_name}</span>
+            <span className="text-muted-foreground">•</span>
+            <span className="text-muted-foreground">{leadVendor}</span>
+          </Badge>
+        </div>
+
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>

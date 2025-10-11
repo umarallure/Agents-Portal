@@ -24,6 +24,7 @@ import TransferPortalPage from "./pages/TransferPortalPage";
 import SubmissionPortalPage from "./pages/SubmissionPortalPage";
 import BulkLookupPage from "./pages/BulkLookupPage";
 import DealFlowLookup from "./pages/DealFlowLookup";
+import AgentLicensing from "./pages/AgentLicensing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -148,6 +149,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DealFlowLookup />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/agent-licensing" 
+              element={
+                <ProtectedRoute>
+                  <AgentLicensing />
                 </ProtectedRoute>
               } 
             />

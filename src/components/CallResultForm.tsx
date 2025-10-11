@@ -427,6 +427,34 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           }
         } else {
           console.log('No existing call result found for submission:', submissionId);
+          
+          // If no call result exists, check if there's an active verification session with buffer agent
+          try {
+            const { data: verificationSession, error: vsError } = await supabase
+              .from('verification_sessions')
+              .select('buffer_agent_id')
+              .eq('submission_id', submissionId)
+              .not('buffer_agent_id', 'is', null)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (verificationSession && !vsError && verificationSession.buffer_agent_id) {
+              // Fetch the buffer agent's display name
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('display_name')
+                .eq('user_id', verificationSession.buffer_agent_id)
+                .single();
+
+              if (profile?.display_name) {
+                console.log('Auto-populating buffer agent from verification session:', profile.display_name);
+                setBufferAgent(profile.display_name);
+              }
+            }
+          } catch (vsError) {
+            console.log('Could not fetch verification session buffer agent:', vsError);
+          }
         }
 
         // Always try to fetch lead_vendor from leads table

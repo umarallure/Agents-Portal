@@ -634,6 +634,16 @@ export type Database = {
       }
     }
     Functions: {
+      get_dashboard_analytics: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_leads: number
+          submitted_leads: number
+          pending_leads: number
+          leads_this_week: number
+          no_results_count: number
+        }[]
+      }
       initialize_verification_items: {
         Args: { session_id_param: string; submission_id_param: string }
         Returns: undefined

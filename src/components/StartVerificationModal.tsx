@@ -286,6 +286,34 @@ export const StartVerificationModal = ({ submissionId, onVerificationStarted }: 
         leadVendor
       });
 
+      // Update daily_deal_flow if entry exists for today's date (buffer workflow only)
+      if (agentType === 'buffer') {
+        const bufferAgentName = bufferAgents.find(a => a.id === selectedAgent)?.display_name || 'N/A';
+        const todayDateString = new Date().toISOString().split('T')[0];
+        
+        // Check if daily_deal_flow entry exists with matching submission_id and today's date
+        const { data: existingDailyDealEntry } = await supabase
+          .from('daily_deal_flow')
+          .select('id, date, submission_id')
+          .eq('submission_id', submissionId)
+          .eq('date', todayDateString)
+          .maybeSingle();
+
+        if (existingDailyDealEntry) {
+          // Update the buffer_agent field only if entry exists AND date matches today
+          await supabase
+            .from('daily_deal_flow')
+            .update({ 
+              buffer_agent: bufferAgentName 
+            })
+            .eq('id', existingDailyDealEntry.id);
+          
+          console.log(`Updated daily_deal_flow buffer_agent to ${bufferAgentName} for submission ${submissionId} on ${todayDateString}`);
+        } else {
+          console.log(`No daily_deal_flow entry found for submission ${submissionId} on ${todayDateString}`);
+        }
+      }
+
       toast({
         title: "Success",
         description: agentType === 'buffer' 

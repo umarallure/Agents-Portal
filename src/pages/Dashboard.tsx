@@ -41,6 +41,30 @@ const Dashboard = () => {
   const [nameFilter, setNameFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  
+  // Analytics state
+  const [analytics, setAnalytics] = useState({
+    totalLeads: 0,
+    submittedLeads: 0,
+    pendingLeads: 0,
+    leadsThisWeek: 0,
+  });
+  
+  // Commission stats for licensed agents
+  const [commissionStats, setCommissionStats] = useState({
+    totalSales: 0,
+    thisWeekSales: 0,
+    thisWeekPremium: 0,
+    todaySales: 0,
+    levelProducts: 0,
+    giProducts: 0,
+    levelPremium: 0,
+    giPremium: 0,
+  });
+  
+  const [isLicensedAgent, setIsLicensedAgent] = useState(false);
+  const [licensedAgentName, setLicensedAgentName] = useState<string>('');
+  
   const isBen = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79';
   const isAuthorizedUser = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79' || user?.id === '9c004d97-b5fb-4ed6-805e-e2c383fe8b6f' || user?.id === 'c2f07638-d3d2-4fe9-9a65-f57395745695' || user?.id === '30b23a3f-df6b-40af-85d1-84d3e6f0b8b4';
 
@@ -71,7 +95,9 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (user) {
+      checkIfLicensedAgent();
       fetchLeads();
+      fetchAnalytics();
     }
   }, [user]);
 
@@ -137,6 +163,149 @@ const Dashboard = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchAnalytics = async () => {
+    try {
+      // Use the database function for accurate analytics
+      const { data, error } = await supabase.rpc('get_dashboard_analytics');
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const stats = data[0];
+        setAnalytics({
+          totalLeads: Number(stats.total_leads),
+          submittedLeads: Number(stats.submitted_leads),
+          pendingLeads: Number(stats.pending_leads),
+          leadsThisWeek: Number(stats.leads_this_week),
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      // Fallback: keep default analytics on error
+    }
+  };
+
+  const checkIfLicensedAgent = async () => {
+    if (!user) return;
+    
+    try {
+      // Check if user has a profile with display_name
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (profile?.display_name) {
+        setLicensedAgentName(profile.display_name);
+        setIsLicensedAgent(true);
+        // Fetch commission stats for this licensed agent
+        fetchCommissionStats(profile.display_name);
+      }
+    } catch (error) {
+      console.error('Error checking licensed agent status:', error);
+    }
+  };
+
+  const fetchCommissionStats = async (displayName: string) => {
+    try {
+      // Get current date in YYYY-MM-DD format
+      const now = new Date();
+      const todayDateString = now.toISOString().split('T')[0];
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const weekAgoDateString = weekAgo.toISOString().split('T')[0];
+      
+      // Fetch ALL submissions with "Pending Approval" status for total sales count
+      const { data: allSubmissions, error: allError } = await supabase
+        .from('daily_deal_flow')
+        .select('id, date')
+        .eq('licensed_agent_account', displayName)
+        .eq('status', 'Pending Approval');
+      
+      if (allError) throw allError;
+      const totalSales = allSubmissions?.length || 0;
+      
+      // Fetch TODAY's submissions with "Pending Approval" status
+      const { data: todayData, error: todayError } = await supabase
+        .from('daily_deal_flow')
+        .select('monthly_premium, product_type, carrier, date')
+        .eq('licensed_agent_account', displayName)
+        .eq('status', 'Pending Approval')
+        .eq('date', todayDateString);
+      
+      if (todayError) throw todayError;
+      const todaySales = todayData?.length || 0;
+      
+      // Fetch THIS WEEK's submissions with "Pending Approval" status
+      const { data: weekData, error: weekError } = await supabase
+        .from('daily_deal_flow')
+        .select('monthly_premium, product_type, carrier, date')
+        .eq('licensed_agent_account', displayName)
+        .eq('status', 'Pending Approval')
+        .gte('date', weekAgoDateString);
+      
+      if (weekError) throw weekError;
+      
+      const thisWeekSales = weekData?.length || 0;
+      
+      // Calculate This Week Premium
+      const thisWeekPremium = weekData?.reduce((sum, item) => sum + (item.monthly_premium || 0), 0) || 0;
+      
+      // Categorize products for the week: Level vs GI with their premiums
+      let levelCount = 0;
+      let giCount = 0;
+      let levelPremium = 0;
+      let giPremium = 0;
+      
+      weekData?.forEach(item => {
+        const productType = item.product_type?.toLowerCase() || '';
+        const carrier = item.carrier?.toLowerCase() || '';
+        const premium = item.monthly_premium || 0;
+        
+        // Check if it's GTL Graded (count as GI)
+        if (productType.includes('graded') && carrier.includes('gtl')) {
+          giCount++;
+          giPremium += premium;
+        }
+        // Level products (including non-GTL Graded)
+        else if (productType.includes('level') || productType.includes('graded')) {
+          levelCount++;
+          levelPremium += premium;
+        }
+        // GI and related products
+        else if (
+          productType.includes('gi') ||
+          productType.includes('immediate') ||
+          productType.includes('rop') ||
+          productType.includes('modified') ||
+          productType.includes('standard') ||
+          productType.includes('preferred')
+        ) {
+          giCount++;
+          giPremium += premium;
+        }
+        // Default: if unclear, count as Level
+        else if (productType) {
+          levelCount++;
+          levelPremium += premium;
+        }
+      });
+      
+      setCommissionStats({
+        totalSales,
+        thisWeekSales,
+        thisWeekPremium,
+        todaySales,
+        levelProducts: levelCount,
+        giProducts: giCount,
+        levelPremium,
+        giPremium,
+      });
+    } catch (error) {
+      console.error('Error fetching commission stats:', error);
     }
   };
 
@@ -456,8 +625,9 @@ const Dashboard = () => {
         description: `Call claimed by ${agentName}`,
       });
       
-      // Refresh leads data
+      // Refresh leads data and analytics
       fetchLeads();
+      fetchAnalytics();
       
       // Auto-redirect to the detailed session page - this will open existing session or create new one
       navigate(`/call-result-update?submissionId=${submissionIdForRedirect}`);
@@ -542,58 +712,176 @@ const Dashboard = () => {
         </Card>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
+        <div className={`grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 ${isLicensedAgent ? 'grid-rows-2' : ''}`}>
+          {/* Row 1 - Always shown */}
+          <Card className="bg-blue-50 border-blue-100">
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <User className="h-4 w-4 text-blue-500" />
-                <span className="text-sm text-muted-foreground">Total Leads</span>
+                <User className="h-4 w-4 text-blue-600" />
+                <span className="text-sm text-blue-700 font-medium">Total Leads</span>
               </div>
-              <p className="text-2xl font-bold">{leads.length}</p>
+              <p className="text-2xl font-bold text-blue-900">{analytics.totalLeads.toLocaleString()}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-green-50 border-green-100">
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <DollarSign className="h-4 w-4 text-green-500" />
-                <span className="text-sm text-muted-foreground">Submitted</span>
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="text-sm text-green-700 font-medium">Submitted</span>
               </div>
-              <p className="text-2xl font-bold">
-                {leads.filter(l => {
-                  if (!l.call_results || l.call_results.length === 0) return false;
-                  const latestResult = l.call_results[0];
-                  return Boolean(latestResult.application_submitted);
-                }).length}
-              </p>
+              <p className="text-2xl font-bold text-green-900">{analytics.submittedLeads.toLocaleString()}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-yellow-50 border-yellow-100">
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <Calendar className="h-4 w-4 text-yellow-500" />
-                <span className="text-sm text-muted-foreground">Pending</span>
+                <Clock className="h-4 w-4 text-yellow-600" />
+                <span className="text-sm text-yellow-700 font-medium">Pending</span>
               </div>
-              <p className="text-2xl font-bold">
-                {leads.filter(l => l.call_results.length === 0 || l.call_results.some(r => !r.application_submitted)).length}
-              </p>
+              <p className="text-2xl font-bold text-yellow-900">{analytics.pendingLeads.toLocaleString()}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-purple-50 border-purple-100">
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <Phone className="h-4 w-4 text-purple-500" />
-                <span className="text-sm text-muted-foreground">This Week</span>
+                <Calendar className="h-4 w-4 text-purple-600" />
+                <span className="text-sm text-purple-700 font-medium">This Week</span>
               </div>
-              <p className="text-2xl font-bold">
-                {leads.filter(l => {
-                  const weekAgo = new Date();
-                  weekAgo.setDate(weekAgo.getDate() - 7);
-                  return l.created_at && new Date(l.created_at) > weekAgo;
-                }).length}
-              </p>
+              <p className="text-2xl font-bold text-purple-900">{analytics.leadsThisWeek.toLocaleString()}</p>
             </CardContent>
           </Card>
+          
+          {/* Row 2 - Commission Stats (Only for Licensed Agents) */}
+          {isLicensedAgent && (
+            <>
+              <Card className="bg-emerald-50 border-emerald-100">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-4 w-4 text-emerald-600" />
+                    <span className="text-sm text-emerald-700 font-medium">Your Total Sales</span>
+                  </div>
+                  <p className="text-2xl font-bold text-emerald-900">{commissionStats.totalSales.toLocaleString()}</p>
+                  <p className="text-xs text-emerald-600 mt-1">All-time submissions</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-cyan-50 border-cyan-100">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <Calendar className="h-4 w-4 text-cyan-600" />
+                    <span className="text-sm text-cyan-700 font-medium">This Week Sales</span>
+                  </div>
+                  <p className="text-2xl font-bold text-cyan-900">{commissionStats.thisWeekSales.toLocaleString()}</p>
+                  <p className="text-xs text-cyan-600 mt-1">Last 7 days</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-green-50 border-green-100">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="h-4 w-4 text-green-700" />
+                    <span className="text-sm text-green-700 font-medium">Premium This Week</span>
+                  </div>
+                  <p className="text-2xl font-bold text-green-900">${commissionStats.thisWeekPremium.toLocaleString()}</p>
+                  <p className="text-xs text-green-600 mt-1">Weekly total</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-orange-50 border-orange-100">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="h-4 w-4 text-orange-600" />
+                    <span className="text-sm text-orange-700 font-medium">Today's Submissions</span>
+                  </div>
+                  <p className="text-2xl font-bold text-orange-900">{commissionStats.todaySales.toLocaleString()}</p>
+                  <p className="text-xs text-orange-600 mt-1">So far today</p>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
+        
+        {/* Product Mix Stats - Only for Licensed Agents */}
+        {isLicensedAgent && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <Card className="bg-blue-50 border-blue-100">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <BarChart3 className="h-5 w-5 text-blue-700" />
+                    <h3 className="text-lg font-semibold text-blue-900">Level Products</h3>
+                  </div>
+                  <Badge variant="outline" className="text-blue-700 border-blue-300 bg-blue-100">
+                    {commissionStats.levelProducts} sales
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-blue-700">Total Count:</span>
+                    <span className="font-semibold text-blue-900">{commissionStats.levelProducts.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-blue-700">Total Premium:</span>
+                    <span className="font-semibold text-blue-900">${commissionStats.levelPremium.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-blue-700">Percentage:</span>
+                    <span className="font-semibold text-blue-900">
+                      {commissionStats.totalSales > 0 
+                        ? Math.round((commissionStats.levelProducts / commissionStats.totalSales) * 100)
+                        : 0}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-blue-700">Avg Premium:</span>
+                    <span className="font-semibold text-blue-900">
+                      ${commissionStats.levelProducts > 0 
+                        ? Math.round(commissionStats.levelPremium / commissionStats.levelProducts).toLocaleString()
+                        : 0}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-orange-50 border-orange-100">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <BarChart3 className="h-5 w-5 text-orange-700" />
+                    <h3 className="text-lg font-semibold text-orange-900">GI Products</h3>
+                  </div>
+                  <Badge variant="outline" className="text-orange-700 border-orange-300 bg-orange-100">
+                    {commissionStats.giProducts} sales
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-orange-700">Total Count:</span>
+                    <span className="font-semibold text-orange-900">{commissionStats.giProducts.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-orange-700">Total Premium:</span>
+                    <span className="font-semibold text-orange-900">${commissionStats.giPremium.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-orange-700">Percentage:</span>
+                    <span className="font-semibold text-orange-900">
+                      {commissionStats.totalSales > 0 
+                        ? Math.round((commissionStats.giProducts / commissionStats.totalSales) * 100)
+                        : 0}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-orange-700">Avg Premium:</span>
+                    <span className="font-semibold text-orange-900">
+                      ${commissionStats.giProducts > 0 
+                        ? Math.round(commissionStats.giPremium / commissionStats.giProducts).toLocaleString()
+                        : 0}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <Card className="mb-6">
@@ -625,7 +913,7 @@ const Dashboard = () => {
             {/* Leads List */}
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Your Submissions ({filteredLeads.length})</h2>
+                <h2 className="text-xl font-semibold">Total Leads</h2>
                 {totalPages > 1 && (
                   <div className="text-sm text-muted-foreground">
                     Page {currentPage} of {totalPages}

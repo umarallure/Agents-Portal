@@ -52,9 +52,13 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       
       console.log('[ProtectedRoute] Center user check result:', isCenter);
 
-      // Redirect center users to their portal
-      if (isCenter && location.pathname !== '/center-lead-portal') {
-        console.log('[ProtectedRoute] Redirecting center user to /center-lead-portal');
+      // Center users can access their portal and agent-licensing page
+      const centerAllowedPaths = ['/center-lead-portal', '/agent-licensing', '/center-callback-request'];
+      const currentPath = location.pathname;
+      
+      // Redirect center users to their portal if they try to access other protected routes
+      if (isCenter && !centerAllowedPaths.includes(currentPath)) {
+        console.log('[ProtectedRoute] Redirecting center user to /center-lead-portal from:', currentPath);
         navigate('/center-lead-portal', { replace: true });
         return;
       }

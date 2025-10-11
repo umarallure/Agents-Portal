@@ -2,9 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, Search, ArrowLeft, DollarSign } from 'lucide-react';
+import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, Search, ArrowLeft, DollarSign, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLicensedAgent } from '@/hooks/useLicensedAgent';
+import { useCenterUser } from '@/hooks/useCenterUser';
 import { canAccessNavigation } from '@/lib/userPermissions';
 
 interface NavigationHeaderProps {
@@ -16,23 +17,30 @@ interface NavigationHeaderProps {
 export const NavigationHeader = ({ title, showBackButton = false, backTo }: NavigationHeaderProps) => {
   const { user, signOut } = useAuth();
   const { isLicensedAgent, loading: licensedLoading } = useLicensedAgent();
+  const { isCenterUser, loading: centerLoading } = useCenterUser();
   const navigate = useNavigate();
   
   const isBen = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79';
   const isAuthorizedUser = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79' || user?.id === '9c004d97-b5fb-4ed6-805e-e2c383fe8b6f' || user?.id === 'c2f07638-d3d2-4fe9-9a65-f57395745695' || user?.id === '30b23a3f-df6b-40af-85d1-84d3e6f0b8b4';
   const hasNavigationAccess = canAccessNavigation(user?.id);
   
-  // Licensed agents should see navigation menu for commission portal access
-  const shouldShowNavigation = (isAuthorizedUser && hasNavigationAccess) || (isLicensedAgent && !licensedLoading);
+  // Licensed agents, center users, and Ben should see navigation menu
+  const shouldShowNavigation = (isAuthorizedUser && hasNavigationAccess) || (isLicensedAgent && !licensedLoading) || (isCenterUser && !centerLoading);
+  
+  // Find Eligible Agents should be visible to Ben, licensed agents, and center users
+  const canAccessAgentFinder = isBen || (isLicensedAgent && !licensedLoading) || (isCenterUser && !centerLoading);
 
   console.log('[NavigationHeader] Navigation visibility:', {
     userId: user?.id,
     email: user?.email,
     isLicensedAgent,
     licensedLoading,
+    isCenterUser,
+    centerLoading,
     isAuthorizedUser,
     hasNavigationAccess,
-    shouldShowNavigation
+    shouldShowNavigation,
+    canAccessAgentFinder
   });
 
   const handleSignOut = async () => {
@@ -101,9 +109,29 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                       <DollarSign className="mr-2 h-4 w-4" />
                       Commission Portal
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/agent-licensing')}>
+                      <ShieldCheck className="mr-2 h-4 w-4" />
+                      Find Eligible Agents
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                       <User className="mr-2 h-4 w-4" />
                       Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                
+                {/* Center User - Available for center users */}
+                {isCenterUser && !centerLoading && !isLicensedAgent && (
+                  <>
+                    <DropdownMenuLabel>Lead Vendor</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => navigate('/center-lead-portal')}>
+                      <Grid3X3 className="mr-2 h-4 w-4" />
+                      My Leads
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/agent-licensing')}>
+                      <ShieldCheck className="mr-2 h-4 w-4" />
+                      Find Eligible Agents
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
@@ -133,6 +161,12 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                       <Search className="mr-2 h-4 w-4" />
                       Deal Flow & Policy Lookup
                     </DropdownMenuItem>
+                    {canAccessAgentFinder && (
+                      <DropdownMenuItem onClick={() => navigate('/agent-licensing')}>
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        Find Eligible Agents
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                       <User className="mr-2 h-4 w-4" />
                       Dashboard
