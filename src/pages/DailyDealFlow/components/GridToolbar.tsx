@@ -127,6 +127,7 @@ export const GridToolbar = ({
   const statusOptions = [
     "All Statuses",
     "Pending Approval",
+    "Previously Sold BPO",
     "Needs BPO Callback",
     "Incomplete Transfer",
     "DQ'd Can't be sold",

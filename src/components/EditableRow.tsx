@@ -73,6 +73,7 @@ const PRODUCT_TYPE_OPTIONS = [
 const STATUS_OPTIONS = [
   "Needs BPO Callback",
   "Pending Approval",
+  "Previously Sold BPO",
   "Incomplete Transfer",
   "DQ'd Can't be sold",
   "Returned To Center - DQ",

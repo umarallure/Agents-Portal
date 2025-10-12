@@ -69,6 +69,7 @@ const statusOptions = [
   "Needs BPO Callback",
   "Not Interested",
   "Pending Approval",
+  "Previously Sold BPO",
   "Returned To Center - DQ",
   "Application Withdrawn",
   "Call Back Fix",
