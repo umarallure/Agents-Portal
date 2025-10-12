@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Filter, Phone, User, DollarSign, TrendingUp, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { Calendar, Filter, Phone, User, DollarSign, TrendingUp, AlertCircle, CheckCircle2, Clock, BarChart3 } from 'lucide-react';
 import { NavigationHeader } from '@/components/NavigationHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { useLicensedAgent } from '@/hooks/useLicensedAgent';
@@ -213,7 +213,7 @@ const CommissionPortal = () => {
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <User className="h-4 w-4 text-blue-500" />
-                <span className="text-sm text-muted-foreground">Total Pending</span>
+                <span className="text-sm text-muted-foreground">All Time Sales</span>
               </div>
               <p className="text-2xl font-bold">{leads.length}</p>
             </CardContent>
@@ -232,8 +232,48 @@ const CommissionPortal = () => {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
+                <Phone className="h-4 w-4 text-purple-500" />
+                <span className="text-sm text-muted-foreground">Avg Premium</span>
+              </div>
+              <p className="text-2xl font-bold">
+                ${leads.length > 0 ? Math.round(leads.reduce((sum, lead) => sum + (lead.monthly_premium || 0), 0) / leads.length).toLocaleString() : '0'}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="h-4 w-4 text-emerald-500" />
+                <span className="text-sm text-muted-foreground">Total Face Amount</span>
+              </div>
+              <p className="text-2xl font-bold">
+                ${leads.reduce((sum, lead) => sum + (lead.face_amount || 0), 0).toLocaleString()}
+              </p>
+            </CardContent>
+          </Card>
+          
+          {/* Row 2 - Time-based Analytics */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="h-4 w-4 text-cyan-500" />
+                <span className="text-sm text-muted-foreground">This Month Sales</span>
+              </div>
+              <p className="text-2xl font-bold">
+                {leads.filter(l => {
+                  if (!l.created_at) return false;
+                  const leadDate = new Date(l.created_at);
+                  const now = new Date();
+                  return leadDate.getMonth() === now.getMonth() && leadDate.getFullYear() === now.getFullYear();
+                }).length}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
                 <Calendar className="h-4 w-4 text-yellow-500" />
-                <span className="text-sm text-muted-foreground">This Week</span>
+                <span className="text-sm text-muted-foreground">This Week Sales</span>
               </div>
               <p className="text-2xl font-bold">
                 {leads.filter(l => {
@@ -247,38 +287,15 @@ const CommissionPortal = () => {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <Phone className="h-4 w-4 text-purple-500" />
-                <span className="text-sm text-muted-foreground">Avg Premium</span>
-              </div>
-              <p className="text-2xl font-bold">
-                ${leads.length > 0 ? Math.round(leads.reduce((sum, lead) => sum + (lead.monthly_premium || 0), 0) / leads.length).toLocaleString() : '0'}
-              </p>
-            </CardContent>
-          </Card>
-          
-          {/* Row 2 - New Analytics Cards */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <TrendingUp className="h-4 w-4 text-emerald-500" />
-                <span className="text-sm text-muted-foreground">Total Face Amount</span>
-              </div>
-              <p className="text-2xl font-bold">
-                ${leads.reduce((sum, lead) => sum + (lead.face_amount || 0), 0).toLocaleString()}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <CheckCircle2 className="h-4 w-4 text-cyan-500" />
-                <span className="text-sm text-muted-foreground">This Month</span>
+                <Clock className="h-4 w-4 text-orange-500" />
+                <span className="text-sm text-muted-foreground">Today Sales</span>
               </div>
               <p className="text-2xl font-bold">
                 {leads.filter(l => {
-                  const monthAgo = new Date();
-                  monthAgo.setMonth(monthAgo.getMonth() - 1);
-                  return l.created_at && new Date(l.created_at) > monthAgo;
+                  if (!l.created_at) return false;
+                  const leadDate = new Date(l.created_at);
+                  const today = new Date();
+                  return leadDate.toDateString() === today.toDateString();
                 }).length}
               </p>
             </CardContent>
@@ -286,25 +303,223 @@ const CommissionPortal = () => {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <Clock className="h-4 w-4 text-orange-500" />
-                <span className="text-sm text-muted-foreground">Avg Face Amount</span>
+                <AlertCircle className="h-4 w-4 text-indigo-500" />
+                <span className="text-sm text-muted-foreground">Daily Avg Sales This Week</span>
               </div>
               <p className="text-2xl font-bold">
-                ${leads.length > 0 ? Math.round(leads.reduce((sum, lead) => sum + (lead.face_amount || 0), 0) / leads.length).toLocaleString() : '0'}
+                {(() => {
+                  const weekLeads = leads.filter(l => {
+                    const weekAgo = new Date();
+                    weekAgo.setDate(weekAgo.getDate() - 7);
+                    return l.created_at && new Date(l.created_at) > weekAgo;
+                  });
+                  return (weekLeads.length / 7).toFixed(1);
+                })()}
               </p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="h-4 w-4 text-red-500" />
-                <span className="text-sm text-muted-foreground">Oldest Pending</span>
+        </div>
+
+        {/* Product Mix Stats - Level vs GI */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <Card className="bg-blue-50 border-blue-100">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <BarChart3 className="h-5 w-5 text-blue-700" />
+                  <h3 className="text-lg font-semibold text-blue-900">All Time Level Products Sales</h3>
+                </div>
+                <Badge variant="outline" className="text-blue-700 border-blue-300 bg-blue-100">
+                  {(() => {
+                    const levelCount = leads.filter(lead => {
+                      const productType = lead.product_type?.toLowerCase() || '';
+                      const carrier = lead.carrier?.toLowerCase() || '';
+                      if (productType.includes('graded') && carrier.includes('gtl')) return false;
+                      return productType.includes('level') || productType.includes('graded');
+                    }).length;
+                    return levelCount;
+                  })()} sales
+                </Badge>
               </div>
-              <p className="text-2xl font-bold">
-                {leads.length > 0 && leads[leads.length - 1]?.created_at
-                  ? Math.floor((new Date().getTime() - new Date(leads[leads.length - 1].created_at).getTime()) / (1000 * 60 * 60 * 24))
-                  : '0'} days
-              </p>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-blue-700">Total Count:</span>
+                  <span className="font-semibold text-blue-900">
+                    {(() => {
+                      const levelCount = leads.filter(lead => {
+                        const productType = lead.product_type?.toLowerCase() || '';
+                        const carrier = lead.carrier?.toLowerCase() || '';
+                        if (productType.includes('graded') && carrier.includes('gtl')) return false;
+                        return productType.includes('level') || productType.includes('graded');
+                      }).length;
+                      return levelCount.toLocaleString();
+                    })()}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-blue-700">Total Premium:</span>
+                  <span className="font-semibold text-blue-900">
+                    ${(() => {
+                      const levelPremium = leads
+                        .filter(lead => {
+                          const productType = lead.product_type?.toLowerCase() || '';
+                          const carrier = lead.carrier?.toLowerCase() || '';
+                          if (productType.includes('graded') && carrier.includes('gtl')) return false;
+                          return productType.includes('level') || productType.includes('graded');
+                        })
+                        .reduce((sum, lead) => sum + (lead.monthly_premium || 0), 0);
+                      return levelPremium.toLocaleString();
+                    })()}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-blue-700">Percentage:</span>
+                  <span className="font-semibold text-blue-900">
+                    {(() => {
+                      const levelCount = leads.filter(lead => {
+                        const productType = lead.product_type?.toLowerCase() || '';
+                        const carrier = lead.carrier?.toLowerCase() || '';
+                        if (productType.includes('graded') && carrier.includes('gtl')) return false;
+                        return productType.includes('level') || productType.includes('graded');
+                      }).length;
+                      return leads.length > 0 ? Math.round((levelCount / leads.length) * 100) : 0;
+                    })()}%
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-blue-700">Avg Premium:</span>
+                  <span className="font-semibold text-blue-900">
+                    ${(() => {
+                      const levelLeads = leads.filter(lead => {
+                        const productType = lead.product_type?.toLowerCase() || '';
+                        const carrier = lead.carrier?.toLowerCase() || '';
+                        if (productType.includes('graded') && carrier.includes('gtl')) return false;
+                        return productType.includes('level') || productType.includes('graded');
+                      });
+                      const levelPremium = levelLeads.reduce((sum, lead) => sum + (lead.monthly_premium || 0), 0);
+                      return levelLeads.length > 0 ? Math.round(levelPremium / levelLeads.length).toLocaleString() : 0;
+                    })()}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-orange-50 border-orange-100">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <BarChart3 className="h-5 w-5 text-orange-700" />
+                  <h3 className="text-lg font-semibold text-orange-900">All Time GI Products Sales</h3>
+                </div>
+                <Badge variant="outline" className="text-orange-700 border-orange-300 bg-orange-100">
+                  {(() => {
+                    const giCount = leads.filter(lead => {
+                      const productType = lead.product_type?.toLowerCase() || '';
+                      const carrier = lead.carrier?.toLowerCase() || '';
+                      if (productType.includes('graded') && carrier.includes('gtl')) return true;
+                      if (productType.includes('level') || productType.includes('graded')) return false;
+                      return productType.includes('gi') || 
+                             productType.includes('immediate') || 
+                             productType.includes('rop') || 
+                             productType.includes('modified') || 
+                             productType.includes('standard') || 
+                             productType.includes('preferred') ||
+                             productType.length > 0;
+                    }).length;
+                    return giCount;
+                  })()} sales
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-orange-700">Total Count:</span>
+                  <span className="font-semibold text-orange-900">
+                    {(() => {
+                      const giCount = leads.filter(lead => {
+                        const productType = lead.product_type?.toLowerCase() || '';
+                        const carrier = lead.carrier?.toLowerCase() || '';
+                        if (productType.includes('graded') && carrier.includes('gtl')) return true;
+                        if (productType.includes('level') || productType.includes('graded')) return false;
+                        return productType.includes('gi') || 
+                               productType.includes('immediate') || 
+                               productType.includes('rop') || 
+                               productType.includes('modified') || 
+                               productType.includes('standard') || 
+                               productType.includes('preferred') ||
+                               productType.length > 0;
+                      }).length;
+                      return giCount.toLocaleString();
+                    })()}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-orange-700">Total Premium:</span>
+                  <span className="font-semibold text-orange-900">
+                    ${(() => {
+                      const giPremium = leads
+                        .filter(lead => {
+                          const productType = lead.product_type?.toLowerCase() || '';
+                          const carrier = lead.carrier?.toLowerCase() || '';
+                          if (productType.includes('graded') && carrier.includes('gtl')) return true;
+                          if (productType.includes('level') || productType.includes('graded')) return false;
+                          return productType.includes('gi') || 
+                                 productType.includes('immediate') || 
+                                 productType.includes('rop') || 
+                                 productType.includes('modified') || 
+                                 productType.includes('standard') || 
+                                 productType.includes('preferred') ||
+                                 productType.length > 0;
+                        })
+                        .reduce((sum, lead) => sum + (lead.monthly_premium || 0), 0);
+                      return giPremium.toLocaleString();
+                    })()}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-orange-700">Percentage:</span>
+                  <span className="font-semibold text-orange-900">
+                    {(() => {
+                      const giCount = leads.filter(lead => {
+                        const productType = lead.product_type?.toLowerCase() || '';
+                        const carrier = lead.carrier?.toLowerCase() || '';
+                        if (productType.includes('graded') && carrier.includes('gtl')) return true;
+                        if (productType.includes('level') || productType.includes('graded')) return false;
+                        return productType.includes('gi') || 
+                               productType.includes('immediate') || 
+                               productType.includes('rop') || 
+                               productType.includes('modified') || 
+                               productType.includes('standard') || 
+                               productType.includes('preferred') ||
+                               productType.length > 0;
+                      }).length;
+                      return leads.length > 0 ? Math.round((giCount / leads.length) * 100) : 0;
+                    })()}%
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-orange-700">Avg Premium:</span>
+                  <span className="font-semibold text-orange-900">
+                    ${(() => {
+                      const giLeads = leads.filter(lead => {
+                        const productType = lead.product_type?.toLowerCase() || '';
+                        const carrier = lead.carrier?.toLowerCase() || '';
+                        if (productType.includes('graded') && carrier.includes('gtl')) return true;
+                        if (productType.includes('level') || productType.includes('graded')) return false;
+                        return productType.includes('gi') || 
+                               productType.includes('immediate') || 
+                               productType.includes('rop') || 
+                               productType.includes('modified') || 
+                               productType.includes('standard') || 
+                               productType.includes('preferred') ||
+                               productType.length > 0;
+                      });
+                      const giPremium = giLeads.reduce((sum, lead) => sum + (lead.monthly_premium || 0), 0);
+                      return giLeads.length > 0 ? Math.round(giPremium / giLeads.length).toLocaleString() : 0;
+                    })()}
+                  </span>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -357,10 +572,10 @@ const CommissionPortal = () => {
             </CardContent>
           </Card>
 
-          {/* Graph 2: Leads Over Time with Targets - Line Graph */}
+          {/* Graph 2: Submissions Over Time with Targets - Line Graph */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Leads Timeline (Last 7 Days)</CardTitle>
+              <CardTitle className="text-lg">Total Submissions (Last 7 Days)</CardTitle>
             </CardHeader>
             <CardContent>
               {(() => {
@@ -384,7 +599,7 @@ const CommissionPortal = () => {
                     date: format(date, 'MMM d'),
                     fullDate: format(date, 'MMM dd, yyyy'),
                     count,
-                    dailyTarget: 4,
+                    dailyTarget: 10,
                     weeklyAvg: 8
                   };
                 });
@@ -425,7 +640,7 @@ const CommissionPortal = () => {
                           labelStyle={{ color: 'hsl(var(--foreground))' }}
                           itemStyle={{ color: 'hsl(var(--foreground))' }}
                           formatter={(value: number, name: string) => {
-                            if (name === 'count') return [value, 'Leads'];
+                            if (name === 'count') return [value, 'Submissions'];
                             if (name === 'dailyTarget') return [value, 'Daily Target'];
                             if (name === 'weeklyAvg') return [value, 'Weekly Avg'];
                             return [value, name];
@@ -435,7 +650,7 @@ const CommissionPortal = () => {
                           wrapperStyle={{ fontSize: '12px' }}
                           formatter={(value: string) => {
                             if (value === 'count') return 'Actual';
-                            if (value === 'dailyTarget') return 'Daily Target (4)';
+                            if (value === 'dailyTarget') return 'Daily Target (10)';
                             if (value === 'weeklyAvg') return 'Weekly Avg (8)';
                             return value;
                           }}
@@ -443,7 +658,7 @@ const CommissionPortal = () => {
                         
                         {/* Target lines */}
                         <ReferenceLine 
-                          y={4} 
+                          y={10} 
                           stroke="#22c55e" 
                           strokeDasharray="5 5" 
                           strokeWidth={2}
@@ -501,13 +716,13 @@ const CommissionPortal = () => {
                       <div>
                         <p className="text-xs text-muted-foreground">Days Above Target</p>
                         <p className="text-lg font-bold text-green-600">
-                          {dailyData.filter(d => d.count >= 4).length}
+                          {dailyData.filter(d => d.count >= 10).length}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Target Achievement</p>
                         <p className="text-lg font-bold text-blue-600">
-                          {dailyData.length > 0 ? Math.round((dailyData.reduce((sum, d) => sum + d.count, 0) / (7 * 4)) * 100) : '0'}%
+                          {dailyData.length > 0 ? Math.round((dailyData.reduce((sum, d) => sum + d.count, 0) / (7 * 10)) * 100) : '0'}%
                         </p>
                       </div>
                     </div>

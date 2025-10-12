@@ -806,7 +806,7 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-2">
                     <BarChart3 className="h-5 w-5 text-blue-700" />
-                    <h3 className="text-lg font-semibold text-blue-900">Level Products</h3>
+                    <h3 className="text-lg font-semibold text-blue-900">This Week Level Products Sales</h3>
                   </div>
                   <Badge variant="outline" className="text-blue-700 border-blue-300 bg-blue-100">
                     {commissionStats.levelProducts} sales
@@ -846,7 +846,7 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-2">
                     <BarChart3 className="h-5 w-5 text-orange-700" />
-                    <h3 className="text-lg font-semibold text-orange-900">GI Products</h3>
+                    <h3 className="text-lg font-semibold text-orange-900">This Week GI Products Sales</h3>
                   </div>
                   <Badge variant="outline" className="text-orange-700 border-orange-300 bg-orange-100">
                     {commissionStats.giProducts} sales
