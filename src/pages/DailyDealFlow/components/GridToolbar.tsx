@@ -1,11 +1,10 @@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
-import { CalendarIcon, Search, X, Filter } from "lucide-react";
+import { Search, X, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface GridToolbarProps {
@@ -244,28 +243,12 @@ export const GridToolbar = ({
             Filter by Date
           </Label>
           <div className="flex items-center gap-2 mt-1">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "justify-start text-left font-normal min-w-[140px]",
-                    !dateFilter && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateFilter ? format(dateFilter, "PPP") : "All dates"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={dateFilter}
-                  onSelect={onDateFilterChange}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+            <DatePicker
+              date={dateFilter}
+              onDateChange={onDateFilterChange}
+              placeholder="All dates"
+              className="min-w-[140px]"
+            />
             
             {dateFilter && (
               <Button
@@ -288,28 +271,12 @@ export const GridToolbar = ({
               From Date
             </Label>
             <div className="flex items-center gap-2 mt-1">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "justify-start text-left font-normal min-w-[140px]",
-                      !dateFromFilter && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateFromFilter ? format(dateFromFilter, "PPP") : "Select start date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dateFromFilter}
-                    onSelect={onDateFromFilterChange}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <DatePicker
+                date={dateFromFilter}
+                onDateChange={onDateFromFilterChange}
+                placeholder="Select start date"
+                className="min-w-[140px]"
+              />
               
               {dateFromFilter && (
                 <Button
@@ -330,28 +297,12 @@ export const GridToolbar = ({
               To Date
             </Label>
             <div className="flex items-center gap-2 mt-1">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "justify-start text-left font-normal min-w-[140px]",
-                      !dateToFilter && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateToFilter ? format(dateToFilter, "PPP") : "Select end date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dateToFilter}
-                    onSelect={onDateToFilterChange}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <DatePicker
+                date={dateToFilter}
+                onDateChange={onDateToFilterChange}
+                placeholder="Select end date"
+                className="min-w-[140px]"
+              />
               
               {dateToFilter && (
                 <Button

@@ -6,12 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
 import { format } from "date-fns";
-import { CalendarIcon, Download, Users, Phone, PhoneCall, UserCheck, TrendingUp, TrendingDown, FileSpreadsheet, ChevronDown, RefreshCw, Loader2 } from "lucide-react";
+import { Download, Users, Phone, PhoneCall, UserCheck, TrendingUp, TrendingDown, FileSpreadsheet, ChevronDown, RefreshCw, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { NavigationHeader } from "@/components/NavigationHeader";
@@ -520,80 +518,29 @@ export const ReportsPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="single-date">Specific Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !dateFilter && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateFilter ? format(dateFilter, "PPP") : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={dateFilter}
-                        onSelect={handleDateFilterChange}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DatePicker
+                    date={dateFilter}
+                    onDateChange={handleDateFilterChange}
+                    placeholder="Pick a date"
+                  />
                 </div>
 
                 <div>
                   <Label htmlFor="date-from">Date From</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !dateFromFilter && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateFromFilter ? format(dateFromFilter, "PPP") : "Pick start date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={dateFromFilter}
-                        onSelect={handleDateFromFilterChange}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DatePicker
+                    date={dateFromFilter}
+                    onDateChange={handleDateFromFilterChange}
+                    placeholder="Pick start date"
+                  />
                 </div>
 
                 <div>
                   <Label htmlFor="date-to">Date To</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !dateToFilter && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateToFilter ? format(dateToFilter, "PPP") : "Pick end date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={dateToFilter}
-                        onSelect={handleDateToFilterChange}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DatePicker
+                    date={dateToFilter}
+                    onDateChange={handleDateToFilterChange}
+                    placeholder="Pick end date"
+                  />
                 </div>
               </div>
             </CardContent>

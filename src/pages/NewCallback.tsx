@@ -6,11 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
 import { format } from "date-fns";
-import { CalendarIcon, ArrowLeft, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentTimestampEST, formatDateToEST } from "@/lib/dateUtils";
@@ -224,29 +222,11 @@ const NewCallback = () => {
 
                   <div className="md:col-span-2">
                     <Label>Submission Date *</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !submissionDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {submissionDate ? format(submissionDate, "PPP") : "Pick a submission date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={submissionDate}
-                          onSelect={setSubmissionDate}
-                          initialFocus
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <DatePicker
+                      date={submissionDate}
+                      onDateChange={setSubmissionDate}
+                      placeholder="Pick a submission date"
+                    />
                   </div>
                 </div>
               </div>
@@ -316,29 +296,11 @@ const NewCallback = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label>Date of Birth</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !dateOfBirth && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateOfBirth ? format(dateOfBirth, "PPP") : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={dateOfBirth}
-                          onSelect={setDateOfBirth}
-                          initialFocus
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <DatePicker
+                      date={dateOfBirth}
+                      onDateChange={setDateOfBirth}
+                      placeholder="Pick a date"
+                    />
                   </div>
 
                   <div>
