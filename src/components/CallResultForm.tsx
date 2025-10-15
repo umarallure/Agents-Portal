@@ -68,6 +68,7 @@ const bufferAgentOptions = [
   "Justine",
   "Isaac",
   "Kaye",
+  "Viez",
   "Laiza Batain"
 ];
 
