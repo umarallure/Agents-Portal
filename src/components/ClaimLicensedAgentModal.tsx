@@ -1,5 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface Agent {
   user_id: string;
@@ -12,7 +14,9 @@ interface ClaimLicensedAgentModalProps {
   licensedAgents: Agent[];
   fetchingAgents: boolean;
   claimLicensedAgent: string;
+  isRetentionCall: boolean;
   onLicensedAgentChange: (id: string) => void;
+  onRetentionCallChange: (value: boolean) => void;
   onCancel: () => void;
   onClaim: () => void;
 }
@@ -23,7 +27,9 @@ export const ClaimLicensedAgentModal: React.FC<ClaimLicensedAgentModalProps> = (
   licensedAgents,
   fetchingAgents,
   claimLicensedAgent,
+  isRetentionCall,
   onLicensedAgentChange,
+  onRetentionCallChange,
   onCancel,
   onClaim,
 }) => {
@@ -54,7 +60,25 @@ export const ClaimLicensedAgentModal: React.FC<ClaimLicensedAgentModalProps> = (
             <p className="text-sm text-muted-foreground">No licensed agents available. Please ensure licensed agents are registered in the system.</p>
           )}
         </div>
-        <div className="flex justify-end gap-2">
+        
+        {/* Retention Call Toggle */}
+        <div className="flex items-center justify-between space-x-2 border-t pt-4 mt-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="licensed-claim-retention" className="text-base">
+              Mark as Retention Call
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              This claim will be tracked as a retention team call
+            </p>
+          </div>
+          <Switch
+            id="licensed-claim-retention"
+            checked={isRetentionCall}
+            onCheckedChange={onRetentionCallChange}
+          />
+        </div>
+        
+        <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={onCancel} disabled={loading}>Cancel</Button>
           <Button onClick={onClaim} disabled={loading || !claimLicensedAgent}>
             {loading ? 'Claiming...' : 'Claim & Reconnect'}

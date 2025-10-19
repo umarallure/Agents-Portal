@@ -76,6 +76,7 @@ const Dashboard = () => {
   const [claimAgentType, setClaimAgentType] = useState<'buffer' | 'licensed'>('buffer');
   const [claimBufferAgent, setClaimBufferAgent] = useState<string>("");
   const [claimLicensedAgent, setClaimLicensedAgent] = useState<string>("");
+  const [claimIsRetentionCall, setClaimIsRetentionCall] = useState(false);
   const [claimLoading, setClaimLoading] = useState(false);
   const [claimLead, setClaimLead] = useState<any>(null);
   const [bufferAgents, setBufferAgents] = useState<any[]>([]);
@@ -562,7 +563,8 @@ const Dashboard = () => {
 
       // Update verification session
       const updateFields: any = {
-        status: 'in_progress'
+        status: 'in_progress',
+        is_retention_call: claimIsRetentionCall
       };
       if (claimAgentType === 'buffer') {
         updateFields.buffer_agent_id = agentId;
@@ -574,6 +576,12 @@ const Dashboard = () => {
         .from('verification_sessions')
         .update(updateFields)
         .eq('id', claimSessionId);
+
+      // Update the lead with retention flag
+      await supabase
+        .from('leads')
+        .update({ is_retention_call: claimIsRetentionCall })
+        .eq('submission_id', claimSubmissionId);
 
       // Log the call claim event
       const agentName = claimAgentType === 'buffer'
@@ -596,7 +604,8 @@ const Dashboard = () => {
         },
         verificationSessionId: claimSessionId!,
         customerName,
-        leadVendor
+        leadVendor,
+        isRetentionCall: claimIsRetentionCall
       });
 
       // Update daily_deal_flow if entry exists for today's date (buffer workflow only)
@@ -647,6 +656,7 @@ const Dashboard = () => {
       setClaimLead(null);
       setClaimBufferAgent("");
       setClaimLicensedAgent("");
+      setClaimIsRetentionCall(false);
       
       toast({
         title: "Success",
@@ -1195,9 +1205,11 @@ const Dashboard = () => {
         fetchingAgents={fetchingAgents}
         claimBufferAgent={claimBufferAgent}
         claimLicensedAgent={claimLicensedAgent}
+        isRetentionCall={claimIsRetentionCall}
         onAgentTypeChange={handleAgentTypeChange}
         onBufferAgentChange={setClaimBufferAgent}
         onLicensedAgentChange={setClaimLicensedAgent}
+        onRetentionCallChange={setClaimIsRetentionCall}
         onCancel={() => setClaimModalOpen(false)}
         onClaim={handleClaimCall}
       />
@@ -1208,7 +1220,9 @@ const Dashboard = () => {
         licensedAgents={licensedAgents}
         fetchingAgents={fetchingAgents}
         claimLicensedAgent={claimLicensedAgent}
+        isRetentionCall={claimIsRetentionCall}
         onLicensedAgentChange={setClaimLicensedAgent}
+        onRetentionCallChange={setClaimIsRetentionCall}
         onCancel={() => setClaimModalOpen(false)}
         onClaim={handleClaimCall}
       />

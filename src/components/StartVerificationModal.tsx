@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Loader2, UserCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +35,7 @@ export const StartVerificationModal = ({ submissionId, onVerificationStarted }: 
   const [selectedAgent, setSelectedAgent] = useState<string>("");
   const [selectedLA, setSelectedLA] = useState<string>("");
   const [agentType, setAgentType] = useState<'buffer' | 'licensed'>('buffer');
+  const [isRetentionCall, setIsRetentionCall] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fetchingAgents, setFetchingAgents] = useState(false);
   const { toast } = useToast();
@@ -193,6 +195,7 @@ export const StartVerificationModal = ({ submissionId, onVerificationStarted }: 
           submission_id: submissionId,
           buffer_agent_id: selectedAgent,
           status: 'in_progress',
+          is_retention_call: isRetentionCall,
           started_at: new Date().toISOString()
         };
         notificationPayload = {
@@ -208,6 +211,7 @@ export const StartVerificationModal = ({ submissionId, onVerificationStarted }: 
           submission_id: submissionId,
           licensed_agent_id: selectedLA,
           status: 'in_progress',
+          is_retention_call: isRetentionCall,
           started_at: new Date().toISOString()
         };
         notificationPayload = {
@@ -228,6 +232,16 @@ export const StartVerificationModal = ({ submissionId, onVerificationStarted }: 
 
       if (sessionError) {
         throw sessionError;
+      }
+
+      // Update the lead with retention flag
+      const { error: leadUpdateError } = await supabase
+        .from('leads')
+        .update({ is_retention_call: isRetentionCall })
+        .eq('submission_id', submissionId);
+
+      if (leadUpdateError) {
+        console.warn('Failed to update lead retention flag:', leadUpdateError);
       }
 
       // Initialize verification items for both workflows
@@ -283,7 +297,8 @@ export const StartVerificationModal = ({ submissionId, onVerificationStarted }: 
         },
         verificationSessionId: session.id,
         customerName,
-        leadVendor
+        leadVendor,
+        isRetentionCall: isRetentionCall
       });
 
       // Update daily_deal_flow if entry exists for today's date (buffer workflow only)
@@ -459,6 +474,23 @@ export const StartVerificationModal = ({ submissionId, onVerificationStarted }: 
               )}
             </div>
           )}
+
+          {/* Retention Call Toggle */}
+          <div className="flex items-center justify-between space-x-2 border-t pt-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="retention-call" className="text-base">
+                Mark as Retention Call
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                This call will be tracked as a retention team call
+              </p>
+            </div>
+            <Switch
+              id="retention-call"
+              checked={isRetentionCall}
+              onCheckedChange={setIsRetentionCall}
+            />
+          </div>
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>

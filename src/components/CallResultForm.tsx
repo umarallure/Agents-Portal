@@ -7,8 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { CalendarIcon, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { CalendarIcon, CheckCircle, XCircle, Loader2, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getTodayDateEST, getCurrentTimestampEST, formatDateESTLocale } from "@/lib/dateUtils";
@@ -380,6 +382,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [callSource, setCallSource] = useState("");
   const [newDraftDate, setNewDraftDate] = useState<Date>();
+  const [isRetentionCall, setIsRetentionCall] = useState(false);
   
   const { toast } = useToast();
 
@@ -415,6 +418,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           setBufferAgent(existingResult.buffer_agent || '');
           setAgentWhoTookCall(existingResult.agent_who_took_call || '');
           setCallSource(existingResult.call_source || '');
+          setIsRetentionCall(Boolean(existingResult.is_retention_call));
           
           // Set status reason if it exists
           if (existingResult.dq_reason) {
@@ -428,32 +432,36 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         } else {
           console.log('No existing call result found for submission:', submissionId);
           
-          // If no call result exists, check if there's an active verification session with buffer agent
+          // If no call result exists, fetch retention flag from verification_sessions
           try {
-            const { data: verificationSession, error: vsError } = await supabase
+            const { data: verificationSession } = await supabase
               .from('verification_sessions')
-              .select('buffer_agent_id')
+              .select('buffer_agent_id, is_retention_call')
               .eq('submission_id', submissionId)
-              .not('buffer_agent_id', 'is', null)
               .order('created_at', { ascending: false })
               .limit(1)
               .maybeSingle();
 
-            if (verificationSession && !vsError && verificationSession.buffer_agent_id) {
-              // Fetch the buffer agent's display name
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('display_name')
-                .eq('user_id', verificationSession.buffer_agent_id)
-                .single();
+            if (verificationSession) {
+              console.log('Auto-populating retention flag from verification session:', verificationSession.is_retention_call);
+              setIsRetentionCall(Boolean(verificationSession.is_retention_call));
 
-              if (profile?.display_name) {
-                console.log('Auto-populating buffer agent from verification session:', profile.display_name);
-                setBufferAgent(profile.display_name);
+              // Also fetch the buffer agent's display name
+              if (verificationSession.buffer_agent_id) {
+                const { data: profile } = await supabase
+                  .from('profiles')
+                  .select('display_name')
+                  .eq('user_id', verificationSession.buffer_agent_id)
+                  .single();
+
+                if (profile?.display_name) {
+                  console.log('Auto-populating buffer agent from verification session:', profile.display_name);
+                  setBufferAgent(profile.display_name);
+                }
               }
             }
           } catch (vsError) {
-            console.log('Could not fetch verification session buffer agent:', vsError);
+            console.log('Could not fetch verification session:', vsError);
           }
         }
 
@@ -475,7 +483,38 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
       } catch (error) {
         console.log('No existing call result found (expected for new entries)');
         
-        // Try to fetch lead_vendor from leads table for new entries
+        // Try to fetch retention flag from verification_sessions and lead_vendor from leads table for new entries
+        try {
+          const { data: verificationSession } = await supabase
+            .from('verification_sessions')
+            .select('is_retention_call, buffer_agent_id')
+            .eq('submission_id', submissionId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (verificationSession) {
+            console.log('Auto-populating retention flag from verification session for new entry:', verificationSession.is_retention_call);
+            setIsRetentionCall(Boolean(verificationSession.is_retention_call));
+
+            // Also fetch the buffer agent's display name
+            if (verificationSession.buffer_agent_id) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('display_name')
+                .eq('user_id', verificationSession.buffer_agent_id)
+                .single();
+
+              if (profile?.display_name) {
+                console.log('Auto-populating buffer agent from verification session:', profile.display_name);
+                setBufferAgent(profile.display_name);
+              }
+            }
+          }
+        } catch (vsError) {
+          console.log('Could not fetch verification session for new entry:', vsError);
+        }
+        
         try {
           const { data: leadData, error: leadError } = await supabase
             .from('leads')
@@ -591,6 +630,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         sent_to_underwriting: sentToUnderwriting,
         new_draft_date: status === "Updated Banking/draft date" && newDraftDate ? format(newDraftDate, "yyyy-MM-dd") : null,
         is_callback: submissionId.startsWith('CB') || submissionId.startsWith('CBB'), // Track if this is a callback based on submission ID
+        is_retention_call: isRetentionCall,
         ...(showSubmittedFields || showCarrierApplicationFields ? {
           carrier,
           product_type: productType,
@@ -711,6 +751,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
               sent_to_underwriting: sentToUnderwriting,
               notes: notes
             },
+            isRetentionCall: isRetentionCall,
             customerName: leadCustomerName,
             leadVendor: leadVendorName
           });
@@ -747,6 +788,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 level_or_gi: null,
                 from_callback: callSource === "Agent Callback",
                 is_callback: submissionId.startsWith('CB') || submissionId.startsWith('CBB'), // Track if this is a callback with CB or CBB prefix
+                is_retention_call: isRetentionCall,
                 // Add the new parameters for proper status determination
                 application_submitted: applicationSubmitted,
                 sent_to_underwriting: sentToUnderwriting
@@ -1200,7 +1242,15 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
       
       <Card>
         <CardHeader>
-          <CardTitle>Update Call Result</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Update Call Result</CardTitle>
+            {isRetentionCall && (
+              <Badge className="bg-purple-600 hover:bg-purple-700 flex items-center gap-1">
+                <Shield className="h-3 w-3" />
+                Retention Call
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">

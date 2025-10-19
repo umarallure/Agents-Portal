@@ -1,5 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface Agent {
   user_id: string;
@@ -15,9 +17,11 @@ interface ClaimDroppedCallModalProps {
   fetchingAgents: boolean;
   claimBufferAgent: string;
   claimLicensedAgent: string;
+  isRetentionCall: boolean;
   onAgentTypeChange: (type: 'buffer' | 'licensed') => void;
   onBufferAgentChange: (id: string) => void;
   onLicensedAgentChange: (id: string) => void;
+  onRetentionCallChange: (value: boolean) => void;
   onCancel: () => void;
   onClaim: () => void;
 }
@@ -31,9 +35,11 @@ export const ClaimDroppedCallModal: React.FC<ClaimDroppedCallModalProps> = ({
   fetchingAgents,
   claimBufferAgent,
   claimLicensedAgent,
+  isRetentionCall,
   onAgentTypeChange,
   onBufferAgentChange,
   onLicensedAgentChange,
+  onRetentionCallChange,
   onCancel,
   onClaim,
 }) => {
@@ -104,7 +110,25 @@ export const ClaimDroppedCallModal: React.FC<ClaimDroppedCallModalProps> = ({
             )}
           </div>
         )}
-        <div className="flex justify-end gap-2">
+        
+        {/* Retention Call Toggle */}
+        <div className="flex items-center justify-between space-x-2 border-t pt-4 mt-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="claim-retention-call" className="text-base">
+              Mark as Retention Call
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              This claim will be tracked as a retention team call
+            </p>
+          </div>
+          <Switch
+            id="claim-retention-call"
+            checked={isRetentionCall}
+            onCheckedChange={onRetentionCallChange}
+          />
+        </div>
+        
+        <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={onCancel} disabled={loading}>Cancel</Button>
           <Button onClick={onClaim} disabled={loading || (agentType === 'buffer' && !claimBufferAgent) || (agentType === 'licensed' && !claimLicensedAgent)}>
             {loading ? 'Claiming...' : 'Claim & Reconnect'}
