@@ -56,6 +56,10 @@ export const DataGrid = ({
           }
         }
 
+        // Add boolean field options
+        distinctValues['is_callback'] = ['Callback', 'Regular Lead'];
+        distinctValues['is_retention_call'] = ['Retention', 'Regular'];
+
         setAllDistinctValues(distinctValues);
       } catch (error) {
         console.error('Error fetching distinct values:', error);
@@ -75,7 +79,8 @@ export const DataGrid = ({
     { value: 'call_result', label: 'Call Result' },
     { value: 'carrier', label: 'Carrier' },
     { value: 'product_type', label: 'Product Type' },
-    { value: 'is_callback', label: 'Callback' }
+    { value: 'is_callback', label: 'Callback' },
+    { value: 'is_retention_call', label: 'Retention' }
   ];
 
   const columns = [
@@ -98,6 +103,9 @@ export const DataGrid = ({
     const getGroupValue = (row: DailyDealFlowRow, groupField: string) => {
       if (groupField === 'is_callback') {
         return (row.is_callback || row.from_callback) ? 'Callback' : 'Regular Lead';
+      }
+      if (groupField === 'is_retention_call') {
+        return row.is_retention_call ? 'Retention' : 'Regular';
       }
       return String(row[groupField as keyof DailyDealFlowRow] || 'N/A');
     };

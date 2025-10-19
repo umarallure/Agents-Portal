@@ -94,7 +94,7 @@ serve(async (req)=>{
     const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
     // Get parameters from request body
     requestBody = await req.json();
-    const { submission_id, call_source, buffer_agent, agent, licensed_agent_account, status, call_result, carrier, product_type, draft_date, monthly_premium, face_amount, notes, policy_number, carrier_audit, product_type_carrier, level_or_gi, from_callback, is_callback = false, create_new_entry = false, original_submission_id = null, application_submitted = null, sent_to_underwriting = null, lead_vendor } = requestBody;
+    const { submission_id, call_source, buffer_agent, agent, licensed_agent_account, status, call_result, carrier, product_type, draft_date, monthly_premium, face_amount, notes, policy_number, carrier_audit, product_type_carrier, level_or_gi, from_callback, is_callback = false, create_new_entry = false, original_submission_id = null, application_submitted = null, sent_to_underwriting = null, lead_vendor, is_retention_call = false } = requestBody;
     // Validate required fields
     if (!submission_id) {
       throw new Error('Missing required field: submission_id');
@@ -157,7 +157,8 @@ serve(async (req)=>{
           product_type_carrier,
           level_or_gi,
           from_callback,
-          is_callback
+          is_callback,
+          is_retention_call
         }).select().single();
         if (error) {
           console.error('Error inserting new daily deal flow entry:', error);
@@ -193,6 +194,7 @@ serve(async (req)=>{
             level_or_gi,
             from_callback,
             is_callback,
+            is_retention_call,
             updated_at: getCurrentTimestampEST()
           }).eq('id', mostRecentEntry.id).select().single();
           if (error) {
@@ -225,7 +227,8 @@ serve(async (req)=>{
             product_type_carrier,
             level_or_gi,
             from_callback,
-            is_callback
+            is_callback,
+            is_retention_call
           }).select().single();
           if (error) {
             console.error('Error inserting new daily deal flow entry:', error);
@@ -264,6 +267,7 @@ serve(async (req)=>{
           level_or_gi,
           from_callback,
           is_callback,
+          is_retention_call,
           updated_at: getCurrentTimestampEST()
         }).eq('id', existingEntry.id).select().single();
         if (error) {
@@ -296,7 +300,8 @@ serve(async (req)=>{
           product_type_carrier,
           level_or_gi,
           from_callback,
-          is_callback
+          is_callback,
+          is_retention_call
         }).select().single();
         if (error) {
           console.error('Error inserting new daily deal flow entry:', error);

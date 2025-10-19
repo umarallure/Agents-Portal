@@ -109,6 +109,8 @@ export type Database = {
           submitting_agent: string | null
           updated_at: string | null
           user_id: string | null
+          is_callback: boolean | null
+          is_retention_call: boolean | null
         }
         Insert: {
           agent_id?: string | null
@@ -136,6 +138,8 @@ export type Database = {
           submitting_agent?: string | null
           updated_at?: string | null
           user_id?: string | null
+          is_callback?: boolean | null
+          is_retention_call?: boolean | null
         }
         Update: {
           agent_id?: string | null
@@ -163,6 +167,8 @@ export type Database = {
           submitting_agent?: string | null
           updated_at?: string | null
           user_id?: string | null
+          is_callback?: boolean | null
+          is_retention_call?: boolean | null
         }
         Relationships: [
           {
@@ -190,6 +196,7 @@ export type Database = {
           submission_id: string
           updated_at: string | null
           verification_session_id: string | null
+          is_retention_call: boolean | null
         }
         Insert: {
           agent_id?: string | null
@@ -206,6 +213,7 @@ export type Database = {
           submission_id: string
           updated_at?: string | null
           verification_session_id?: string | null
+          is_retention_call?: boolean | null
         }
         Update: {
           agent_id?: string | null
@@ -222,6 +230,7 @@ export type Database = {
           submission_id?: string
           updated_at?: string | null
           verification_session_id?: string | null
+          is_retention_call?: boolean | null
         }
         Relationships: [
           {
@@ -259,6 +268,8 @@ export type Database = {
           status: string | null
           submission_id: string
           updated_at: string | null
+          is_callback: boolean | null
+          is_retention_call: boolean | null
         }
         Insert: {
           agent?: string | null
@@ -285,6 +296,8 @@ export type Database = {
           status?: string | null
           submission_id: string
           updated_at?: string | null
+          is_callback?: boolean | null
+          is_retention_call?: boolean | null
         }
         Update: {
           agent?: string | null
@@ -311,6 +324,8 @@ export type Database = {
           status?: string | null
           submission_id?: string
           updated_at?: string | null
+          is_callback?: boolean | null
+          is_retention_call?: boolean | null
         }
         Relationships: []
       }
@@ -357,6 +372,8 @@ export type Database = {
           user_id: string | null
           weight: string | null
           zip_code: string | null
+          is_callback: boolean | null
+          is_retention_call: boolean | null
         }
         Insert: {
           account_type?: string | null
@@ -400,6 +417,8 @@ export type Database = {
           user_id?: string | null
           weight?: string | null
           zip_code?: string | null
+          is_callback?: boolean | null
+          is_retention_call?: boolean | null
         }
         Update: {
           account_type?: string | null
@@ -443,6 +462,8 @@ export type Database = {
           user_id?: string | null
           weight?: string | null
           zip_code?: string | null
+          is_callback?: boolean | null
+          is_retention_call?: boolean | null
         }
         Relationships: []
       }
@@ -545,6 +566,7 @@ export type Database = {
           transferred_at: string | null
           updated_at: string | null
           verified_fields: number | null
+          is_retention_call: boolean | null
         }
         Insert: {
           buffer_agent_id?: string | null
@@ -561,6 +583,7 @@ export type Database = {
           transferred_at?: string | null
           updated_at?: string | null
           verified_fields?: number | null
+          is_retention_call?: boolean | null
         }
         Update: {
           buffer_agent_id?: string | null
@@ -577,6 +600,7 @@ export type Database = {
           transferred_at?: string | null
           updated_at?: string | null
           verified_fields?: number | null
+          is_retention_call?: boolean | null
         }
         Relationships: [
           {

@@ -63,6 +63,7 @@ const DailyDealFlowPage = () => {
   const [statusFilter, setStatusFilter] = useState(ALL_OPTION);
   const [carrierFilter, setCarrierFilter] = useState(ALL_OPTION);
   const [callResultFilter, setCallResultFilter] = useState(ALL_OPTION);
+  const [retentionFilter, setRetentionFilter] = useState(ALL_OPTION);
   
   const recordsPerPage = 100;
   
@@ -154,6 +155,11 @@ const DailyDealFlowPage = () => {
         query = query.eq('call_result', callResultFilter);
       }
 
+      if (retentionFilter && retentionFilter !== ALL_OPTION) {
+        const isRetention = retentionFilter === 'Retention';
+        query = query.eq('is_retention_call', isRetention);
+      }
+
       // Apply search filter if set
       if (searchTerm) {
         query = query.or(`insured_name.ilike.%${searchTerm}%,client_phone_number.ilike.%${searchTerm}%,submission_id.ilike.%${searchTerm}%,lead_vendor.ilike.%${searchTerm}%,agent.ilike.%${searchTerm}%,status.ilike.%${searchTerm}%,carrier.ilike.%${searchTerm}%,licensed_agent_account.ilike.%${searchTerm}%,buffer_agent.ilike.%${searchTerm}%`);
@@ -198,7 +204,7 @@ const DailyDealFlowPage = () => {
   useEffect(() => {
     setCurrentPage(1); // Reset to first page when filters change
     fetchData(1);
-  }, [dateFilter, dateFromFilter, dateToFilter, bufferAgentFilter, licensedAgentFilter, leadVendorFilter, statusFilter, carrierFilter, callResultFilter]);
+  }, [dateFilter, dateFromFilter, dateToFilter, bufferAgentFilter, licensedAgentFilter, leadVendorFilter, statusFilter, carrierFilter, callResultFilter, retentionFilter]);
 
   // Refetch when search term changes (debounced)
   useEffect(() => {
@@ -220,7 +226,7 @@ const DailyDealFlowPage = () => {
   const filteredData = data;
 
   const handleRefresh = () => {
-    fetchData(true);
+    fetchData(1, true);
   };
 
   const handleExport = () => {
@@ -318,6 +324,8 @@ const DailyDealFlowPage = () => {
           onCarrierFilterChange={setCarrierFilter}
           callResultFilter={callResultFilter}
           onCallResultFilterChange={setCallResultFilter}
+          retentionFilter={retentionFilter}
+          onRetentionFilterChange={setRetentionFilter}
           totalRows={totalRecords}
         />
 

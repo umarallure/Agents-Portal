@@ -19,6 +19,7 @@ import { VerificationDashboard } from '@/components/VerificationDashboard';
 import { ClaimDroppedCallModal } from '@/components/ClaimDroppedCallModal';
 import { ClaimLicensedAgentModal } from '@/components/ClaimLicensedAgentModal';
 import { logCallUpdate, getLeadInfo } from '@/lib/callLogging';
+import { getTodayDateEST } from '@/lib/dateUtils';
 
 type Lead = Database['public']['Tables']['leads']['Row'];
 type CallResult = Database['public']['Tables']['call_results']['Row'];
@@ -213,11 +214,11 @@ const Dashboard = () => {
 
   const fetchCommissionStats = async (displayName: string) => {
     try {
-      // Get current date in YYYY-MM-DD format
-      const now = new Date();
-      const todayDateString = now.toISOString().split('T')[0];
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const weekAgoDateString = weekAgo.toISOString().split('T')[0];
+      // Get current date in YYYY-MM-DD format (EST timezone)
+      const todayDateString = getTodayDateEST();
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const weekAgoDateString = weekAgo.toISOString().split('T')[0]; // This is for comparison, keep as UTC for relative calculation
       
       // Fetch ALL submissions with "Pending Approval" status for total sales count
       const { data: allSubmissions, error: allError } = await supabase
@@ -492,13 +493,16 @@ const Dashboard = () => {
     setClaimSubmissionId(submissionId);
     setClaimModalOpen(true);
     
-    // Fetch lead info
+    // Fetch lead info including retention status
     const { data: lead } = await supabase
       .from('leads')
-      .select('lead_vendor, customer_full_name')
+      .select('lead_vendor, customer_full_name, is_retention_call')
       .eq('submission_id', submissionId)
       .single();
     setClaimLead(lead);
+    
+    // Initialize retention call toggle based on existing lead status
+    setClaimIsRetentionCall(lead?.is_retention_call || false);
     
     if (agentTypeOverride === 'licensed') {
       setModalType('licensed');
@@ -580,7 +584,7 @@ const Dashboard = () => {
       // Update the lead with retention flag
       await supabase
         .from('leads')
-        .update({ is_retention_call: claimIsRetentionCall })
+        .update({ is_retention_call: claimIsRetentionCall } as any)
         .eq('submission_id', claimSubmissionId);
 
       // Log the call claim event
@@ -611,7 +615,7 @@ const Dashboard = () => {
       // Update daily_deal_flow if entry exists for today's date (buffer workflow only)
       if (claimAgentType === 'buffer') {
         const bufferAgentName = bufferAgents.find(a => a.user_id === agentId)?.display_name || 'N/A';
-        const todayDateString = new Date().toISOString().split('T')[0];
+        const todayDateString = getTodayDateEST();
         
         // Check if daily_deal_flow entry exists with matching submission_id and today's date
         const { data: existingDailyDealEntry } = await supabase
@@ -626,11 +630,12 @@ const Dashboard = () => {
           await supabase
             .from('daily_deal_flow')
             .update({ 
-              buffer_agent: bufferAgentName 
-            })
+              buffer_agent: bufferAgentName,
+              is_retention_call: claimIsRetentionCall
+            } as any)
             .eq('id', existingDailyDealEntry.id);
           
-          console.log(`Updated daily_deal_flow buffer_agent to ${bufferAgentName} for submission ${claimSubmissionId} on ${todayDateString}`);
+          console.log(`Updated daily_deal_flow buffer_agent to ${bufferAgentName} and is_retention_call to ${claimIsRetentionCall} for submission ${claimSubmissionId} on ${todayDateString}`);
         } else {
           console.log(`No daily_deal_flow entry found for submission ${claimSubmissionId} on ${todayDateString}`);
         }

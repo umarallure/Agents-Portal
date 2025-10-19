@@ -8,6 +8,7 @@ import { Loader2, UserCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { logCallUpdate, getLeadInfo, getAgentProfile } from "@/lib/callLogging";
+import { getTodayDateEST } from "@/lib/dateUtils";
 
 interface BufferAgent {
   id: string;
@@ -237,7 +238,7 @@ export const StartVerificationModal = ({ submissionId, onVerificationStarted }: 
       // Update the lead with retention flag
       const { error: leadUpdateError } = await supabase
         .from('leads')
-        .update({ is_retention_call: isRetentionCall })
+        .update({ is_retention_call: isRetentionCall } as any)
         .eq('submission_id', submissionId);
 
       if (leadUpdateError) {
@@ -304,7 +305,7 @@ export const StartVerificationModal = ({ submissionId, onVerificationStarted }: 
       // Update daily_deal_flow if entry exists for today's date (buffer workflow only)
       if (agentType === 'buffer') {
         const bufferAgentName = bufferAgents.find(a => a.id === selectedAgent)?.display_name || 'N/A';
-        const todayDateString = new Date().toISOString().split('T')[0];
+        const todayDateString = getTodayDateEST(); // Use EST date to match database
         
         // Check if daily_deal_flow entry exists with matching submission_id and today's date
         const { data: existingDailyDealEntry } = await supabase
@@ -315,15 +316,16 @@ export const StartVerificationModal = ({ submissionId, onVerificationStarted }: 
           .maybeSingle();
 
         if (existingDailyDealEntry) {
-          // Update the buffer_agent field only if entry exists AND date matches today
+          // Update the buffer_agent field and retention flag if entry exists AND date matches today
           await supabase
             .from('daily_deal_flow')
             .update({ 
-              buffer_agent: bufferAgentName 
-            })
+              buffer_agent: bufferAgentName,
+              is_retention_call: isRetentionCall
+            } as any)
             .eq('id', existingDailyDealEntry.id);
           
-          console.log(`Updated daily_deal_flow buffer_agent to ${bufferAgentName} for submission ${submissionId} on ${todayDateString}`);
+          console.log(`Updated daily_deal_flow buffer_agent to ${bufferAgentName} and is_retention_call to ${isRetentionCall} for submission ${submissionId} on ${todayDateString}`);
         } else {
           console.log(`No daily_deal_flow entry found for submission ${submissionId} on ${todayDateString}`);
         }
