@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Filter, Phone, User, DollarSign, CheckCircle, BarChart3, Eye, Clock, Grid3X3, Search, UserPlus } from 'lucide-react';
+import { Calendar, Filter, Phone, User, DollarSign, CheckCircle, BarChart3, Eye, Clock, Grid3X3, Search, UserPlus, AlertCircle, Database as DatabaseIcon } from 'lucide-react';
 import { NavigationHeader } from '@/components/NavigationHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,6 +42,8 @@ const Dashboard = () => {
   const [nameFilter, setNameFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [showAllLeads, setShowAllLeads] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   
   // Analytics state
   const [analytics, setAnalytics] = useState({
@@ -98,8 +100,11 @@ const Dashboard = () => {
   useEffect(() => {
     if (user) {
       checkIfLicensedAgent();
-      fetchLeads();
-      fetchAnalytics();
+      // Optimization 3: Run data fetches in parallel instead of sequential
+      Promise.all([
+        fetchLeads(),
+        fetchAnalytics()
+      ]);
     }
   }, [user]);
 
@@ -107,14 +112,62 @@ const Dashboard = () => {
     applyFilters();
     setCurrentPage(1); // Reset to first page when filters change
   }, [leads, dateFilter, statusFilter, nameFilter]);
+  
+  // Refetch when showAllLeads changes
+  useEffect(() => {
+    if (user && showAllLeads) {
+      setLoadingMore(true);
+      fetchLeads();
+    }
+  }, [showAllLeads]);
 
   const fetchLeads = async () => {
     try {
-      // First, get all leads
-      const { data: leadsData, error: leadsError } = await supabase
+      // Optimization 1: Use single query with joins instead of multiple queries
+      // Optimization 2: Limit initial load to recent records (last 30 days or 100 records)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      // Build query based on showAllLeads flag
+      let query = supabase
         .from('leads')
-        .select('*')
+        .select(`
+          *,
+          call_results!left(
+            id,
+            application_submitted,
+            status,
+            carrier,
+            product_type,
+            buffer_agent,
+            agent_who_took_call,
+            licensed_agent_account,
+            call_source,
+            draft_date,
+            monthly_premium,
+            coverage_amount,
+            submission_date,
+            sent_to_underwriting,
+            notes,
+            created_at
+          ),
+          verification_sessions!left(
+            id,
+            status,
+            progress_percentage,
+            created_at
+          )
+        `)
         .order('created_at', { ascending: false });
+      
+      // Only limit if not showing all leads
+      if (!showAllLeads) {
+        query = query
+          .gte('created_at', thirtyDaysAgo.toISOString())
+          .limit(100);
+      }
+
+      const { data: leadsData, error: leadsError } = await query;
 
       if (leadsError) throw leadsError;
 
@@ -124,37 +177,16 @@ const Dashboard = () => {
         return;
       }
 
-      // Get call results for all leads
-      const submissionIds = leadsData.map(lead => lead.submission_id).filter(Boolean);
-      const { data: callResultsData, error: callResultsError } = await supabase
-        .from('call_results')
-        .select('*')
-        .in('submission_id', submissionIds)
-        .order('created_at', { ascending: false });
+      // Data is already joined, just need to format for compatibility
+      const leadsWithData = leadsData.map(lead => {
+        const { call_results, verification_sessions, ...leadData } = lead;
+        return {
+          ...leadData,
+          call_results: Array.isArray(call_results) ? call_results : (call_results ? [call_results] : []),
+          verification_sessions: Array.isArray(verification_sessions) ? verification_sessions : (verification_sessions ? [verification_sessions] : [])
+        } as LeadWithCallResult;
+      });
 
-      if (callResultsError) {
-        console.error('Error fetching call results:', callResultsError);
-      }
-
-      // Get verification sessions for all leads
-      const { data: verificationData, error: verificationError } = await supabase
-        .from('verification_sessions')
-        .select('*')
-        .in('submission_id', submissionIds)
-        .order('created_at', { ascending: false });
-
-      if (verificationError) {
-        console.error('Error fetching verification sessions:', verificationError);
-      }
-
-      // Combine the data
-      const leadsWithData = leadsData.map(lead => ({
-        ...lead,
-        call_results: callResultsData?.filter(cr => cr.submission_id === lead.submission_id) || [],
-        verification_sessions: verificationData?.filter(vs => vs.submission_id === lead.submission_id) || []
-      }));
-
-      // Show all leads (no user-based filtering)
       setLeads(leadsWithData || []);
     } catch (error) {
       console.error('Error fetching leads:', error);
@@ -165,6 +197,7 @@ const Dashboard = () => {
       });
     } finally {
       setIsLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -944,6 +977,45 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Load All Leads Button */}
+        {!showAllLeads && filteredLeads.length >= 100 && (
+          <Card className="mb-6 bg-blue-50 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-blue-100 p-2 rounded-full">
+                    <AlertCircle className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-blue-900">Limited View Active</h4>
+                    <p className="text-sm text-blue-700">
+                      Showing last 30 days or 100 most recent leads for faster loading
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => setShowAllLeads(true)}
+                  disabled={loadingMore}
+                  variant="default"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {loadingMore ? (
+                    <>
+                      <Clock className="h-4 w-4 mr-2 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <DatabaseIcon className="h-4 w-4 mr-2" />
+                      Load All Leads
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Main Content with Tabs */}
         <Tabs defaultValue="leads" className="space-y-6">
