@@ -1,0 +1,70 @@
+# Apache Configuration for Vite React SPA (Agents Portal)
+
+# Enable Rewrite Engine for SPA routing
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  
+  # If hosting in root: RewriteBase /
+  # If hosting in subfolder (e.g., /app): RewriteBase /app/
+  RewriteBase /
+  
+  # Don't rewrite files or directories that exist
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_FILENAME} !-l
+  
+  # Redirect all requests to index.html for client-side routing
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Browser Caching - Cache static assets for 1 year
+<IfModule mod_headers.c>
+  # Cache JavaScript and CSS for 1 year (immutable)
+  <FilesMatch "\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  
+  # Cache fonts and images for 1 year
+  <FilesMatch "\.(woff|woff2|ttf|eot|svg|jpg|jpeg|png|gif|ico|webp)$">
+    Header set Cache-Control "public, max-age=31536000"
+  </FilesMatch>
+  
+  # Don't cache HTML files (always fetch fresh)
+  <FilesMatch "\.(html)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+</IfModule>
+
+# Compression - Reduce file sizes for faster loading
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript
+  AddOutputFilterByType DEFLATE application/javascript application/json application/xml
+  AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# Security Headers
+<IfModule mod_headers.c>
+  # Prevent clickjacking
+  Header always set X-Frame-Options "SAMEORIGIN"
+  
+  # Prevent MIME sniffing
+  Header always set X-Content-Type-Options "nosniff"
+  
+  # Enable XSS protection
+  Header always set X-XSS-Protection "1; mode=block"
+  
+  # Referrer Policy
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Force HTTPS (if you have SSL certificate installed)
+# Uncomment the following lines after SSL is active:
+# <IfModule mod_rewrite.c>
+#   RewriteCond %{HTTPS} !=on
+#   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>
+
+# Error Documents (optional)
+# ErrorDocument 404 /index.html

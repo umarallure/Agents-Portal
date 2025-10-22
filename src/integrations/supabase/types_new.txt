@@ -1,0 +1,176 @@
+﻿export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.3 (519615d)"
+  }
+  public: {
+    Tables: {
+      agent_carrier_licenses: {
+        Row: {
+          agent_user_id: string
+          carrier_id: string
+          created_at: string
+          id: string
+          is_licensed: boolean | null
+          license_end_date: string | null
+          license_start_date: string | null
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          agent_user_id: string
+          carrier_id: string
+          created_at?: string
+          id?: string
+          is_licensed?: boolean | null
+          license_end_date?: string | null
+          license_start_date?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agent_user_id?: string
+          carrier_id?: string
+          created_at?: string
+          id?: string
+          is_licensed?: boolean | null
+          license_end_date?: string | null
+          license_start_date?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_carrier_licenses_carrier_id_fkey"
+            columns: ["carrier_id"]
+            isOneToOne: false
+            referencedRelation: "carriers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_state_licenses: {
+        Row: {
+          agent_user_id: string
+          created_at: string
+          id: string
+          is_licensed: boolean | null
+          license_end_date: string | null
+          license_number: string | null
+          license_start_date: string | null
+          notes: string | null
+          state_id: string
+          updated_at: string
+        }
+        Insert: {
+          agent_user_id: string
+          created_at?: string
+          id?: string
+          is_licensed?: boolean | null
+          license_end_date?: string | null
+          license_number?: string | null
+          license_start_date?: string | null
+          notes?: string | null
+          state_id: string
+          updated_at?: string
+        }
+        Update: {
+          agent_user_id?: string
+          created_at?: string
+          id?: string
+          is_licensed?: boolean | null
+          license_end_date?: string | null
+          license_number?: string | null
+          license_start_date?: string | null
+          notes?: string | null
+          state_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_state_licenses_state_id_fkey"
+            columns: ["state_id"]
+            isOneToOne: false
+            referencedRelation: "states"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      carriers: {
+        Row: {
+          carrier_code: string | null
+          carrier_name: string
+          created_at: string
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          carrier_code?: string | null
+          carrier_name: string
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          carrier_code?: string | null
+          carrier_name?: string
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      states: {
+        Row: {
+          created_at: string
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          state_code: string
+          state_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          state_code: string
+          state_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          state_code?: string
+          state_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+    }
+  }
+}

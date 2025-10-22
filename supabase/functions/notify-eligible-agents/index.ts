@@ -189,7 +189,25 @@ serve(async (req)=>{
       });
     }
     // Build agent mentions for Slack with full display names
-    const agentMentions = eligibleAgents.map((agent)=>{
+    // Sort agents so Sales Managers appear at the bottom
+    const sortedAgents = [...eligibleAgents].sort((a, b) => {
+      const aInfo = agentSlackIdMapping[a.agent_name];
+      const bInfo = agentSlackIdMapping[b.agent_name];
+      
+      // If both have display names, check if one is a Sales Manager
+      if (aInfo && bInfo) {
+        const aIsSalesManager = aInfo.displayName.includes('Sales Manager');
+        const bIsSalesManager = bInfo.displayName.includes('Sales Manager');
+        
+        if (aIsSalesManager && !bIsSalesManager) return 1; // a (Sales Manager) goes after b
+        if (!aIsSalesManager && bIsSalesManager) return -1; // b (Sales Manager) goes after a
+      }
+      
+      // Default alphabetical sort for same role types
+      return a.agent_name.localeCompare(b.agent_name);
+    });
+    
+      const agentMentions = sortedAgents.map((agent)=>{
       const agentInfo = agentSlackIdMapping[agent.agent_name];
       if (agentInfo) {
         return `• <@${agentInfo.slackId}>`;

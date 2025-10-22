@@ -167,6 +167,12 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                         Find Eligible Agents
                       </DropdownMenuItem>
                     )}
+                    {isBen && (
+                      <DropdownMenuItem onClick={() => navigate('/agent-eligibility')}>
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        Agent Eligibility Management
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                       <User className="mr-2 h-4 w-4" />
                       Dashboard
