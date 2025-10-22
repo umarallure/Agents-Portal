@@ -37,7 +37,7 @@ export const useLicensedAgent = () => {
           .select('*')
           .eq('user_id', user.id)
           .eq('agent_type', 'licensed')
-          .single();
+          .maybeSingle();
 
         console.log('[useLicensedAgent] Agent status query result:', {
           data: agentStatus,
@@ -57,7 +57,7 @@ export const useLicensedAgent = () => {
           .from('profiles')
           .select('display_name')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
         console.log('[useLicensedAgent] Profile query result:', {
           data: profile,
