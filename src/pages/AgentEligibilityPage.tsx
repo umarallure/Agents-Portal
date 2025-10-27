@@ -76,17 +76,42 @@ export function AgentEligibilityPage() {
   const fetchAgents = async () => {
     setAgentsLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch only licensed agents from user_roles table
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'licensed_agent')
+        .eq('is_active', true);
+
+      if (rolesError) throw rolesError;
+
+      if (!userRoles || userRoles.length === 0) {
+        setAgents([]);
+        setAgentsLoading(false);
+        return;
+      }
+
+      const userIds = userRoles.map(r => r.user_id);
+
+      // Fetch profiles for these licensed agents
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, user_id, display_name, agent_code')
-        .not('agent_code', 'is', null)
+        .in('user_id', userIds)
         .order('display_name');
 
-      if (error) throw error;
+      if (profilesError) throw profilesError;
 
-      const agentProfiles: AgentProfile[] = data.map(profile => ({
+      // Fetch emails from auth.users
+      const { data: users, error: usersError } = await supabase.auth.admin.listUsers();
+      
+      const emailMap = new Map(
+        users?.users.map(u => [u.id, u.email]) || []
+      );
+
+      const agentProfiles: AgentProfile[] = (profiles || []).map(profile => ({
         id: profile.user_id!,
-        email: '', // We'll fetch this separately if needed
+        email: emailMap.get(profile.user_id!) || '',
         display_name: profile.display_name,
         agent_code: profile.agent_code
       }));
