@@ -94,7 +94,6 @@ const CallResultUpdate = () => {
       }
     } catch (error) {
       // No existing session found, which is fine
-      console.log('No existing verification session found');
     }
   };
 
@@ -144,105 +143,50 @@ const CallResultUpdate = () => {
 
   const fetchLead = async () => {
     try {
-      // First check if we have an authenticated session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log("Auth session:", { session, error: sessionError });
-
-      // Test database connection with a simpler query
-      const { data: testData, error: testError } = await supabase
-        .from("leads")
-        .select("id")
-        .limit(1);
+      // Trim the submission ID
+      const trimmedSubmissionId = submissionId ? submissionId.trim() : "";
       
-      console.log("Database connection test:", { testData, testError });
-
-      if (testError) {
-        console.error("Database access error:", testError);
-        toast({
-          title: "Database Error",
-          description: "Unable to access the database. Please check your permissions.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Log all leads for debugging
-      const { data: leads, error: leadsError } = await supabase
-        .from("leads")
-        .select("*");
-      
-      console.log("Leads query:", { data: leads, error: leadsError });
-      
-      if (leadsError) {
-        console.error("Error fetching leads:", leadsError);
+      if (!trimmedSubmissionId) {
         toast({
           title: "Error",
-          description: "Failed to fetch leads from database",
+          description: "Invalid submission ID",
           variant: "destructive",
         });
+        setLoading(false);
         return;
       }
 
-      if (leads && leads.length > 0) {
-        console.log("Total leads found:", leads.length);
-        leads.forEach((row, idx) => {
-          console.log(`Row ${idx}:`, {
-            id: row.id,
-            submission_id: row.submission_id,
-            type: typeof row.submission_id,
-            length: String(row.submission_id).length,
-            customer_name: row.customer_full_name
-          });
-        });
-      } else {
-        console.log("No leads found in database");
-      }
-
-      // Debug: log the submissionId being searched
-      const trimmedSubmissionId = submissionId ? submissionId.trim() : "";
-      console.log("Searching for:", {
-        submissionId: trimmedSubmissionId,
-        length: trimmedSubmissionId.length,
-        type: typeof trimmedSubmissionId
-      });
-      
-      // Try direct query with the submission ID
+      // Direct query - fetch lead by submission ID only
       const { data: directLead, error: directError } = await supabase
         .from("leads")
         .select("*")
         .eq("submission_id", trimmedSubmissionId)
         .single();
-      
-      console.log("Direct query result:", { directLead, directError });
+
+      if (directError) {
+        console.error("Error fetching lead:", directError);
+        toast({
+          title: "Lead Not Found",
+          description: `Could not find lead with submission ID: ${trimmedSubmissionId}`,
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
 
       if (directLead) {
-        console.log("Lead found directly:", directLead);
         setLead(directLead);
         setLoading(false);
         return;
       }
 
-      // If no lead found, try to fetch from JotForm API
-      const jotformResult = await processLeadFromJotForm();
-      console.log("JotForm fetch result:", jotformResult);
-
-      if (jotformResult?.success) {
-        // Try to fetch the newly created lead using the leadId from JotForm result
-        const { data: newLead, error: newLeadError } = await supabase
-          .from("leads")
-          .select("*")
-          .eq("id", jotformResult.leadId)
-          .single();
-          
-        console.log("Query by leadId result:", { newLead, newLeadError });
-        
-        if (newLead) {
-          console.log("Lead found by ID:", newLead);
-          setLead(newLead);
-          setLoading(false);
-          return;
-        }
-      }
+      // If no lead found
+      toast({
+        title: "Lead Not Found",
+        description: `No lead found with submission ID: ${trimmedSubmissionId}`,
+        variant: "destructive",
+      });
+      setLoading(false);
 
     } catch (error) {
       console.error("Error:", error);
@@ -251,7 +195,6 @@ const CallResultUpdate = () => {
         description: "An unexpected error occurred",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };

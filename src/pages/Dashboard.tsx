@@ -667,10 +667,6 @@ const Dashboard = () => {
               is_retention_call: claimIsRetentionCall
             } as any)
             .eq('id', existingDailyDealEntry.id);
-          
-          console.log(`Updated daily_deal_flow buffer_agent to ${bufferAgentName} and is_retention_call to ${claimIsRetentionCall} for submission ${claimSubmissionId} on ${todayDateString}`);
-        } else {
-          console.log(`No daily_deal_flow entry found for submission ${claimSubmissionId} on ${todayDateString}`);
         }
       }
 
