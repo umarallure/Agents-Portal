@@ -85,7 +85,7 @@ const CenterAuth = () => {
               className="p-0 h-auto font-normal"
               onClick={() => navigate('/auth')}
             >
-              Go to Agent Portal
+              Back to Agent Portal
             </Button>
           </p>
         </div>
