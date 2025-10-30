@@ -30,6 +30,8 @@ interface GridToolbarProps {
   onCallResultFilterChange: (value: string) => void;
   retentionFilter: string;
   onRetentionFilterChange: (value: string) => void;
+  incompleteUpdatesFilter: string;
+  onIncompleteUpdatesFilterChange: (value: string) => void;
   totalRows: number;
 }
 
@@ -56,6 +58,8 @@ export const GridToolbar = ({
   onCallResultFilterChange,
   retentionFilter,
   onRetentionFilterChange,
+  incompleteUpdatesFilter,
+  onIncompleteUpdatesFilterChange,
   totalRows
 }: GridToolbarProps) => {
   // Special constant to represent "All" selections (cannot use empty string with Radix UI)
@@ -174,6 +178,12 @@ export const GridToolbar = ({
     "Regular"
   ];
 
+  const incompleteUpdatesOptions = [
+    "All Updates",
+    "Incomplete",
+    "Complete"
+  ];
+
   const clearDateFilter = () => {
     onDateFilterChange(undefined);
   };
@@ -208,6 +218,7 @@ export const GridToolbar = ({
     onCarrierFilterChange(ALL_OPTION);
     onCallResultFilterChange(ALL_OPTION);
     onRetentionFilterChange(ALL_OPTION);
+    onIncompleteUpdatesFilterChange(ALL_OPTION);
   };
 
   const hasActiveFilters = searchTerm || dateFilter || dateFromFilter || dateToFilter ||
@@ -217,7 +228,8 @@ export const GridToolbar = ({
     (statusFilter && statusFilter !== ALL_OPTION) || 
     (carrierFilter && carrierFilter !== ALL_OPTION) || 
     (callResultFilter && callResultFilter !== ALL_OPTION) ||
-    (retentionFilter && retentionFilter !== ALL_OPTION);
+    (retentionFilter && retentionFilter !== ALL_OPTION) ||
+    (incompleteUpdatesFilter && incompleteUpdatesFilter !== ALL_OPTION);
 
   return (
     <div className="space-y-4 p-4 bg-card rounded-lg border">
@@ -370,7 +382,7 @@ export const GridToolbar = ({
       </div>
 
       {/* Second Row: Additional Filters */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-4">
         {/* Buffer Agent Filter */}
         <div>
           <Label className="text-sm font-medium">
@@ -485,6 +497,26 @@ export const GridToolbar = ({
               {callResultOptions.map((result) => (
                 <SelectItem key={result} value={result === "All Call Results" ? ALL_OPTION : result}>
                   {result}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Incomplete Updates Filter */}
+        <div>
+          <Label className="text-sm font-medium">
+            Update Status
+            {incompleteUpdatesFilter && incompleteUpdatesFilter !== ALL_OPTION && <span className="text-blue-600 ml-1">●</span>}
+          </Label>
+          <Select value={incompleteUpdatesFilter || ALL_OPTION} onValueChange={onIncompleteUpdatesFilterChange}>
+            <SelectTrigger className={cn("mt-1", incompleteUpdatesFilter && incompleteUpdatesFilter !== ALL_OPTION && "ring-2 ring-blue-200")}>
+              <SelectValue placeholder="All Updates" />
+            </SelectTrigger>
+            <SelectContent>
+              {incompleteUpdatesOptions.map((option) => (
+                <SelectItem key={option} value={option === "All Updates" ? ALL_OPTION : option}>
+                  {option}
                 </SelectItem>
               ))}
             </SelectContent>
