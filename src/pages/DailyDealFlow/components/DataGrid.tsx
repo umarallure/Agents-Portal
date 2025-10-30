@@ -147,13 +147,7 @@ export const DataGrid = ({
       // Single level grouping
       const groups: { [key: string]: DailyDealFlowRow[] } = {};
 
-      // Initialize groups with all distinct values (including those with 0 entries)
-      const distinctValuesForField = allDistinctValues[groupBy] || [];
-      distinctValuesForField.forEach(value => {
-        groups[value] = [];
-      });
-
-      // Add data to groups
+      // Add data to groups (only create groups that have data)
       data.forEach(row => {
         const groupKey = getGroupValue(row, groupBy);
         if (!groups[groupKey]) {
@@ -162,7 +156,9 @@ export const DataGrid = ({
         groups[groupKey].push(row);
       });
 
+      // Only include groups with entries (count > 0)
       const sortedGroups = Object.keys(groups)
+        .filter(groupKey => groups[groupKey].length > 0)
         .sort()
         .map(groupKey => ({
           key: groupKey,
@@ -177,19 +173,7 @@ export const DataGrid = ({
       // Two level grouping
       const primaryGroups: { [key: string]: { [key: string]: DailyDealFlowRow[] } } = {};
 
-      // Initialize primary groups with all distinct values
-      const distinctPrimaryValues = allDistinctValues[groupBy] || [];
-      const distinctSecondaryValues = allDistinctValues[groupBySecondary] || [];
-      
-      distinctPrimaryValues.forEach(primaryValue => {
-        primaryGroups[primaryValue] = {};
-        // Initialize secondary groups for each primary group
-        distinctSecondaryValues.forEach(secondaryValue => {
-          primaryGroups[primaryValue][secondaryValue] = [];
-        });
-      });
-
-      // Add data to groups
+      // Add data to groups (only create groups that have data)
       data.forEach(row => {
         const primaryKey = getGroupValue(row, groupBy);
         const secondaryKey = getGroupValue(row, groupBySecondary);
@@ -203,7 +187,9 @@ export const DataGrid = ({
         primaryGroups[primaryKey][secondaryKey].push(row);
       });
 
+      // Only include primary groups that have data, and only include subgroups with entries > 0
       const sortedGroups = Object.keys(primaryGroups)
+        .filter(primaryKey => Object.values(primaryGroups[primaryKey]).flat().length > 0)
         .sort()
         .map(primaryKey => ({
           key: primaryKey,
@@ -211,6 +197,7 @@ export const DataGrid = ({
           items: [], // Not used in nested structure
           count: Object.values(primaryGroups[primaryKey]).flat().length,
           subgroups: Object.keys(primaryGroups[primaryKey])
+            .filter(secondaryKey => primaryGroups[primaryKey][secondaryKey].length > 0)
             .sort()
             .map(secondaryKey => ({
               key: `${primaryKey}::${secondaryKey}`,
@@ -218,7 +205,8 @@ export const DataGrid = ({
               items: sortItems(primaryGroups[primaryKey][secondaryKey]),
               count: primaryGroups[primaryKey][secondaryKey].length
             }))
-        }));
+        }))
+        .filter(primaryGroup => primaryGroup.subgroups.length > 0); // Only include primary groups that have subgroups with data
 
       return { groups: sortedGroups, ungroupedData: [] };
     }
