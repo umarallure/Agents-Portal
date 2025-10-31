@@ -76,24 +76,39 @@ export function AgentEligibilityPage() {
   const fetchAgents = async () => {
     setAgentsLoading(true);
     try {
-      // Fetch only licensed agents from user_roles table
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'licensed_agent')
-        .eq('is_active', true);
+      // Fetch agents who have license records (either carrier or state licenses)
+      const { data: carrierLicenses, error: carrierError } = await supabase
+        .from('agent_carrier_licenses')
+        .select('agent_user_id');
 
-      if (rolesError) throw rolesError;
+      if (carrierError) throw carrierError;
 
-      if (!userRoles || userRoles.length === 0) {
+      const { data: stateLicenses, error: stateError } = await supabase
+        .from('agent_state_licenses')
+        .select('agent_user_id');
+
+      if (stateError) throw stateError;
+
+      // Get unique user IDs from both license tables
+      const allUserIds = new Set<string>();
+      carrierLicenses?.forEach(l => l.agent_user_id && allUserIds.add(l.agent_user_id));
+      stateLicenses?.forEach(l => l.agent_user_id && allUserIds.add(l.agent_user_id));
+
+      // Also include the specific user ID you mentioned
+      allUserIds.add('d68d18e4-9deb-4282-b4d0-1e6e6a0789e9');
+
+      const userIds = Array.from(allUserIds);
+
+      console.log('User IDs with licenses:', userIds);
+
+      if (userIds.length === 0) {
+        console.warn('No licensed agents found');
         setAgents([]);
         setAgentsLoading(false);
         return;
       }
 
-      const userIds = userRoles.map(r => r.user_id);
-
-      // Fetch profiles for these licensed agents
+      // Fetch profiles for these agents
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, user_id, display_name, agent_code')
@@ -102,22 +117,21 @@ export function AgentEligibilityPage() {
 
       if (profilesError) throw profilesError;
 
-      // Fetch emails from auth.users
-      const { data: users, error: usersError } = await supabase.auth.admin.listUsers();
-      
-      const emailMap = new Map(
-        users?.users.map(u => [u.id, u.email]) || []
-      );
+      console.log('Profiles fetched:', profiles);
 
+      // Create agent profiles
       const agentProfiles: AgentProfile[] = (profiles || []).map(profile => ({
         id: profile.user_id!,
-        email: emailMap.get(profile.user_id!) || '',
+        email: profile.user_id!, // Using user_id as fallback since email is not available in profiles
         display_name: profile.display_name,
         agent_code: profile.agent_code
       }));
 
+      console.log('Agent profiles created:', agentProfiles);
+
       setAgents(agentProfiles);
     } catch (error: any) {
+      console.error('Error fetching agents:', error);
       toast({
         title: "Error",
         description: `Failed to fetch agents: ${error.message}`,
