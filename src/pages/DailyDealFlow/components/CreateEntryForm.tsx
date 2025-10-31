@@ -23,7 +23,7 @@ const bufferAgentOptions = [
 ];
 
 const agentOptions = [
-  "Claudia", "Lydia", "Noah", "Tatumn","Angy", "Benjamin", "N/A", "Isaac"
+  "Claudia", "Lydia", "Zack", "Tatumn","Angy", "Benjamin", "N/A", "Isaac"
 ];
 
 const licensedAccountOptions = [

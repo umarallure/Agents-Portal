@@ -54,7 +54,7 @@ const BUFFER_AGENT_OPTIONS = [
 const AGENT_OPTIONS = [
   "Claudia", "Lydia", "Juan", "Angy","Benjamin", "N/A", "Isaac",
    "Tatumn",
-   "Noah"
+   "Zack"
 ];
 
 const LICENSED_ACCOUNT_OPTIONS = [
