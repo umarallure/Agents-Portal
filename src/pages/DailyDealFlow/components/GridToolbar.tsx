@@ -100,6 +100,7 @@ export const GridToolbar = ({
     "Corebiz",
     "Digicon",
     "Ambition",
+    "StratiX BPO",
     "Argon Comm",
     "AJ BPO",
     "Pro Solutions BPO",

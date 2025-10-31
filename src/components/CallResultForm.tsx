@@ -139,6 +139,7 @@ const leadVendorOptions = [
 "Leads BPO",
 "Helix BPO",
 "CrossNotch",
+"StratiX BPO",
 "Exito BPO"
 ];
 

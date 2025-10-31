@@ -22,6 +22,7 @@ const leadVendorOptions = [
 "Corebiz",
 "Digicon",
 "Ambition",
+"StratiX BPO",
 "AJ BPO",
 "Pro Solutions BPO",
 "Emperor BPO",

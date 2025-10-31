@@ -61,6 +61,7 @@ export const WeeklyReports = ({ className }: WeeklyReportsProps) => {
     "LightVerse BPO",
     "Leads BPO",
     "Helix BPO",
+    "StratiX BPO",
     "Exito BPO"
   ];
 

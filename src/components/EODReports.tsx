@@ -60,7 +60,8 @@ export const EODReports = ({ className }: EODReportsProps) => {
     "LightVerse BPO",
     "Leads BPO",
     "Helix BPO",
-    "Exito BPO"
+    "Exito BPO",
+    "StratiX BPO"
   ];
 
   // Base columns for all reports
