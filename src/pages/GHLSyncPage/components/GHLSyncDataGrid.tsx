@@ -112,11 +112,23 @@ export const GHLSyncDataGrid = ({
         'Needs BPO Callback': mappings.needs_bpo_callback,
         'Previously Sold BPO': mappings.previously_sold_bpo,
         'Returned To Center - DQ': mappings.returned_to_center_dq,
+        'Application Withdrawn': mappings.application_withdrawn,
+        'Call Back Fix': mappings.chargeback_fix_api,
+        'Incomplete Transfer': mappings.incomplete_transfer,
+        "DQ'd Can't be sold": mappings.dqd_cant_be_sold 
       };
 
+      console.log('🔍 Status Mapping Resolution:');
+      console.log('  Current Status:', row.status || 'NO STATUS');
+      console.log('  Available Mappings:', statusToStageMap);
+      
       const pipelineStageId = statusToStageMap[row.status || ''] || mappings.pending_approval;
+      
+      console.log('  Resolved Stage ID:', pipelineStageId);
+      console.log('  Used Fallback:', !statusToStageMap[row.status || ''] ? 'YES (pending_approval)' : 'NO');
 
       if (!pipelineStageId) {
+        console.error('❌ No pipeline stage ID found for status:', row.status);
         toast({
           title: 'Configuration Error',
           description: `No pipeline stage ID found for status: ${row.status || 'Unknown'}`,
@@ -140,6 +152,7 @@ export const GHLSyncDataGrid = ({
           id: mappings.customdraftdate,
           field_value: row.draft_date
         });
+        console.log('  ✅ Added custom field: Draft Date =', row.draft_date);
       }
 
       if (mappings.customcarrier && row.carrier) {
@@ -147,6 +160,7 @@ export const GHLSyncDataGrid = ({
           id: mappings.customcarrier,
           field_value: row.carrier
         });
+        console.log('  ✅ Added custom field: Carrier =', row.carrier);
       }
 
       if (mappings.custommp && row.monthly_premium) {
@@ -154,6 +168,7 @@ export const GHLSyncDataGrid = ({
           id: mappings.custommp,
           field_value: row.monthly_premium.toString()
         });
+        console.log('  ✅ Added custom field: Monthly Premium =', row.monthly_premium);
       }
 
       if (mappings.customfaceamount && row.face_amount) {
@@ -161,18 +176,18 @@ export const GHLSyncDataGrid = ({
           id: mappings.customfaceamount,
           field_value: row.face_amount.toString()
         });
+        console.log('  ✅ Added custom field: Face Amount =', row.face_amount);
       }
 
-      console.log('GHL Sync Payload:', {
+      console.log('📦 GHL Sync Payload:', {
         opportunityId: row.ghl_opportunity_id,
         locationId: row.ghl_location_id,
-        pipelineStageId,
-        status: row.status,
+        insuredName: row.insured_name,
         payload: updatePayload
       });
 
       // First, let's get the current opportunity to understand its pipeline structure
-      console.log('Fetching current opportunity data...');
+      console.log('🔄 Fetching current opportunity data...');
       const getResponse = await fetch(`https://services.leadconnectorhq.com/opportunities/${row.ghl_opportunity_id}`, {
         method: 'GET',
         headers: {
@@ -185,26 +200,27 @@ export const GHLSyncDataGrid = ({
       let currentPipelineId = null;
       if (getResponse.ok) {
         const opportunityData = await getResponse.json();
-        console.log('Current opportunity data:', opportunityData);
+        console.log('✅ Current opportunity data:', opportunityData);
         currentPipelineId = opportunityData.pipelineId;
-        console.log('Current pipeline ID from opportunity:', currentPipelineId);
+        console.log('  Current Pipeline ID:', currentPipelineId || 'NOT SET');
 
         // If the opportunity already has a pipeline, we might not need to change it
         // Only add pipelineId if we want to move it to a different pipeline
         if (currentPipelineId) {
-          console.log('Opportunity already belongs to pipeline:', currentPipelineId);
+          console.log('ℹ️  Opportunity already belongs to pipeline, keeping existing pipeline');
           // For now, let's not change the pipeline, just update the stage and other fields
         }
       } else {
-        console.error('Failed to get opportunity details:', getResponse.status, await getResponse.text());
+        console.error('❌ Failed to get opportunity details:', getResponse.status, await getResponse.text());
       }
 
       // If we want to change the pipeline, we could add logic here
       // But for now, let's just update the stage and custom fields without changing pipeline
 
-      console.log('Final update payload (no pipeline change):', updatePayload);
+      console.log('📤 Final update payload (no pipeline change):', JSON.stringify(updatePayload, null, 2));
 
       // Make the API call to GHL
+      console.log('🚀 Sending update to GHL API...');
       const response = await fetch(`https://services.leadconnectorhq.com/opportunities/${row.ghl_opportunity_id}`, {
         method: 'PUT',
         headers: {
@@ -217,14 +233,23 @@ export const GHLSyncDataGrid = ({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('❌ GHL API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
         throw new Error(`GHL API Error: ${response.status} - ${errorData.message || 'Unknown error'}`);
       }
 
       const result = await response.json();
+      console.log('✅ GHL API Response:', result);
+      console.log('  Updated Stage ID:', result.pipelineStageId);
+      console.log('  Updated Pipeline ID:', result.pipelineId);
 
       // Create notes if we have notes content
       if (row.notes && row.notes.trim()) {
-        console.log('Creating notes for contact:', row.ghlcontactid);
+        console.log('📝 Creating notes for contact:', row.ghlcontactid);
+        console.log('  Notes content:', row.notes.substring(0, 100) + (row.notes.length > 100 ? '...' : ''));
         try {
           const notesResponse = await fetch(`https://services.leadconnectorhq.com/contacts/${row.ghlcontactid}/notes`, {
             method: 'POST',
@@ -240,30 +265,34 @@ export const GHLSyncDataGrid = ({
           });
 
           if (!notesResponse.ok) {
-            console.error('Failed to create notes:', notesResponse.status, await notesResponse.text());
+            console.error('❌ Failed to create notes:', notesResponse.status, await notesResponse.text());
             // Don't fail the entire sync for notes failure
           } else {
-            console.log('Notes created successfully');
+            console.log('✅ Notes created successfully');
           }
         } catch (notesError) {
-          console.error('Error creating notes:', notesError);
+          console.error('❌ Error creating notes:', notesError);
           // Don't fail the entire sync for notes failure
         }
+      } else {
+        console.log('ℹ️  No notes to sync');
       }
 
       // Update the status to "synced" in the database
-      console.log('Updating sync_status to synced for row:', row.id);
+      console.log('💾 Updating sync_status to "synced" for row:', row.id);
       const { error: updateError } = await supabase
         .from('daily_deal_flow')
         .update({ sync_status: 'synced' })
         .eq('id', row.id);
 
       if (updateError) {
-        console.error('Failed to update status:', updateError);
+        console.error('❌ Failed to update status:', updateError);
         // Don't fail the entire sync for status update failure
       } else {
-        console.log('Status updated to synced successfully');
+        console.log('✅ Status updated to synced successfully');
       }
+
+      console.log('🎉 Sync completed successfully for:', row.insured_name);
 
       toast({
         title: 'Sync Successful',
@@ -273,10 +302,13 @@ export const GHLSyncDataGrid = ({
       onDataUpdate(); // Refresh the data
 
     } catch (error) {
-      console.error('Error syncing to GHL:', error);
+      console.error('💥 Error syncing to GHL:', error);
+      console.error('  Row ID:', row.id);
+      console.error('  Insured Name:', row.insured_name);
+      console.error('  Error Details:', error instanceof Error ? error.message : String(error));
 
       // Update the status to "sync failed" in the database when sync fails
-      console.log('Updating sync_status to sync failed for row:', row.id);
+      console.log('💾 Updating sync_status to "sync failed" for row:', row.id);
       try {
         const { error: updateError } = await supabase
           .from('daily_deal_flow')
@@ -284,12 +316,12 @@ export const GHLSyncDataGrid = ({
           .eq('id', row.id);
 
         if (updateError) {
-          console.error('Failed to update status to sync failed:', updateError);
+          console.error('❌ Failed to update status to sync failed:', updateError);
         } else {
-          console.log('Status updated to sync failed successfully');
+          console.log('✅ Status updated to sync failed successfully');
         }
       } catch (statusUpdateError) {
-        console.error('Error updating status to sync failed:', statusUpdateError);
+        console.error('❌ Error updating status to sync failed:', statusUpdateError);
       }
 
       toast({
@@ -300,6 +332,7 @@ export const GHLSyncDataGrid = ({
 
       onDataUpdate(); // Refresh the data to show the updated status
     } finally {
+      console.log('🏁 Sync process finished for:', row.insured_name);
       setSyncingRows(prev => {
         const newSet = new Set(prev);
         newSet.delete(row.id);
