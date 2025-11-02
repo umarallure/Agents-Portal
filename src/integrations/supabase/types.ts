@@ -412,21 +412,26 @@ export type Database = {
           draft_date: string | null
           face_amount: number | null
           from_callback: boolean | null
+          ghl_location_id: string | null
+          ghl_opportunity_id: string | null
+          ghlcontactid: string | null
           id: string
           insured_name: string | null
+          is_callback: boolean | null
+          is_retention_call: boolean | null
           lead_vendor: string | null
           level_or_gi: string | null
           licensed_agent_account: string | null
           monthly_premium: number | null
           notes: string | null
+          placement_status: string | null
           policy_number: string | null
           product_type: string | null
           product_type_carrier: string | null
           status: string | null
           submission_id: string
+          sync_status: string | null
           updated_at: string | null
-          is_callback: boolean | null
-          is_retention_call: boolean | null
         }
         Insert: {
           agent?: string | null
@@ -440,21 +445,26 @@ export type Database = {
           draft_date?: string | null
           face_amount?: number | null
           from_callback?: boolean | null
+          ghl_location_id?: string | null
+          ghl_opportunity_id?: string | null
+          ghlcontactid?: string | null
           id?: string
           insured_name?: string | null
+          is_callback?: boolean | null
+          is_retention_call?: boolean | null
           lead_vendor?: string | null
           level_or_gi?: string | null
           licensed_agent_account?: string | null
           monthly_premium?: number | null
           notes?: string | null
+          placement_status?: string | null
           policy_number?: string | null
           product_type?: string | null
           product_type_carrier?: string | null
           status?: string | null
           submission_id: string
+          sync_status?: string | null
           updated_at?: string | null
-          is_callback?: boolean | null
-          is_retention_call?: boolean | null
         }
         Update: {
           agent?: string | null
@@ -468,21 +478,26 @@ export type Database = {
           draft_date?: string | null
           face_amount?: number | null
           from_callback?: boolean | null
+          ghl_location_id?: string | null
+          ghl_opportunity_id?: string | null
+          ghlcontactid?: string | null
           id?: string
           insured_name?: string | null
+          is_callback?: boolean | null
+          is_retention_call?: boolean | null
           lead_vendor?: string | null
           level_or_gi?: string | null
           licensed_agent_account?: string | null
           monthly_premium?: number | null
           notes?: string | null
+          placement_status?: string | null
           policy_number?: string | null
           product_type?: string | null
           product_type_carrier?: string | null
           status?: string | null
           submission_id?: string
+          sync_status?: string | null
           updated_at?: string | null
-          is_callback?: boolean | null
-          is_retention_call?: boolean | null
         }
         Relationships: []
       }
@@ -650,6 +665,66 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          user_id: string | null
+          role: string
+          is_active: boolean | null
+          assigned_at: string | null
+          assigned_by: string | null
+          notes: string | null
+          created_at: string | null
+          updated_at: string | null
+          is_admin_bypass: boolean | null
+          bypass_code: string | null
+          bypass_expires_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          role: string
+          is_active?: boolean | null
+          assigned_at?: string | null
+          assigned_by?: string | null
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          is_admin_bypass?: boolean | null
+          bypass_code?: string | null
+          bypass_expires_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          role?: string
+          is_active?: boolean | null
+          assigned_at?: string | null
+          assigned_by?: string | null
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          is_admin_bypass?: boolean | null
+          bypass_code?: string | null
+          bypass_expires_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       verification_items: {
         Row: {
@@ -828,6 +903,10 @@ export type Database = {
       initialize_verification_items: {
         Args: { session_id_param: string; submission_id_param: string }
         Returns: undefined
+      }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
       log_call_update: {
         Args: {

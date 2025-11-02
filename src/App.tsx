@@ -26,7 +26,9 @@ import BulkLookupPage from "./pages/BulkLookupPage";
 import DealFlowLookup from "./pages/DealFlowLookup";
 import AgentLicensing from "./pages/AgentLicensing";
 import { AgentEligibilityPage } from "./pages/AgentEligibilityPage";
+import GHLSyncPage from "./pages/GHLSyncPage/GHLSyncPage";
 import NotFound from "./pages/NotFound";
+import UserManagement from "./pages/UserManagement";
 
 const queryClient = new QueryClient();
 
@@ -154,6 +156,14 @@ const App = () => (
               } 
             />
             <Route 
+              path="/ghl-sync" 
+              element={
+                <ProtectedRoute>
+                  <GHLSyncPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/agent-licensing" 
               element={
                 <ProtectedRoute>
@@ -166,6 +176,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AgentEligibilityPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/user-management" 
+              element={
+                <ProtectedRoute>
+                  <UserManagement />
                 </ProtectedRoute>
               } 
             />

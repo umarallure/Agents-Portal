@@ -1,0 +1,690 @@
+﻿import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Card, CardContent } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2, ChevronLeft, ChevronRight, ExternalLink, RefreshCw, CheckSquare, Square, Play } from 'lucide-react';
+import { GHLSyncRow } from '../GHLSyncPage';
+
+interface GHLSyncDataGridProps {
+  data: GHLSyncRow[];
+  onDataUpdate: () => void;
+  hasWritePermissions: boolean;
+  currentPage: number;
+  totalRecords: number;
+  recordsPerPage: number;
+  onPageChange: (page: number) => void;
+}
+
+export const GHLSyncDataGrid = ({
+  data,
+  onDataUpdate,
+  hasWritePermissions,
+  currentPage,
+  totalRecords,
+  recordsPerPage,
+  onPageChange,
+}: GHLSyncDataGridProps) => {
+  const [syncingRows, setSyncingRows] = useState<Set<string>>(new Set());
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [bulkSyncing, setBulkSyncing] = useState(false);
+  const [bulkSyncProgress, setBulkSyncProgress] = useState<{ current: number; total: number; currentRow?: GHLSyncRow }>({ current: 0, total: 0 });
+  const { toast } = useToast();
+
+  const totalPages = Math.ceil(totalRecords / recordsPerPage);
+
+  const handleSyncToGHL = async (row: GHLSyncRow) => {
+    if (!hasWritePermissions) {
+      toast({
+        title: 'Permission Denied',
+        description: 'You do not have permission to sync data to GHL',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check if already synced
+    if (row.sync_status?.toLowerCase() === 'synced') {
+      toast({
+        title: 'Already Synced',
+        description: 'This record has already been synced to GHL',
+        variant: 'default',
+      });
+      return;
+    }
+
+    setSyncingRows(prev => new Set(prev).add(row.id));
+
+    try {
+      // Check if we have the required GHL data
+      if (!row.ghl_location_id || !row.ghl_opportunity_id || !row.ghlcontactid) {
+        toast({
+          title: 'Missing GHL Data',
+          description: `Missing required GHL data for ${row.insured_name || 'Unknown'}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Get API token for this location
+      const { data: locationSecret, error: secretError } = await (supabase as any)
+        .from('ghl_location_secrets')
+        .select('api_token')
+        .eq('locationid', row.ghl_location_id)
+        .single();
+
+      if (secretError || !locationSecret?.api_token) {
+        console.error('Error fetching GHL token:', secretError);
+        toast({
+          title: 'Configuration Error',
+          description: `No API token found for location ${row.ghl_location_id}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const apiToken = (locationSecret as any).api_token;
+
+      // Get stage mappings for this location
+      const { data: stageMappings, error: mappingError } = await (supabase as any)
+        .from('ghl_stage_mappings')
+        .select('*')
+        .eq('locationid', row.ghl_location_id)
+        .single();
+
+      if (mappingError || !stageMappings) {
+        console.error('Error fetching stage mappings:', mappingError);
+        toast({
+          title: 'Configuration Error',
+          description: `No stage mappings found for location ${row.ghl_location_id}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const mappings = stageMappings as any;
+
+      // Map status to pipeline stage ID
+      const statusToStageMap: Record<string, string> = {
+        'Pending Approval': mappings.pending_approval,
+        'Needs BPO Callback': mappings.needs_bpo_callback,
+        'Previously Sold BPO': mappings.previously_sold_bpo,
+        'Returned To Center - DQ': mappings.returned_to_center_dq,
+      };
+
+      const pipelineStageId = statusToStageMap[row.status || ''] || mappings.pending_approval;
+
+      if (!pipelineStageId) {
+        toast({
+          title: 'Configuration Error',
+          description: `No pipeline stage ID found for status: ${row.status || 'Unknown'}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Prepare the update payload WITHOUT pipelineId initially
+      const updatePayload = {
+        pipelineStageId: pipelineStageId,
+        status: 'open', // Default to open, can be mapped based on status
+        monetaryValue: 0,
+        assignedTo: null, // Can be set if you have agent mapping
+        customFields: [] as any[],
+      };
+
+      // Add custom fields based on available mappings and data
+      if (mappings.customdraftdate && row.draft_date) {
+        updatePayload.customFields.push({
+          id: mappings.customdraftdate,
+          field_value: row.draft_date
+        });
+      }
+
+      if (mappings.customcarrier && row.carrier) {
+        updatePayload.customFields.push({
+          id: mappings.customcarrier,
+          field_value: row.carrier
+        });
+      }
+
+      if (mappings.custommp && row.monthly_premium) {
+        updatePayload.customFields.push({
+          id: mappings.custommp,
+          field_value: row.monthly_premium.toString()
+        });
+      }
+
+      if (mappings.customfaceamount && row.face_amount) {
+        updatePayload.customFields.push({
+          id: mappings.customfaceamount,
+          field_value: row.face_amount.toString()
+        });
+      }
+
+      console.log('GHL Sync Payload:', {
+        opportunityId: row.ghl_opportunity_id,
+        locationId: row.ghl_location_id,
+        pipelineStageId,
+        status: row.status,
+        payload: updatePayload
+      });
+
+      // First, let's get the current opportunity to understand its pipeline structure
+      console.log('Fetching current opportunity data...');
+      const getResponse = await fetch(`https://services.leadconnectorhq.com/opportunities/${row.ghl_opportunity_id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Version': '2021-07-28',
+          'Authorization': `Bearer ${apiToken}`,
+        },
+      });
+
+      let currentPipelineId = null;
+      if (getResponse.ok) {
+        const opportunityData = await getResponse.json();
+        console.log('Current opportunity data:', opportunityData);
+        currentPipelineId = opportunityData.pipelineId;
+        console.log('Current pipeline ID from opportunity:', currentPipelineId);
+
+        // If the opportunity already has a pipeline, we might not need to change it
+        // Only add pipelineId if we want to move it to a different pipeline
+        if (currentPipelineId) {
+          console.log('Opportunity already belongs to pipeline:', currentPipelineId);
+          // For now, let's not change the pipeline, just update the stage and other fields
+        }
+      } else {
+        console.error('Failed to get opportunity details:', getResponse.status, await getResponse.text());
+      }
+
+      // If we want to change the pipeline, we could add logic here
+      // But for now, let's just update the stage and custom fields without changing pipeline
+
+      console.log('Final update payload (no pipeline change):', updatePayload);
+
+      // Make the API call to GHL
+      const response = await fetch(`https://services.leadconnectorhq.com/opportunities/${row.ghl_opportunity_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Version': '2021-07-28',
+          'Authorization': `Bearer ${apiToken}`,
+        },
+        body: JSON.stringify(updatePayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`GHL API Error: ${response.status} - ${errorData.message || 'Unknown error'}`);
+      }
+
+      const result = await response.json();
+
+      // Create notes if we have notes content
+      if (row.notes && row.notes.trim()) {
+        console.log('Creating notes for contact:', row.ghlcontactid);
+        try {
+          const notesResponse = await fetch(`https://services.leadconnectorhq.com/contacts/${row.ghlcontactid}/notes`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Version': '2021-07-28',
+              'Authorization': `Bearer ${apiToken}`,
+            },
+            body: JSON.stringify({
+              userId: 'uO52LEhmrtCqg9eYdiIZ',
+              body: row.notes.trim()
+            }),
+          });
+
+          if (!notesResponse.ok) {
+            console.error('Failed to create notes:', notesResponse.status, await notesResponse.text());
+            // Don't fail the entire sync for notes failure
+          } else {
+            console.log('Notes created successfully');
+          }
+        } catch (notesError) {
+          console.error('Error creating notes:', notesError);
+          // Don't fail the entire sync for notes failure
+        }
+      }
+
+      // Update the status to "synced" in the database
+      console.log('Updating sync_status to synced for row:', row.id);
+      const { error: updateError } = await supabase
+        .from('daily_deal_flow')
+        .update({ sync_status: 'synced' })
+        .eq('id', row.id);
+
+      if (updateError) {
+        console.error('Failed to update status:', updateError);
+        // Don't fail the entire sync for status update failure
+      } else {
+        console.log('Status updated to synced successfully');
+      }
+
+      toast({
+        title: 'Sync Successful',
+        description: `Successfully synced ${row.insured_name || 'Unknown'} to GHL`,
+      });
+
+      onDataUpdate(); // Refresh the data
+
+    } catch (error) {
+      console.error('Error syncing to GHL:', error);
+
+      // Update the status to "sync failed" in the database when sync fails
+      console.log('Updating sync_status to sync failed for row:', row.id);
+      try {
+        const { error: updateError } = await supabase
+          .from('daily_deal_flow')
+          .update({ sync_status: 'sync failed' })
+          .eq('id', row.id);
+
+        if (updateError) {
+          console.error('Failed to update status to sync failed:', updateError);
+        } else {
+          console.log('Status updated to sync failed successfully');
+        }
+      } catch (statusUpdateError) {
+        console.error('Error updating status to sync failed:', statusUpdateError);
+      }
+
+      toast({
+        title: 'Sync Failed',
+        description: error instanceof Error ? error.message : `Failed to sync ${row.insured_name || 'Unknown'} to GHL`,
+        variant: 'destructive',
+      });
+
+      onDataUpdate(); // Refresh the data to show the updated status
+    } finally {
+      setSyncingRows(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(row.id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleBulkSync = async () => {
+    if (!hasWritePermissions) {
+      toast({
+        title: 'Permission Denied',
+        description: 'You do not have permission to sync data to GHL',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const rowsToSync = data.filter(row =>
+      selectedRows.has(row.id) &&
+      row.sync_status?.toLowerCase() !== 'synced'
+    );
+
+    if (rowsToSync.length === 0) {
+      toast({
+        title: 'No Rows to Sync',
+        description: 'Please select rows that are not already synced',
+        variant: 'default',
+      });
+      return;
+    }
+
+    setBulkSyncing(true);
+    setBulkSyncProgress({ current: 0, total: rowsToSync.length });
+
+    let successCount = 0;
+    let failureCount = 0;
+
+    try {
+      for (let i = 0; i < rowsToSync.length; i++) {
+        const row = rowsToSync[i];
+        setBulkSyncProgress({ current: i + 1, total: rowsToSync.length, currentRow: row });
+
+        try {
+          await handleSyncToGHL(row);
+          successCount++;
+        } catch (error) {
+          failureCount++;
+          console.error(`Failed to sync row ${row.id}:`, error);
+        }
+
+        // Small delay between requests to avoid overwhelming the API
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      toast({
+        title: 'Bulk Sync Complete',
+        description: `Successfully synced ${successCount} rows${failureCount > 0 ? `, ${failureCount} failed` : ''}`,
+        variant: failureCount > 0 ? 'destructive' : 'default',
+      });
+
+    } catch (error) {
+      console.error('Bulk sync error:', error);
+      toast({
+        title: 'Bulk Sync Failed',
+        description: 'An unexpected error occurred during bulk sync',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkSyncing(false);
+      setBulkSyncProgress({ current: 0, total: 0 });
+      setSelectedRows(new Set()); // Clear selection after bulk sync
+      onDataUpdate(); // Refresh the data
+    }
+  };
+
+  const handleRowSelect = (rowId: string, checked: boolean) => {
+    setSelectedRows(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(rowId);
+      } else {
+        newSet.delete(rowId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const syncableRowIds = data
+        .filter(row => row.sync_status?.toLowerCase() !== 'synced')
+        .map(row => row.id);
+      setSelectedRows(new Set(syncableRowIds));
+    } else {
+      setSelectedRows(new Set());
+    }
+  };
+
+  const formatCurrency = (amount: number | null | undefined) => {
+    if (!amount) return '';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const getStatusBadgeVariant = (status: string | null | undefined, syncStatus: string | null | undefined) => {
+    // First check sync_status for sync-related statuses
+    if (syncStatus) {
+      const syncStatusLower = syncStatus.toLowerCase();
+      if (syncStatusLower === 'synced') return 'default'; // Green badge for synced
+      if (syncStatusLower === 'sync failed') return 'destructive'; // Red badge for sync failed
+    }
+
+    // Fall back to regular status if no sync_status or not sync-related
+    if (!status) return 'secondary';
+
+    const statusLower = status.toLowerCase();
+    if (statusLower.includes('pending') || statusLower.includes('incomplete')) return 'secondary';
+    if (statusLower.includes('sold') || statusLower.includes('fulfilled')) return 'default';
+    if (statusLower.includes('dq') || statusLower.includes('returned')) return 'destructive';
+    if (statusLower.includes('callback') || statusLower.includes('future')) return 'outline';
+
+    return 'secondary';
+  };
+
+  if (data.length === 0) {
+    return (
+      <Card>
+        <CardContent className='flex items-center justify-center py-12'>
+          <div className='text-center'>
+            <p className='text-muted-foreground text-lg'>No data found</p>
+            <p className='text-sm text-muted-foreground mt-1'>
+              Try adjusting your filters or check back later
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className='space-y-4'>
+      {/* Bulk Actions */}
+      {selectedRows.size > 0 && (
+        <Card>
+          <CardContent className='p-4'>
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center gap-2'>
+                <span className='text-sm font-medium'>
+                  {selectedRows.size} row{selectedRows.size !== 1 ? 's' : ''} selected
+                </span>
+                {bulkSyncing && (
+                  <span className='text-sm text-muted-foreground'>
+                    Processing {bulkSyncProgress.current} of {bulkSyncProgress.total}
+                    {bulkSyncProgress.currentRow && (
+                      <span className='ml-2'>
+                        - {bulkSyncProgress.currentRow.insured_name || 'Unknown'}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+              <div className='flex items-center gap-2'>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => setSelectedRows(new Set())}
+                  disabled={bulkSyncing}
+                >
+                  Clear Selection
+                </Button>
+                <Button
+                  variant='default'
+                  size='sm'
+                  onClick={handleBulkSync}
+                  disabled={bulkSyncing || !hasWritePermissions}
+                  className='flex items-center gap-2'
+                >
+                  {bulkSyncing ? (
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                  ) : (
+                    <Play className='h-4 w-4' />
+                  )}
+                  {bulkSyncing ? 'Syncing...' : 'Bulk Sync Selected'}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Data Table */}
+      <div className='border rounded-lg overflow-hidden'>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className='w-[50px]'>
+                <button
+                  onClick={() => handleSelectAll(selectedRows.size === 0)}
+                  className='flex items-center justify-center w-full h-full hover:bg-muted/50 rounded'
+                  disabled={bulkSyncing}
+                >
+                  {(() => {
+                    const syncableRows = data.filter(row => row.sync_status?.toLowerCase() !== 'synced');
+                    const selectedSyncableRows = syncableRows.filter(row => selectedRows.has(row.id));
+                    if (selectedSyncableRows.length === syncableRows.length && syncableRows.length > 0) {
+                      return <CheckSquare className='h-4 w-4' />;
+                    } else if (selectedSyncableRows.length > 0) {
+                      return <div className='h-4 w-4 border-2 border-current bg-current' style={{clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%)'}} />;
+                    } else {
+                      return <Square className='h-4 w-4' />;
+                    }
+                  })()}
+                </button>
+              </TableHead>
+              <TableHead className='w-[120px]'>Date</TableHead>
+              <TableHead className='w-[140px]'>Submission ID</TableHead>
+              <TableHead className='w-[160px]'>Insured Name</TableHead>
+              <TableHead className='w-[140px]'>Phone</TableHead>
+              <TableHead className='w-[120px]'>Lead Vendor</TableHead>
+              <TableHead className='w-[100px]'>Agent</TableHead>
+              <TableHead className='w-[120px]'>Status</TableHead>
+              <TableHead className='w-[100px]'>Carrier</TableHead>
+              <TableHead className='w-[100px]'>Face Amount</TableHead>
+              <TableHead className='w-[120px]'>GHL Location</TableHead>
+              <TableHead className='w-[120px]'>GHL Opportunity</TableHead>
+              <TableHead className='w-[120px]'>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell>
+                  {row.sync_status?.toLowerCase() !== 'synced' && (
+                    <button
+                      onClick={() => handleRowSelect(row.id, !selectedRows.has(row.id))}
+                      className='flex items-center justify-center w-full h-full hover:bg-muted/50 rounded'
+                      disabled={bulkSyncing || syncingRows.has(row.id)}
+                    >
+                      {selectedRows.has(row.id) ? (
+                        <CheckSquare className='h-4 w-4' />
+                      ) : (
+                        <Square className='h-4 w-4' />
+                      )}
+                    </button>
+                  )}
+                </TableCell>
+                <TableCell className='font-medium'>
+                  {formatDate(row.date)}
+                </TableCell>
+                <TableCell className='font-mono text-sm'>
+                  {row.submission_id}
+                </TableCell>
+                <TableCell>{row.insured_name || 'N/A'}</TableCell>
+                <TableCell className='font-mono text-sm'>
+                  {row.client_phone_number || 'N/A'}
+                </TableCell>
+                <TableCell>{row.lead_vendor || 'N/A'}</TableCell>
+                <TableCell>{row.agent || 'N/A'}</TableCell>
+                <TableCell>
+                  <Badge variant={getStatusBadgeVariant(row.status, row.sync_status)}>
+                    {row.sync_status || row.status || 'N/A'}
+                  </Badge>
+                </TableCell>
+                <TableCell>{row.carrier || 'N/A'}</TableCell>
+                <TableCell className='text-right'>
+                  {formatCurrency(row.face_amount)}
+                </TableCell>
+                <TableCell className='font-mono text-xs'>
+                  {row.ghl_location_id ? (
+                    <div className='flex items-center gap-1'>
+                      <span className='truncate max-w-[100px]' title={row.ghl_location_id}>
+                        {row.ghl_location_id}
+                      </span>
+                      <ExternalLink className='h-3 w-3 text-muted-foreground' />
+                    </div>
+                  ) : (
+                    <span className='text-muted-foreground'>Not set</span>
+                  )}
+                </TableCell>
+                <TableCell className='font-mono text-xs'>
+                  {row.ghl_opportunity_id ? (
+                    <div className='flex items-center gap-1'>
+                      <span className='truncate max-w-[100px]' title={row.ghl_opportunity_id}>
+                        {row.ghl_opportunity_id}
+                      </span>
+                      <ExternalLink className='h-3 w-3 text-muted-foreground' />
+                    </div>
+                  ) : (
+                    <span className='text-muted-foreground'>Not set</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {row.sync_status?.toLowerCase() === 'synced' ? (
+                    <Badge variant="default" className="flex items-center gap-1">
+                      <RefreshCw className="h-3 w-3" />
+                      Synced
+                    </Badge>
+                  ) : (
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => handleSyncToGHL(row)}
+                      disabled={!hasWritePermissions || syncingRows.has(row.id)}
+                      className='flex items-center gap-1'
+                    >
+                      {syncingRows.has(row.id) ? (
+                        <Loader2 className='h-3 w-3 animate-spin' />
+                      ) : (
+                        <RefreshCw className='h-3 w-3' />
+                      )}
+                      {row.sync_status?.toLowerCase() === 'sync failed' ? 'Retry Sync' : 'Sync'}
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className='flex items-center justify-between'>
+          <div className='text-sm text-muted-foreground'>
+            Showing {((currentPage - 1) * recordsPerPage) + 1} to {Math.min(currentPage * recordsPerPage, totalRecords)} of {totalRecords} results
+          </div>
+
+          <div className='flex items-center gap-2'>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className='h-4 w-4' />
+              Previous
+            </Button>
+
+            <div className='flex items-center gap-1'>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                if (pageNum > totalPages) return null;
+
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={pageNum === currentPage ? 'default' : 'outline'}
+                    size='sm'
+                    onClick={() => onPageChange(pageNum)}
+                    className='w-8 h-8 p-0'
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Next
+              <ChevronRight className='h-4 w-4' />
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
