@@ -14,6 +14,7 @@ import Auth from "./pages/Auth";
 import CenterAuth from "./pages/CenterAuth";
 import Dashboard from "./pages/Dashboard";
 import CenterLeadPortal from "./pages/CenterLeadPortal";
+import CenterCalendarView from "./pages/CenterCalendarView";
 import CallbackRequestPage from "./pages/CallbackRequestPage";
 import CommissionPortal from "./pages/CommissionPortal";
 import CallResultUpdate from "./pages/CallResultUpdate";
@@ -56,6 +57,14 @@ const App = () => (
               element={
                 <CenterProtectedRoute>
                   <CenterLeadPortal />
+                </CenterProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/center-calendar-view" 
+              element={
+                <CenterProtectedRoute>
+                  <CenterCalendarView />
                 </CenterProtectedRoute>
               } 
             />

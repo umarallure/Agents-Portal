@@ -282,6 +282,13 @@ const CenterLeadPortal = () => {
                 </div>
               )}
               <Button 
+                variant="outline"
+                onClick={() => navigate('/center-calendar-view')}
+              >
+                <Calendar className="mr-2 h-4 w-4" />
+                Calendar View
+              </Button>
+              <Button 
                 onClick={() => setCreateLeadModalOpen(true)}
                 className="bg-green-600 hover:bg-green-700"
               >
