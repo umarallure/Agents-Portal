@@ -39,6 +39,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // If user signed in, check if they are banned
+        if (event === 'SIGNED_IN' && session?.user) {
+          // The ban check will happen automatically on next API call
+          // Supabase will reject requests from banned users
+        }
       }
     );
 
@@ -59,11 +65,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     });
     
     if (error) {
-      toast({
-        title: "Error signing in",
-        description: error.message,
-        variant: "destructive",
-      });
+      // Check if error is due to banned user
+      if (error.message?.toLowerCase().includes('banned') || 
+          error.message?.toLowerCase().includes('user is banned')) {
+        toast({
+          title: "Account Banned",
+          description: "Your account has been banned. Please contact support for assistance.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error signing in",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     } else {
       toast({
         title: "Welcome back!",

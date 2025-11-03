@@ -104,21 +104,23 @@ serve(async (req) => {
       }
 
       if (ban) {
-        // Ban user - set banned_until to far future (permanently banned)
-        const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-          banned_until: new Date('2099-12-31').toISOString(),
+        // Ban user permanently (100 years)
+        const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+          ban_duration: '876000h', // 100 years
         })
 
-        if (error) {
-          console.error('Error banning user:', error)
+        if (banError) {
+          console.error('Error banning user:', banError)
           return new Response(
-            JSON.stringify({ error: 'Failed to ban user', details: error }),
+            JSON.stringify({ error: 'Failed to ban user', details: banError }),
             {
               status: 500,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             }
           )
         }
+
+        console.log(`User ${userId} banned successfully`)
 
         return new Response(
           JSON.stringify({ success: true, message: 'User banned successfully' }),
@@ -128,21 +130,23 @@ serve(async (req) => {
           }
         )
       } else {
-        // Unban user - set banned_until to null
-        const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-          banned_until: null,
+        // Unban user - set ban duration to none (removes ban)
+        const { error: unbanError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+          ban_duration: 'none',
         })
 
-        if (error) {
-          console.error('Error unbanning user:', error)
+        if (unbanError) {
+          console.error('Error unbanning user:', unbanError)
           return new Response(
-            JSON.stringify({ error: 'Failed to unban user', details: error }),
+            JSON.stringify({ error: 'Failed to unban user', details: unbanError }),
             {
               status: 500,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             }
           )
         }
+
+        console.log(`User ${userId} unbanned successfully`)
 
         return new Response(
           JSON.stringify({ success: true, message: 'User unbanned successfully' }),
