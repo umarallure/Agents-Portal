@@ -69,7 +69,7 @@ const Dashboard = () => {
   const [licensedAgentName, setLicensedAgentName] = useState<string>('');
   
   const isBen = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79';
-  const isAuthorizedUser = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79' || user?.id === '9c004d97-b5fb-4ed6-805e-e2c383fe8b6f' || user?.id === 'c2f07638-d3d2-4fe9-9a65-f57395745695' || user?.id === '30b23a3f-df6b-40af-85d1-84d3e6f0b8b4';
+  const isAuthorizedUser = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79' || user?.id === '9c004d97-b5fb-4ed6-805e-e2c383fe8b6f' || user?.id === 'c2f07638-d3d2-4fe9-9a65-f57395745695' || user?.id === '30b23a3f-df6b-40af-85d1-84d3e6f0b8b4' || user?.id === 'd68d18e4-9deb-4282-b4d0-1e6e6a0789e9';
 
   // Claim call modal state
   const [modalType, setModalType] = useState<'dropped' | 'licensed' | null>(null);
