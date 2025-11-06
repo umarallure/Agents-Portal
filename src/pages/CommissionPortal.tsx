@@ -657,7 +657,7 @@ const CommissionPortal = () => {
                                 <div className="flex flex-col items-start space-y-1">
                                   <div className="flex items-center space-x-1.5 mb-0.5">
                                     <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                                    <span className="text-xs font-semibold text-orange-700">Non-GI</span>
+                                    <span className="text-xs font-semibold text-orange-900">Non-GI</span>
                                   </div>
                                   <span className="text-3xl font-bold text-orange-600">{nonGiPercentage}%</span>
                                   <span className="text-sm text-muted-foreground font-medium">({nonGiCount})</span>

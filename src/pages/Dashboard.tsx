@@ -846,16 +846,6 @@ const Dashboard = () => {
                   <p className="text-xs text-cyan-600 mt-1">Last 7 days</p>
                 </CardContent>
               </Card>
-              <Card className="bg-green-50 border-green-100">
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-2">
-                    <DollarSign className="h-4 w-4 text-green-700" />
-                    <span className="text-sm text-green-700 font-medium">Premium This Week</span>
-                  </div>
-                  <p className="text-2xl font-bold text-green-900">${commissionStats.thisWeekPremium.toLocaleString()}</p>
-                  <p className="text-xs text-green-600 mt-1">Weekly total</p>
-                </CardContent>
-              </Card>
               <Card className="bg-orange-50 border-orange-100">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
@@ -869,91 +859,6 @@ const Dashboard = () => {
             </>
           )}
         </div>
-        
-        {/* Product Mix Stats - Only for Licensed Agents */}
-        {isLicensedAgent && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <Card className="bg-blue-50 border-blue-100">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-2">
-                    <BarChart3 className="h-5 w-5 text-blue-700" />
-                    <h3 className="text-lg font-semibold text-blue-900">This Week Level Products Sales</h3>
-                  </div>
-                  <Badge variant="outline" className="text-blue-700 border-blue-300 bg-blue-100">
-                    {commissionStats.levelProducts} sales
-                  </Badge>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-blue-700">Total Count:</span>
-                    <span className="font-semibold text-blue-900">{commissionStats.levelProducts.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-blue-700">Total Premium:</span>
-                    <span className="font-semibold text-blue-900">${commissionStats.levelPremium.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-blue-700">Percentage:</span>
-                    <span className="font-semibold text-blue-900">
-                      {commissionStats.totalSales > 0 
-                        ? Math.round((commissionStats.levelProducts / commissionStats.totalSales) * 100)
-                        : 0}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-blue-700">Avg Premium:</span>
-                    <span className="font-semibold text-blue-900">
-                      ${commissionStats.levelProducts > 0 
-                        ? Math.round(commissionStats.levelPremium / commissionStats.levelProducts).toLocaleString()
-                        : 0}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-orange-50 border-orange-100">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-2">
-                    <BarChart3 className="h-5 w-5 text-orange-700" />
-                    <h3 className="text-lg font-semibold text-orange-900">This Week GI Products Sales</h3>
-                  </div>
-                  <Badge variant="outline" className="text-orange-700 border-orange-300 bg-orange-100">
-                    {commissionStats.giProducts} sales
-                  </Badge>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-orange-700">Total Count:</span>
-                    <span className="font-semibold text-orange-900">{commissionStats.giProducts.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-orange-700">Total Premium:</span>
-                    <span className="font-semibold text-orange-900">${commissionStats.giPremium.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-orange-700">Percentage:</span>
-                    <span className="font-semibold text-orange-900">
-                      {commissionStats.totalSales > 0 
-                        ? Math.round((commissionStats.giProducts / commissionStats.totalSales) * 100)
-                        : 0}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-orange-700">Avg Premium:</span>
-                    <span className="font-semibold text-orange-900">
-                      ${commissionStats.giProducts > 0 
-                        ? Math.round(commissionStats.giPremium / commissionStats.giProducts).toLocaleString()
-                        : 0}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
 
         {/* Action Buttons */}
         <Card className="mb-6">
