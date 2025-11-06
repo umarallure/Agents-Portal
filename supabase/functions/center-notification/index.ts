@@ -19,17 +19,15 @@ serve(async (req)=>{
     const leadVendorCenterMapping = {
       "Ark Tech": "#orbit-team-ark-tech",
       "GrowthOnics BPO": "#orbit-team-growthonics-bpo",
-      "Maverick": "#orbit-team-maverick-comm",
+      "Maverick": "#sample-center-transfer-channel",
       "Omnitalk BPO": "#orbit-team-omnitalk-bpo",
       "Vize BPO": "#orbit-team-vize-bpo",
       "Corebiz": "#orbit-team-corebiz-bpo",
       "Digicon": "#orbit-team-digicon-bpo",
       "Ambition": "#orbit-team-ambition-bpo",
-      
       "AJ BPO": "#orbit-team-aj-bpo",
       "Pro Solutions BPO": "#orbit-team-pro-solutions-bpo",
       "Emperor BPO": "#orbit-team-emperor-bpo",
-
       "Benchmark": "#orbit-team-benchmark-bpo",
       "Poshenee": "#orbit-team-poshenee-tech-bpo",
       "Plexi": "#orbit-team-plexi-bpo",
@@ -43,28 +41,25 @@ serve(async (req)=>{
       "Trust Link": "#orbit-team-trust-link",
       "Quotes BPO": "#obit-team-quotes-bpo",
       "Zupax Marketing": "#orbit-team-zupax-marketing",
-      "Argon Communications": "#orbit-team-argon-communications",
-      "Care Solutions": "#test-bpo",
-      "Cutting Edge": "#test-bpo",
-      "Next Era": "#test-bpo",
+      "Argon Comm": "#orbit-team-argon-comm",
+      "Care Solutions": "#unlimited-team-care-solutions",
+      "Cutting Edge": "#unlimited-team-cutting-edge",
+      "Next Era": "#unlimited-team-next-era",
       "Rock BPO": "#orbit-team-rock-bpo",
       "Avenue Consultancy": "#orbit-team-avenue-consultancy",
-      "Crown Connect BPO": "#orbit-team-crown-connect-bpo"
+      "Crown Connect BPO": "#orbit-team-crown-connect-bpo",
+      "Networkize": "#orbit-team-networkize",
+      "LightVerse BPO": "#orbit-team-lightverse-bpo",
+      "Leads BPO": "#orbit-team-leads-bpo",
+      "Helix BPO": "#orbit-team-helix-bpo",
+      "CrossNotch": "#orbit-team-crossnotch",
+      "TechPlanet": "#orbit-team-techplanet",
+      "Exito BPO": "#orbit-team-exito-bpo",
+      "StratiX BPO": "#orbit-team-stratix-bpo",
+      "Lumenix BPO": "#orbit-team-lumenix-bpo"
     };
-    // Only send notifications for NOT submitted applications
-    const isNotSubmitted = callResult && callResult.application_submitted === false;
-    if (!isNotSubmitted) {
-      console.log('Skipping center notification - only for not submitted applications');
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'No notification sent - application was submitted'
-      }), {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      });
-    }
+    // Send notifications for all call results (submitted or not)
+    // No filtering - centers need to know about all outcomes
     console.log('Debug - callResult data:', JSON.stringify(callResult, null, 2));
     console.log('Debug - leadData:', JSON.stringify(leadData, null, 2));
     // Get the lead vendor from callResult or leadData
@@ -102,22 +97,26 @@ serve(async (req)=>{
     const phoneNumber = leadData.phone_number || 'No phone number';
     const email = leadData.email || 'No email';
     // Format the message with status emoji
+    // Use trim() and normalize to handle invisible characters and whitespace
+    const normalizedStatus = (callResult.status || '').trim().normalize('NFKC');
+    const normalizedReason = (callResult.dq_reason || '').trim().normalize('NFKC');
     let statusEmoji = '✅';
-    switch(callResult.status){
-      case '⁠DQ':
-        statusEmoji = '🚫';
-        break;
-      case 'Needs callback':
-        statusEmoji = '📞';
-        break;
-      case 'Not Interested':
-        statusEmoji = '🙅‍♂️';
-        break;
-      case 'Future Submission Date':
-        statusEmoji = '📅';
-        break;
-      default:
-        statusEmoji = '✅';
+    // Use includes() for partial matching to handle variations and invisible characters
+    if (normalizedStatus.includes('DQ') || normalizedStatus === 'DQ' || normalizedReason.includes('Chargeback DQ')) {
+      statusEmoji = '🚫';
+    } else if (normalizedStatus.includes('callback') || normalizedStatus.includes('Callback')) {
+      statusEmoji = '📞';
+    } else if (normalizedStatus.includes('Not Interested') || normalizedStatus.includes('not interested')) {
+      statusEmoji = '🙅‍♂️';
+    } else if (normalizedStatus.includes('Future') || normalizedStatus.includes('future')) {
+      statusEmoji = '📅';
+    } else if (normalizedStatus.includes('Submitted') || normalizedStatus.includes('submitted')) {
+      statusEmoji = '✅';
+    } else if (normalizedStatus.includes('Fulfilled carrier requirements') || normalizedStatus.includes('fulfilled carrier requirements')) {
+      statusEmoji = '✅';
+    } else {
+      // Default for unknown statuses
+      statusEmoji = '⚠️';
     }
     const centerSlackMessage = {
       channel: centerChannel,
@@ -207,7 +206,7 @@ serve(async (req)=>{
   } catch (error) {
     console.error('Error in center-notification:', error);
     return new Response(JSON.stringify({
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
     }), {
       status: 500,
       headers: {

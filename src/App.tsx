@@ -28,6 +28,7 @@ import DealFlowLookup from "./pages/DealFlowLookup";
 import AgentLicensing from "./pages/AgentLicensing";
 import { AgentEligibilityPage } from "./pages/AgentEligibilityPage";
 import GHLSyncPage from "./pages/GHLSyncPage/GHLSyncPage";
+import AdminAnalytics from "./pages/AdminAnalytics";
 import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
 
@@ -193,6 +194,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <UserManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin-analytics" 
+              element={
+                <ProtectedRoute>
+                  <AdminAnalytics />
                 </ProtectedRoute>
               } 
             />
