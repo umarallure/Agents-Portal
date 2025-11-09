@@ -32,7 +32,8 @@ const statusOptions = [
   "Updated Banking/draft date",
   "Fulfilled carrier requirements",
   "Call Never Sent",
-  "Disconnected"
+  "Disconnected",
+  "GI - Currently DQ"
 ];
 
 const carrierOptions = [
@@ -212,7 +213,8 @@ const mapStatusToSheetValue = (userSelectedStatus: string) => {
     "Chargeback DQ": "DQ'd Can't be sold",
     "Future Submission Date": "Application Withdrawn",
     "Disconnected": "Incomplete Transfer",
-    "Disconnected - Never Retransferred": "Incomplete Transfer"
+    "Disconnected - Never Retransferred": "Incomplete Transfer",
+    "GI - Currently DQ": "Returned To Center - DQ"
   };
   return statusMap[userSelectedStatus] || userSelectedStatus;
 };
@@ -390,6 +392,9 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
   const [callSource, setCallSource] = useState("");
   const [newDraftDate, setNewDraftDate] = useState<Date>();
   const [isRetentionCall, setIsRetentionCall] = useState(false);
+  const [carrierAttempted1, setCarrierAttempted1] = useState("");
+  const [carrierAttempted2, setCarrierAttempted2] = useState("");
+  const [carrierAttempted3, setCarrierAttempted3] = useState("");
   
   const { toast } = useToast();
 
@@ -553,17 +558,37 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
       // Auto-populate notes for Chargeback DQ
       const clientName = customerName || "[Client Name]";
       setNotes(getNoteText(status, "Chargeback DQ", clientName));
+    } else if (status === "GI - Currently DQ") {
+      // Reset carrier attempted fields when switching to this status
+      setCarrierAttempted1("");
+      setCarrierAttempted2("");
+      setCarrierAttempted3("");
+      setNotes("");
     } else {
       setStatusReason("");
       setNotes("");
     }
   }, [status, customerName]);
 
+  // Auto-generate notes for GI - Currently DQ status
+  useEffect(() => {
+    if (status === "GI - Currently DQ" && carrierAttempted1) {
+      const clientName = customerName || "[Client Name]";
+      const carriers = [carrierAttempted1];
+      if (carrierAttempted2) carriers.push(carrierAttempted2);
+      if (carrierAttempted3) carriers.push(carrierAttempted3);
+      
+      const carrierText = carriers.join(', ');
+      setNotes(`${clientName} has been declined through ${carrierText} and only qualifies for a GI policy. They are currently DQ'd`);
+    }
+  }, [status, carrierAttempted1, carrierAttempted2, carrierAttempted3, customerName]);
+
   const showCarrierApplicationFields = status === "Needs Carrier Application";
   const showSubmittedFields = applicationSubmitted === true;
   const showNotSubmittedFields = applicationSubmitted === false;
   const showStatusReasonDropdown = applicationSubmitted === false && ["⁠DQ", "Chargeback DQ", "Needs callback", "Not Interested", "Future Submission Date", "Updated Banking/draft date", "Fulfilled carrier requirements"].includes(status);
   const showNewDraftDateField = applicationSubmitted === false && status === "Updated Banking/draft date" && statusReason;
+  const showCarrierAttemptedFields = applicationSubmitted === false && status === "GI - Currently DQ";
   const currentReasonOptions = getReasonOptions(status);
 
   const handleStatusReasonChange = (reason: string) => {
@@ -638,6 +663,9 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         new_draft_date: status === "Updated Banking/draft date" && newDraftDate ? format(newDraftDate, "yyyy-MM-dd") : null,
         is_callback: submissionId.startsWith('CB') || submissionId.startsWith('CBB'), // Track if this is a callback based on submission ID
         is_retention_call: isRetentionCall,
+        carrier_attempted_1: status === "GI - Currently DQ" ? carrierAttempted1 : null,
+        carrier_attempted_2: status === "GI - Currently DQ" ? carrierAttempted2 : null,
+        carrier_attempted_3: status === "GI - Currently DQ" ? carrierAttempted3 : null,
         ...(showSubmittedFields || showCarrierApplicationFields ? {
           carrier,
           product_type: productType,
@@ -798,7 +826,10 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 is_retention_call: isRetentionCall,
                 // Add the new parameters for proper status determination
                 application_submitted: applicationSubmitted,
-                sent_to_underwriting: sentToUnderwriting
+                sent_to_underwriting: sentToUnderwriting,
+                carrier_attempted_1: status === "GI - Currently DQ" ? carrierAttempted1 : null,
+                carrier_attempted_2: status === "GI - Currently DQ" ? carrierAttempted2 : null,
+                carrier_attempted_3: status === "GI - Currently DQ" ? carrierAttempted3 : null
               }
             });
 
@@ -909,7 +940,10 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
               dq_reason: showStatusReasonDropdown ? statusReason : null,
               sent_to_underwriting: sentToUnderwriting,
               from_callback: callSource === "Agent Callback",
-              call_source: callSource
+              call_source: callSource,
+              carrier_attempted_1: status === "GI - Currently DQ" ? carrierAttempted1 : null,
+              carrier_attempted_2: status === "GI - Currently DQ" ? carrierAttempted2 : null,
+              carrier_attempted_3: status === "GI - Currently DQ" ? carrierAttempted3 : null
             };
 
             // Create new entry in Google Sheets
@@ -947,7 +981,10 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                   dq_reason: showStatusReasonDropdown ? statusReason : null,
                   sent_to_underwriting: sentToUnderwriting,
                   from_callback: callSource === "Agent Callback",
-                  call_source: callSource
+                  call_source: callSource,
+                  carrier_attempted_1: status === "GI - Currently DQ" ? carrierAttempted1 : null,
+                  carrier_attempted_2: status === "GI - Currently DQ" ? carrierAttempted2 : null,
+                  carrier_attempted_3: status === "GI - Currently DQ" ? carrierAttempted3 : null
                 }
               }
             });
@@ -1220,6 +1257,11 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           setAgentWhoTookCall("");
           setLeadVendor("");
           setCallSource("");
+          setNewDraftDate(undefined);
+          setIsRetentionCall(false);
+          setCarrierAttempted1("");
+          setCarrierAttempted2("");
+          setCarrierAttempted3("");
         }
       }
 
@@ -1638,6 +1680,68 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 </div>
               )}
 
+              {/* Carrier Attempted fields - shows only for GI - Currently DQ status */}
+              {showCarrierAttemptedFields && (
+                <div className="space-y-4 p-4 border rounded-lg bg-red-50">
+                  <h4 className="font-semibold text-red-800">GI - Currently DQ Details</h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="carrierAttempted1">
+                        Attempted Carrier #1 <span className="text-red-500">*</span>
+                      </Label>
+                      <Select value={carrierAttempted1} onValueChange={setCarrierAttempted1} required>
+                        <SelectTrigger className={`${!carrierAttempted1 ? 'border-red-300 focus:border-red-500' : ''}`}>
+                          <SelectValue placeholder="Select carrier (required)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {carrierOptions.map((carrier) => (
+                            <SelectItem key={carrier} value={carrier}>
+                              {carrier}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {!carrierAttempted1 && (
+                        <p className="text-sm text-red-500 mt-1">Carrier #1 is required</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="carrierAttempted2">Attempted Carrier #2</Label>
+                      <Select value={carrierAttempted2} onValueChange={setCarrierAttempted2}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select carrier (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {carrierOptions.map((carrier) => (
+                            <SelectItem key={carrier} value={carrier}>
+                              {carrier}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="carrierAttempted3">Attempted Carrier #3</Label>
+                      <Select value={carrierAttempted3} onValueChange={setCarrierAttempted3}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select carrier (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {carrierOptions.map((carrier) => (
+                            <SelectItem key={carrier} value={carrier}>
+                              {carrier}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <Label htmlFor="notes">
                   Notes <span className="text-red-500">*</span>
@@ -1753,12 +1857,15 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           )}
 
           {/* Validation message for not submitted applications */}
-          {applicationSubmitted === false && (!agentWhoTookCall || !status || !notes.trim()) && (
+          {applicationSubmitted === false && (
+            (!agentWhoTookCall || !status || !notes.trim() || (status === "GI - Currently DQ" && !carrierAttempted1))
+          ) && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-md">
               <p className="text-sm text-red-600">
                 Please complete all required fields:
                 {!agentWhoTookCall && " Agent who took the call"}
                 {!status && " Status/Stage"}
+                {status === "GI - Currently DQ" && !carrierAttempted1 && " Carrier Attempted #1"}
                 {!notes.trim() && " Notes"}
               </p>
             </div>
@@ -1771,7 +1878,12 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 applicationSubmitted === null || 
                 !callSource || 
                 isSubmitting || 
-                (applicationSubmitted === false && (!agentWhoTookCall || !status || !notes.trim()))
+                (applicationSubmitted === false && (
+                  !agentWhoTookCall || 
+                  !status || 
+                  !notes.trim() || 
+                  (status === "GI - Currently DQ" && !carrierAttempted1)
+                ))
               }
               className="min-w-32"
             >

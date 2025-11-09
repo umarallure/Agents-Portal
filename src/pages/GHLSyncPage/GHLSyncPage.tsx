@@ -29,10 +29,6 @@ export interface GHLSyncRow {
   monthly_premium?: number;
   draft_date?: string;
   notes?: string;
-  // GHL specific fields
-  ghl_location_id?: string;
-  ghl_opportunity_id?: string;
-  ghlcontactid?: string;
 }
 
 const GHLSyncPage = () => {
@@ -130,7 +126,7 @@ const GHLSyncPage = () => {
       // First get daily deal flow data
       let query = supabase
         .from('daily_deal_flow')
-        .select('id, submission_id, client_phone_number, lead_vendor, date, insured_name, agent, status, sync_status, carrier, face_amount, monthly_premium, draft_date, notes, ghl_location_id, ghl_opportunity_id, ghlcontactid', { count: 'exact' })
+        .select('id, submission_id, client_phone_number, lead_vendor, date, insured_name, agent, status, sync_status, carrier, face_amount, monthly_premium, draft_date, notes', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -190,9 +186,6 @@ const GHLSyncPage = () => {
           monthly_premium: row.monthly_premium,
           draft_date: row.draft_date,
           notes: row.notes,
-          ghl_location_id: row.ghl_location_id,
-          ghl_opportunity_id: row.ghl_opportunity_id,
-          ghlcontactid: row.ghlcontactid,
         };
       });
 

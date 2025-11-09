@@ -55,50 +55,159 @@ export const GHLSyncDataGrid = ({
       return;
     }
 
+    console.log('🚀 Starting GHL sync for:', {
+      submissionId: row.submission_id,
+      insuredName: row.insured_name,
+      leadVendor: row.lead_vendor,
+      status: row.status
+    });
+
+    // Special debug for the specific failing case
+    if (row.submission_id === '6383498429784501726') {
+      console.log('🐛 DEBUG: Processing Annissa M Hughes case');
+      console.log('🐛 DEBUG: Full row data:', JSON.stringify(row, null, 2));
+    }
+
     setSyncingRows(prev => new Set(prev).add(row.id));
 
     try {
-      // Check if we have the required GHL data
-      if (!row.ghl_location_id || !row.ghl_opportunity_id || !row.ghlcontactid) {
+      // Check if we have the required data
+      if (!row.lead_vendor || !row.insured_name) {
+        const missingFields = [];
+        if (!row.lead_vendor) missingFields.push('lead vendor');
+        if (!row.insured_name) missingFields.push('insured name');
+
+        console.error('❌ Missing required data for sync:', {
+          submissionId: row.submission_id,
+          insuredName: row.insured_name,
+          leadVendor: row.lead_vendor,
+          missingFields
+        });
+
         toast({
-          title: 'Missing GHL Data',
-          description: `Missing required GHL data for ${row.insured_name || 'Unknown'}`,
+          title: 'Missing Required Data',
+          description: `Missing ${missingFields.join(' and ')} for ${row.insured_name || row.submission_id || 'Unknown'}`,
           variant: 'destructive',
         });
         return;
       }
 
-      // Get API token for this location
+      console.log('✅ Basic validation passed');
+
+      // Step 1: Get location_id from ghl_location_secrets using lead_vendor
+      console.log('🔍 Finding GHL location for lead vendor:', row.lead_vendor);
       const { data: locationSecret, error: secretError } = await (supabase as any)
         .from('ghl_location_secrets')
-        .select('api_token')
-        .eq('locationid', row.ghl_location_id)
+        .select('locationid, api_token')
+        .eq('lead_vendor', row.lead_vendor)
         .single();
 
-      if (secretError || !locationSecret?.api_token) {
-        console.error('Error fetching GHL token:', secretError);
+      console.log('🔍 Location secret query result:', {
+        data: locationSecret,
+        error: secretError,
+        leadVendor: row.lead_vendor
+      });
+
+      if (secretError || !locationSecret?.locationid || !locationSecret?.api_token) {
+        console.error('❌ No GHL location/token found:', {
+          error: secretError,
+          locationSecret,
+          leadVendor: row.lead_vendor
+        });
+
+        // Show more specific error message
+        let errorMessage = `No GHL location/token found for lead vendor: ${row.lead_vendor}`;
+        if (secretError?.message) {
+          errorMessage += ` (${secretError.message})`;
+        }
+
         toast({
           title: 'Configuration Error',
-          description: `No API token found for location ${row.ghl_location_id}`,
+          description: errorMessage,
           variant: 'destructive',
         });
         return;
       }
 
-      const apiToken = (locationSecret as any).api_token;
+      const locationId = locationSecret.locationid;
+      const apiToken = locationSecret.api_token;
+      console.log('✅ Found GHL location:', { locationId, hasToken: !!apiToken });
 
-      // Get stage mappings for this location
+      // Step 2: Search for opportunity using insured name
+      console.log('🔍 Searching for opportunity with name:', row.insured_name);
+      console.log('🔍 Search URL:', `https://services.leadconnectorhq.com/opportunities/search?q=${encodeURIComponent(row.insured_name)}&location_id=${locationId}`);
+
+      const searchResponse = await fetch(`https://services.leadconnectorhq.com/opportunities/search?q=${encodeURIComponent(row.insured_name)}&location_id=${locationId}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Version': '2021-07-28',
+          'Authorization': `Bearer ${apiToken}`,
+        },
+      });
+
+      console.log('🔍 Search response status:', searchResponse.status, searchResponse.statusText);
+
+      if (!searchResponse.ok) {
+        const errorData = await searchResponse.json().catch(() => ({}));
+        console.error('❌ Opportunity search failed:', {
+          status: searchResponse.status,
+          statusText: searchResponse.statusText,
+          error: errorData,
+          url: `https://services.leadconnectorhq.com/opportunities/search?q=${encodeURIComponent(row.insured_name)}&location_id=${locationId}`
+        });
+        throw new Error(`Opportunity search failed: ${searchResponse.status} - ${errorData.message || 'Unknown error'}`);
+      }
+
+      const searchResult = await searchResponse.json();
+      console.log('✅ Opportunity search result:', {
+        totalOpportunities: searchResult.opportunities?.length || 0,
+        opportunities: searchResult.opportunities?.map((opp: any) => ({
+          id: opp.id,
+          name: opp.name,
+          pipelineId: opp.pipelineId,
+          contactId: opp.contact?.id
+        })) || []
+      });
+
+      if (!searchResult.opportunities || searchResult.opportunities.length === 0) {
+        console.error('❌ No opportunities found for:', {
+          insuredName: row.insured_name,
+          locationId,
+          searchResult
+        });
+        throw new Error(`No opportunities found for insured name: ${row.insured_name}`);
+      }
+
+      // Use the first opportunity found
+      const opportunity = searchResult.opportunities[0];
+      const opportunityId = opportunity.id;
+      const pipelineId = opportunity.pipelineId;
+      const contactId = opportunity.contact?.id;
+
+      console.log('📋 Found opportunity details:', {
+        opportunityId,
+        pipelineId,
+        contactId,
+        opportunityName: opportunity.name
+      });
+
+      if (!opportunityId || !contactId) {
+        throw new Error('Opportunity found but missing required IDs');
+      }
+
+      // Step 3: Get stage mappings for this location
       const { data: stageMappings, error: mappingError } = await (supabase as any)
         .from('ghl_stage_mappings')
         .select('*')
-        .eq('locationid', row.ghl_location_id)
+        .eq('locationid', locationId)
         .single();
 
       if (mappingError || !stageMappings) {
         console.error('Error fetching stage mappings:', mappingError);
         toast({
           title: 'Configuration Error',
-          description: `No stage mappings found for location ${row.ghl_location_id}`,
+          description: `No stage mappings found for location ${locationId}`,
           variant: 'destructive',
         });
         return;
@@ -115,15 +224,15 @@ export const GHLSyncDataGrid = ({
         'Application Withdrawn': mappings.application_withdrawn,
         'Call Back Fix': mappings.chargeback_fix_api,
         'Incomplete Transfer': mappings.incomplete_transfer,
-        "DQ'd Can't be sold": mappings.dqd_cant_be_sold 
+        "DQ'd Can't be sold": mappings.dqd_cant_be_sold
       };
 
       console.log('🔍 Status Mapping Resolution:');
       console.log('  Current Status:', row.status || 'NO STATUS');
       console.log('  Available Mappings:', statusToStageMap);
-      
+
       const pipelineStageId = statusToStageMap[row.status || ''] || mappings.pending_approval;
-      
+
       console.log('  Resolved Stage ID:', pipelineStageId);
       console.log('  Used Fallback:', !statusToStageMap[row.status || ''] ? 'YES (pending_approval)' : 'NO');
 
@@ -137,8 +246,9 @@ export const GHLSyncDataGrid = ({
         return;
       }
 
-      // Prepare the update payload WITHOUT pipelineId initially
+      // Prepare the update payload
       const updatePayload = {
+        pipelineId: pipelineId, // Include pipeline ID from search result
         pipelineStageId: pipelineStageId,
         status: 'open', // Default to open, can be mapped based on status
         monetaryValue: 0,
@@ -180,48 +290,15 @@ export const GHLSyncDataGrid = ({
       }
 
       console.log('📦 GHL Sync Payload:', {
-        opportunityId: row.ghl_opportunity_id,
-        locationId: row.ghl_location_id,
+        opportunityId,
+        locationId,
         insuredName: row.insured_name,
         payload: updatePayload
       });
 
-      // First, let's get the current opportunity to understand its pipeline structure
-      console.log('🔄 Fetching current opportunity data...');
-      const getResponse = await fetch(`https://services.leadconnectorhq.com/opportunities/${row.ghl_opportunity_id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Version': '2021-07-28',
-          'Authorization': `Bearer ${apiToken}`,
-        },
-      });
-
-      let currentPipelineId = null;
-      if (getResponse.ok) {
-        const opportunityData = await getResponse.json();
-        console.log('✅ Current opportunity data:', opportunityData);
-        currentPipelineId = opportunityData.pipelineId;
-        console.log('  Current Pipeline ID:', currentPipelineId || 'NOT SET');
-
-        // If the opportunity already has a pipeline, we might not need to change it
-        // Only add pipelineId if we want to move it to a different pipeline
-        if (currentPipelineId) {
-          console.log('ℹ️  Opportunity already belongs to pipeline, keeping existing pipeline');
-          // For now, let's not change the pipeline, just update the stage and other fields
-        }
-      } else {
-        console.error('❌ Failed to get opportunity details:', getResponse.status, await getResponse.text());
-      }
-
-      // If we want to change the pipeline, we could add logic here
-      // But for now, let's just update the stage and custom fields without changing pipeline
-
-      console.log('📤 Final update payload (no pipeline change):', JSON.stringify(updatePayload, null, 2));
-
       // Make the API call to GHL
       console.log('🚀 Sending update to GHL API...');
-      const response = await fetch(`https://services.leadconnectorhq.com/opportunities/${row.ghl_opportunity_id}`, {
+      const response = await fetch(`https://services.leadconnectorhq.com/opportunities/${opportunityId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -248,10 +325,10 @@ export const GHLSyncDataGrid = ({
 
       // Create notes if we have notes content
       if (row.notes && row.notes.trim()) {
-        console.log('📝 Creating notes for contact:', row.ghlcontactid);
+        console.log('📝 Creating notes for contact:', contactId);
         console.log('  Notes content:', row.notes.substring(0, 100) + (row.notes.length > 100 ? '...' : ''));
         try {
-          const notesResponse = await fetch(`https://services.leadconnectorhq.com/contacts/${row.ghlcontactid}/notes`, {
+          const notesResponse = await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}/notes`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -572,8 +649,6 @@ export const GHLSyncDataGrid = ({
               <TableHead className='w-[120px]'>Status</TableHead>
               <TableHead className='w-[100px]'>Carrier</TableHead>
               <TableHead className='w-[100px]'>Face Amount</TableHead>
-              <TableHead className='w-[120px]'>GHL Location</TableHead>
-              <TableHead className='w-[120px]'>GHL Opportunity</TableHead>
               <TableHead className='w-[120px]'>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -615,30 +690,6 @@ export const GHLSyncDataGrid = ({
                 <TableCell>{row.carrier || 'N/A'}</TableCell>
                 <TableCell className='text-right'>
                   {formatCurrency(row.face_amount)}
-                </TableCell>
-                <TableCell className='font-mono text-xs'>
-                  {row.ghl_location_id ? (
-                    <div className='flex items-center gap-1'>
-                      <span className='truncate max-w-[100px]' title={row.ghl_location_id}>
-                        {row.ghl_location_id}
-                      </span>
-                      <ExternalLink className='h-3 w-3 text-muted-foreground' />
-                    </div>
-                  ) : (
-                    <span className='text-muted-foreground'>Not set</span>
-                  )}
-                </TableCell>
-                <TableCell className='font-mono text-xs'>
-                  {row.ghl_opportunity_id ? (
-                    <div className='flex items-center gap-1'>
-                      <span className='truncate max-w-[100px]' title={row.ghl_opportunity_id}>
-                        {row.ghl_opportunity_id}
-                      </span>
-                      <ExternalLink className='h-3 w-3 text-muted-foreground' />
-                    </div>
-                  ) : (
-                    <span className='text-muted-foreground'>Not set</span>
-                  )}
                 </TableCell>
                 <TableCell>
                   {row.sync_status?.toLowerCase() === 'synced' ? (
