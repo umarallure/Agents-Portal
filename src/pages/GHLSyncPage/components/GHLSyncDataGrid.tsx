@@ -2,10 +2,11 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ChevronLeft, ChevronRight, ExternalLink, RefreshCw, CheckSquare, Square, Play } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, ExternalLink, RefreshCw, CheckSquare, Square, Play, X } from 'lucide-react';
 import { GHLSyncRow } from '../GHLSyncPage';
 
 interface GHLSyncDataGridProps {
@@ -567,6 +568,59 @@ export const GHLSyncDataGrid = ({
 
   return (
     <div className='space-y-4'>
+      {/* Bulk Sync Progress Modal */}
+      {bulkSyncing && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-96 max-w-md mx-4">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Bulk Sync Progress</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setBulkSyncing(false);
+                    setBulkSyncProgress({ current: 0, total: 0 });
+                  }}
+                  className="h-6 w-6 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Progress</span>
+                  <span>{bulkSyncProgress.current} of {bulkSyncProgress.total}</span>
+                </div>
+                <Progress 
+                  value={(bulkSyncProgress.current / bulkSyncProgress.total) * 100} 
+                  className="w-full"
+                />
+              </div>
+              
+              {bulkSyncProgress.currentRow && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Currently Processing:</div>
+                  <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
+                    <div><strong>Name:</strong> {bulkSyncProgress.currentRow.insured_name || 'Unknown'}</div>
+                    <div><strong>Submission ID:</strong> {bulkSyncProgress.currentRow.submission_id}</div>
+                    <div><strong>Lead Vendor:</strong> {bulkSyncProgress.currentRow.lead_vendor || 'Unknown'}</div>
+                    <div><strong>Status:</strong> {bulkSyncProgress.currentRow.status || 'Unknown'}</div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Syncing records to GoHighLevel...</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Bulk Actions */}
       {selectedRows.size > 0 && (
         <Card>
@@ -576,16 +630,6 @@ export const GHLSyncDataGrid = ({
                 <span className='text-sm font-medium'>
                   {selectedRows.size} row{selectedRows.size !== 1 ? 's' : ''} selected
                 </span>
-                {bulkSyncing && (
-                  <span className='text-sm text-muted-foreground'>
-                    Processing {bulkSyncProgress.current} of {bulkSyncProgress.total}
-                    {bulkSyncProgress.currentRow && (
-                      <span className='ml-2'>
-                        - {bulkSyncProgress.currentRow.insured_name || 'Unknown'}
-                      </span>
-                    )}
-                  </span>
-                )}
               </div>
               <div className='flex items-center gap-2'>
                 <Button

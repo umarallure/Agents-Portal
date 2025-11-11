@@ -41,6 +41,7 @@ const GHLSyncPage = () => {
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [leadVendorFilter, setLeadVendorFilter] = useState("__ALL__");
   const [statusFilter, setStatusFilter] = useState("__ALL__");
+  const [syncStatusFilter, setSyncStatusFilter] = useState("__ALL__");
 
   const recordsPerPage = 50;
 
@@ -104,9 +105,14 @@ const GHLSyncPage = () => {
     "Fulfilled carrier requirements",
     "Call Back Fix",
     "Call Never Sent",
-    "Disconnected",
-    "synced",
-    "sync failed"
+    "Disconnected"
+  ];
+
+  const syncStatusOptions = [
+    "All Sync Statuses",
+    "Synced",
+    "Unsynced",
+    "Sync Failed"
   ];
 
   const { toast } = useToast();
@@ -132,7 +138,11 @@ const GHLSyncPage = () => {
 
       // Apply date filter if set
       if (dateFilter) {
-        const dateStr = dateFilter.toISOString().split('T')[0];
+        // Format date to match the database format (YYYY-MM-DD)
+        const year = dateFilter.getFullYear();
+        const month = String(dateFilter.getMonth() + 1).padStart(2, '0');
+        const day = String(dateFilter.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
         query = query.eq('date', dateStr);
       }
 
@@ -143,12 +153,17 @@ const GHLSyncPage = () => {
 
       // Apply status filter if set
       if (statusFilter && statusFilter !== "__ALL__") {
-        if (statusFilter === "synced" || statusFilter === "sync failed") {
-          // Filter by sync_status for sync-related statuses
-          query = query.eq('sync_status', statusFilter);
-        } else {
-          // Filter by status for business logic statuses
-          query = query.eq('status', statusFilter);
+        query = query.eq('status', statusFilter);
+      }
+
+      // Apply sync status filter if set
+      if (syncStatusFilter && syncStatusFilter !== "__ALL__") {
+        if (syncStatusFilter === "Synced") {
+          query = query.eq('sync_status', 'synced');
+        } else if (syncStatusFilter === "Sync Failed") {
+          query = query.eq('sync_status', 'sync failed');
+        } else if (syncStatusFilter === "Unsynced") {
+          query = query.or('sync_status.is.null,sync_status.eq.');
         }
       }
 
@@ -216,7 +231,7 @@ const GHLSyncPage = () => {
   useEffect(() => {
     setCurrentPage(1); // Reset to first page when filters change
     fetchData(1);
-  }, [dateFilter, leadVendorFilter, statusFilter]);
+  }, [dateFilter, leadVendorFilter, statusFilter, syncStatusFilter]);
 
   // Refetch when search term changes (debounced)
   useEffect(() => {
@@ -286,7 +301,7 @@ const GHLSyncPage = () => {
               <CardTitle>Filters</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
                   <Label className="text-sm font-medium">Search</Label>
                   <Input
@@ -342,6 +357,25 @@ const GHLSyncPage = () => {
                       {statusOptions.map((status) => (
                         <SelectItem key={status} value={status === "All Statuses" ? ALL_OPTION : status}>
                           {status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium">
+                    Sync Status
+                    {syncStatusFilter && syncStatusFilter !== ALL_OPTION && <span className="text-blue-600 ml-1">●</span>}
+                  </Label>
+                  <Select value={syncStatusFilter || ALL_OPTION} onValueChange={setSyncStatusFilter}>
+                    <SelectTrigger className={cn("mt-1", syncStatusFilter && syncStatusFilter !== ALL_OPTION && "ring-2 ring-blue-200")}>
+                      <SelectValue placeholder="All Sync Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {syncStatusOptions.map((syncStatus) => (
+                        <SelectItem key={syncStatus} value={syncStatus === "All Sync Statuses" ? ALL_OPTION : syncStatus}>
+                          {syncStatus}
                         </SelectItem>
                       ))}
                     </SelectContent>
