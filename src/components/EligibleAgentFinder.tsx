@@ -97,11 +97,29 @@ export default function EligibleAgentFinder() {
     setLoading(true);
     setHasSearched(true);
     try {
-      const { data, error } = await supabase
-        .rpc('get_eligible_agents_with_upline_check' as any, {
-          p_carrier_name: carrierName,
-          p_state_name: stateName
-        });
+      // Check if the carrier is Aetna - use special function for Aetna
+      const isAetna = carrierName.toLowerCase() === 'aetna';
+      
+      let data, error;
+      
+      if (isAetna) {
+        // Use Aetna-specific function
+        const result = await supabase
+          .rpc('get_eligible_agents_for_aetna' as any, {
+            p_state_name: stateName
+          });
+        data = result.data;
+        error = result.error;
+      } else {
+        // Use general upline check function for all other carriers
+        const result = await supabase
+          .rpc('get_eligible_agents_with_upline_check' as any, {
+            p_carrier_name: carrierName,
+            p_state_name: stateName
+          });
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) throw error;
 
@@ -111,13 +129,15 @@ export default function EligibleAgentFinder() {
       if (agentsList.length === 0) {
         toast({
           title: 'No Eligible Agents Found',
-          description: `No agents are licensed for ${carrierName} in ${stateName}.`,
+          description: isAetna 
+            ? `No agents are available for Aetna in ${stateName} (requires upline approval).`
+            : `No agents are licensed for ${carrierName} in ${stateName}.`,
           variant: 'default'
         });
       } else {
         toast({
           title: 'Search Complete',
-          description: `Found ${agentsList.length} eligible agent(s).`,
+          description: `Found ${agentsList.length} eligible agent(s).${isAetna ? ' (Aetna requires upline licensing)' : ''}`,
         });
       }
     } catch (error) {
@@ -178,6 +198,17 @@ export default function EligibleAgentFinder() {
               </Select>
             </div>
           </div>
+          
+          {/* Aetna Special Notice */}
+          {carrierName.toLowerCase() === 'aetna' && (
+            <Alert className="bg-blue-50 border-blue-200">
+              <CheckCircle2 className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                <strong>Aetna Special Requirements:</strong> This carrier uses a separate state availability system. All 52 US states/territories require upline license verification with custom per-agent state approvals.
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <Button onClick={searchEligibleAgents} disabled={loading || loadingOptions} className="w-full">
             {loading ? (
               <>

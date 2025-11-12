@@ -528,11 +528,27 @@ export function AgentEligibilityPage() {
         throw new Error('Invalid carrier or state selection');
       }
 
-      // Call the new function with upline checking
-      const { data, error } = await supabase.rpc('get_eligible_agents_with_upline_check' as any, {
-        p_carrier_name: carrierObj.carrier_name,
-        p_state_name: stateObj.state_name
-      });
+      // Check if the carrier is Aetna - use special function for Aetna
+      const isAetna = carrierObj.carrier_name.toLowerCase() === 'aetna';
+      
+      let data, error;
+      
+      if (isAetna) {
+        // Use Aetna-specific function
+        const result = await supabase.rpc('get_eligible_agents_for_aetna' as any, {
+          p_state_name: stateObj.state_name
+        });
+        data = result.data;
+        error = result.error;
+      } else {
+        // Call the regular function with upline checking
+        const result = await supabase.rpc('get_eligible_agents_with_upline_check' as any, {
+          p_carrier_name: carrierObj.carrier_name,
+          p_state_name: stateObj.state_name
+        });
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) throw error;
 
@@ -543,7 +559,14 @@ export function AgentEligibilityPage() {
       if (agentsList.length === 0) {
         toast({
           title: "No Eligible Agents",
-          description: `No agents found who are licensed for ${carrierObj.carrier_name} in ${stateObj.state_name}`,
+          description: isAetna 
+            ? `No agents are available for Aetna in ${stateObj.state_name} (requires upline approval and custom state availability)`
+            : `No agents found who are licensed for ${carrierObj.carrier_name} in ${stateObj.state_name}`,
+        });
+      } else {
+        toast({
+          title: "Search Complete",
+          description: `Found ${agentsList.length} eligible agent(s)${isAetna ? ' (Aetna requires upline licensing)' : ''}`,
         });
       }
     } catch (error: any) {
@@ -629,6 +652,17 @@ export function AgentEligibilityPage() {
                     </Select>
                   </div>
                 </div>
+
+                {/* Aetna Special Notice */}
+                {selectedCarrier && carriers.find(c => c.id === selectedCarrier)?.carrier_name.toLowerCase() === 'aetna' && (
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-blue-800">Aetna Special Requirements</AlertTitle>
+                    <AlertDescription className="text-blue-700">
+                      Aetna uses a separate state availability system with custom per-agent approvals. All 52 US states/territories require upline license verification. Results will show agents based on their individual Aetna state availability settings.
+                    </AlertDescription>
+                  </Alert>
+                )}
 
                 {/* Search Button */}
                 <Button
