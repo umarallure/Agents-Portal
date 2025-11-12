@@ -15,12 +15,15 @@ import {
 } from "@/components/ui/select";
 
 interface EligibleAgent {
-  agent_user_id: string;
+  user_id: string;
   agent_name: string;
-  agent_email: string;
+  email: string;
   agent_code: string | null;
   carrier_licensed: boolean;
   state_licensed: boolean;
+  upline_licensed: boolean;
+  upline_required: boolean;
+  upline_name: string | null;
 }
 
 interface Carrier {
@@ -95,16 +98,17 @@ export default function EligibleAgentFinder() {
     setHasSearched(true);
     try {
       const { data, error } = await supabase
-        .rpc('get_eligible_agents', {
+        .rpc('get_eligible_agents_with_upline_check' as any, {
           p_carrier_name: carrierName,
           p_state_name: stateName
         });
 
       if (error) throw error;
 
-      setEligibleAgents(data || []);
+      const agentsList = Array.isArray(data) ? data : [];
+      setEligibleAgents(agentsList);
 
-      if (!data || data.length === 0) {
+      if (agentsList.length === 0) {
         toast({
           title: 'No Eligible Agents Found',
           description: `No agents are licensed for ${carrierName} in ${stateName}.`,
@@ -113,7 +117,7 @@ export default function EligibleAgentFinder() {
       } else {
         toast({
           title: 'Search Complete',
-          description: `Found ${data.length} eligible agent(s).`,
+          description: `Found ${agentsList.length} eligible agent(s).`,
         });
       }
     } catch (error) {
@@ -215,7 +219,7 @@ export default function EligibleAgentFinder() {
               <div className="space-y-3">
                 {eligibleAgents.map((agent) => (
                   <div
-                    key={agent.agent_user_id}
+                    key={agent.user_id}
                     className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
                   >
                     <div className="flex items-center gap-3">
@@ -227,17 +231,38 @@ export default function EligibleAgentFinder() {
                         {agent.agent_code && (
                           <p className="text-sm text-muted-foreground">Code: {agent.agent_code}</p>
                         )}
+                        {agent.upline_name && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Upline: <strong>{agent.upline_name}</strong>
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Badge variant="default" className="flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Carrier
-                      </Badge>
-                      <Badge variant="default" className="flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" />
-                        State
-                      </Badge>
+                      {agent.carrier_licensed && (
+                        <Badge variant="default" className="flex items-center gap-1 bg-green-600">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Carrier
+                        </Badge>
+                      )}
+                      {agent.state_licensed && (
+                        <Badge variant="default" className="flex items-center gap-1 bg-green-600">
+                          <CheckCircle2 className="h-3 w-3" />
+                          State
+                        </Badge>
+                      )}
+                      {agent.upline_required && agent.upline_licensed && (
+                        <Badge variant="default" className="flex items-center gap-1 bg-blue-600">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Upline
+                        </Badge>
+                      )}
+                      {agent.upline_required && !agent.upline_licensed && (
+                        <Badge variant="destructive" className="flex items-center gap-1">
+                          <XCircle className="h-3 w-3" />
+                          Upline Missing
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 ))}

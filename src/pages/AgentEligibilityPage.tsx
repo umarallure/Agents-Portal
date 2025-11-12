@@ -5,11 +5,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { NavigationHeader } from '@/components/NavigationHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Shield, MapPin, Building2, Save, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Shield, MapPin, Building2, Save, RefreshCw, CheckCircle2, Users, AlertTriangle, Info } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
 
 type Carrier = Database['public']['Tables']['carriers']['Row'];
@@ -22,6 +23,20 @@ interface AgentProfile {
   email: string;
   display_name: string | null;
   agent_code: string | null;
+}
+
+interface UplineInfo {
+  upline_user_id: string | null;
+  upline_name: string | null;
+  relationship_type: string | null;
+}
+
+interface OverrideStateInfo {
+  carrier_id: string;
+  carrier_name: string;
+  state_id: string;
+  state_name: string;
+  requires_upline_license: boolean;
 }
 
 export function AgentEligibilityPage() {
@@ -43,6 +58,16 @@ export function AgentEligibilityPage() {
   const [agentStateLicenses, setAgentStateLicenses] = useState<AgentStateLicense[]>([]);
   const [stateChanges, setStateChanges] = useState<Map<string, boolean>>(new Map());
 
+  // Upline data
+  const [uplineInfo, setUplineInfo] = useState<UplineInfo | null>(null);
+  const [overrideStates, setOverrideStates] = useState<OverrideStateInfo[]>([]);
+
+  // Find Eligible Agents feature
+  const [selectedCarrier, setSelectedCarrier] = useState<string>('');
+  const [selectedState, setSelectedState] = useState<string>('');
+  const [eligibleAgents, setEligibleAgents] = useState<any[]>([]);
+  const [searchingAgents, setSearchingAgents] = useState(false);
+
   // Loading states
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -59,12 +84,15 @@ export function AgentEligibilityPage() {
       const agent = agents.find(a => a.id === selectedAgentId);
       setSelectedAgent(agent || null);
       fetchAgentEligibility(selectedAgentId);
+      fetchUplineInfo(selectedAgentId);
+      fetchOverrideStates();
     } else {
       setSelectedAgent(null);
       setAgentCarrierLicenses([]);
       setAgentStateLicenses([]);
       setCarrierChanges(new Map());
       setStateChanges(new Map());
+      setUplineInfo(null);
     }
   }, [selectedAgentId, agents]);
 
@@ -170,6 +198,94 @@ export function AgentEligibilityPage() {
         description: `Failed to fetch carriers and states: ${error.message}`,
         variant: "destructive",
       });
+    }
+  };
+
+  const fetchUplineInfo = async (agentUserId: string) => {
+    try {
+      // Try direct query with type assertion
+      const { data, error } = await supabase
+        .from('agent_upline_hierarchy' as any)
+        .select('upline_user_id, relationship_type')
+        .eq('agent_user_id', agentUserId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching upline hierarchy:', error);
+        setUplineInfo(null);
+        return;
+      }
+
+      if (data && (data as any).upline_user_id) {
+        // Fetch upline name separately
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('user_id', (data as any).upline_user_id)
+          .maybeSingle();
+
+        setUplineInfo({
+          upline_user_id: (data as any).upline_user_id,
+          upline_name: profileData?.display_name || null,
+          relationship_type: (data as any).relationship_type,
+        });
+      } else {
+        setUplineInfo(null);
+      }
+    } catch (error: any) {
+      console.error('Error fetching upline info:', error);
+      setUplineInfo(null);
+    }
+  };
+
+  const fetchOverrideStates = async () => {
+    try {
+      // Use raw query since table might not be in generated types yet
+      const { data: overrideData, error: overrideError } = await supabase
+        .from('carrier_override_states' as any)
+        .select(`
+          carrier_id,
+          state_id,
+          requires_upline_license
+        `)
+        .eq('requires_upline_license', true);
+
+      if (overrideError) {
+        console.error('Override states error:', overrideError);
+        setOverrideStates([]);
+        return;
+      }
+
+      // Fetch carrier and state names separately
+      const carrierIds = [...new Set(overrideData?.map((item: any) => item.carrier_id) || [])];
+      const stateIds = [...new Set(overrideData?.map((item: any) => item.state_id) || [])];
+
+      const { data: carriersData } = await supabase
+        .from('carriers')
+        .select('id, carrier_name')
+        .in('id', carrierIds);
+
+      const { data: statesData } = await supabase
+        .from('states')
+        .select('id, state_name')
+        .in('id', stateIds);
+
+      const carrierMap = new Map(carriersData?.map(c => [c.id, c.carrier_name]));
+      const stateMap = new Map(statesData?.map(s => [s.id, s.state_name]));
+
+      const formattedOverrides: OverrideStateInfo[] = (overrideData || []).map((item: any) => ({
+        carrier_id: item.carrier_id,
+        carrier_name: carrierMap.get(item.carrier_id) || '',
+        state_id: item.state_id,
+        state_name: stateMap.get(item.state_id) || '',
+        requires_upline_license: item.requires_upline_license,
+      }));
+
+      setOverrideStates(formattedOverrides);
+    } catch (error: any) {
+      console.error('Error fetching override states:', error);
+      setOverrideStates([]);
     }
   };
 
@@ -352,6 +468,96 @@ export function AgentEligibilityPage() {
     return { licensed, total: states.length };
   };
 
+  const hasCarrierOverrideStates = (carrierId: string): boolean => {
+    return overrideStates.some(os => os.carrier_id === carrierId);
+  };
+
+  const getCarrierOverrideStates = (carrierId: string): string[] => {
+    return overrideStates
+      .filter(os => os.carrier_id === carrierId)
+      .map(os => os.state_name);
+  };
+
+  const isStateRequiredForCarrier = (stateId: string, carrierId: string): boolean => {
+    return overrideStates.some(os => os.carrier_id === carrierId && os.state_id === stateId);
+  };
+
+  const getUplineStatusForCarrierState = (carrierId: string, stateId: string): {
+    required: boolean;
+    uplineLicensed: boolean;
+  } => {
+    const isRequired = isStateRequiredForCarrier(stateId, carrierId);
+    
+    if (!isRequired || !uplineInfo?.upline_user_id) {
+      return { required: false, uplineLicensed: true };
+    }
+
+    // Check if upline has the necessary licenses
+    const uplineCarrierLicense = agentCarrierLicenses.find(
+      l => l.agent_user_id === uplineInfo.upline_user_id && l.carrier_id === carrierId
+    );
+    const uplineStateLicense = agentStateLicenses.find(
+      l => l.agent_user_id === uplineInfo.upline_user_id && l.state_id === stateId
+    );
+
+    const uplineLicensed = 
+      (uplineCarrierLicense?.is_licensed ?? false) && 
+      (uplineStateLicense?.is_licensed ?? false);
+
+    return { required: true, uplineLicensed };
+  };
+
+  const findEligibleAgents = async () => {
+    if (!selectedCarrier || !selectedState) {
+      toast({
+        title: "Missing Selection",
+        description: "Please select both a carrier and a state",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSearchingAgents(true);
+    setEligibleAgents([]);
+
+    try {
+      const carrierObj = carriers.find(c => c.id === selectedCarrier);
+      const stateObj = states.find(s => s.id === selectedState);
+
+      if (!carrierObj || !stateObj) {
+        throw new Error('Invalid carrier or state selection');
+      }
+
+      // Call the new function with upline checking
+      const { data, error } = await supabase.rpc('get_eligible_agents_with_upline_check' as any, {
+        p_carrier_name: carrierObj.carrier_name,
+        p_state_name: stateObj.state_name
+      });
+
+      if (error) throw error;
+
+      console.log('Eligible agents found:', data);
+      const agentsList = Array.isArray(data) ? data : [];
+      setEligibleAgents(agentsList);
+
+      if (agentsList.length === 0) {
+        toast({
+          title: "No Eligible Agents",
+          description: `No agents found who are licensed for ${carrierObj.carrier_name} in ${stateObj.state_name}`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error finding eligible agents:', error);
+      toast({
+        title: "Error",
+        description: `Failed to find eligible agents: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setSearchingAgents(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <NavigationHeader title="Agent Eligibility Management" />
@@ -368,6 +574,151 @@ export function AgentEligibilityPage() {
               Manage carrier and state licensing eligibility for licensed agents
             </p>
           </div>
+
+          {/* Find Eligible Agents */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Find Eligible Agents
+              </CardTitle>
+              <CardDescription>
+                Search for agents licensed to sell a specific carrier in a specific state
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Carrier Selection */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Carrier Name</label>
+                    <Select
+                      value={selectedCarrier}
+                      onValueChange={setSelectedCarrier}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a carrier..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {carriers.map(carrier => (
+                          <SelectItem key={carrier.id} value={carrier.id}>
+                            {carrier.carrier_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* State Selection */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">State Name</label>
+                    <Select
+                      value={selectedState}
+                      onValueChange={setSelectedState}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a state..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {states.map(state => (
+                          <SelectItem key={state.id} value={state.id}>
+                            {state.state_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Search Button */}
+                <Button
+                  onClick={findEligibleAgents}
+                  disabled={!selectedCarrier || !selectedState || searchingAgents}
+                  className="w-full md:w-auto"
+                >
+                  <Shield className="h-4 w-4 mr-2" />
+                  {searchingAgents ? 'Searching...' : 'Search for Eligible Agents'}
+                </Button>
+
+                {/* Search Results */}
+                {eligibleAgents.length > 0 && (
+                  <div className="mt-6 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold">Search Results</h3>
+                      <Badge variant="secondary">
+                        {eligibleAgents.length} agent{eligibleAgents.length !== 1 ? 's' : ''} found
+                      </Badge>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {eligibleAgents.map((agent: any, index: number) => (
+                        <div
+                          key={agent.user_id || index}
+                          className="flex items-center justify-between p-4 border rounded-lg bg-background hover:bg-accent transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                              <Users className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-semibold">{agent.agent_name || 'Unknown'}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Code: {agent.agent_code || 'N/A'}
+                                {agent.email && ` • ${agent.email}`}
+                              </p>
+                              {agent.upline_name && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Upline: <strong>{agent.upline_name}</strong>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            {agent.carrier_licensed && (
+                              <Badge variant="default" className="bg-green-600">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Carrier
+                              </Badge>
+                            )}
+                            {agent.state_licensed && (
+                              <Badge variant="default" className="bg-green-600">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                State
+                              </Badge>
+                            )}
+                            {agent.upline_required && agent.upline_licensed && (
+                              <Badge variant="default" className="bg-blue-600">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Upline
+                              </Badge>
+                            )}
+                            {agent.upline_required && !agent.upline_licensed && (
+                              <Badge variant="destructive">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Upline Missing
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* No Results Message */}
+                {!searchingAgents && eligibleAgents.length === 0 && selectedCarrier && selectedState && (
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>No Results</AlertTitle>
+                    <AlertDescription>
+                      Click "Search for Eligible Agents" to find agents licensed for the selected carrier and state.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Agent Selection */}
           <Card>
@@ -400,20 +751,47 @@ export function AgentEligibilityPage() {
                 </Select>
 
                 {selectedAgent && (
-                  <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-semibold">{selectedAgent.display_name || 'Unknown Agent'}</p>
-                      <p className="text-sm text-muted-foreground">Agent Code: {selectedAgent.agent_code || 'N/A'}</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+                      <div className="flex-1">
+                        <p className="font-semibold">{selectedAgent.display_name || 'Unknown Agent'}</p>
+                        <p className="text-sm text-muted-foreground">Agent Code: {selectedAgent.agent_code || 'N/A'}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fetchAgentEligibility(selectedAgentId)}
+                        disabled={loading}
+                      >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </Button>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fetchAgentEligibility(selectedAgentId)}
-                      disabled={loading}
-                    >
-                      <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                      Refresh
-                    </Button>
+
+                    {/* Upline Information Alert */}
+                    {uplineInfo && uplineInfo.upline_user_id && (
+                      <Alert>
+                        <Users className="h-4 w-4" />
+                        <AlertTitle>Upline Agent</AlertTitle>
+                        <AlertDescription>
+                          This agent reports to <strong>{uplineInfo.upline_name || 'Unknown'}</strong>
+                          {uplineInfo.relationship_type && ` (${uplineInfo.relationship_type})`}.
+                          Some carriers require the upline to be licensed in certain states.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {/* No Upline Warning */}
+                    {(!uplineInfo || !uplineInfo.upline_user_id) && overrideStates.length > 0 && (
+                      <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>No Upline Assigned</AlertTitle>
+                        <AlertDescription>
+                          This agent has no upline assigned. Some carrier/state combinations require an upline to be licensed.
+                          The agent may be blocked from receiving leads for those combinations.
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </div>
                 )}
               </div>
@@ -423,7 +801,7 @@ export function AgentEligibilityPage() {
           {/* Eligibility Management */}
           {selectedAgentId && !loading && (
             <Tabs defaultValue="carriers" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="carriers" className="flex items-center gap-2">
                   <Building2 className="h-4 w-4" />
                   Carriers ({getCarrierStats().licensed}/{getCarrierStats().total})
@@ -431,6 +809,10 @@ export function AgentEligibilityPage() {
                 <TabsTrigger value="states" className="flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
                   States ({getStateStats().licensed}/{getStateStats().total})
+                </TabsTrigger>
+                <TabsTrigger value="overrides" className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Upline Requirements ({overrideStates.length})
                 </TabsTrigger>
               </TabsList>
 
@@ -462,34 +844,49 @@ export function AgentEligibilityPage() {
                       {carriers.map(carrier => {
                         const isLicensed = isCarrierLicensed(carrier.id);
                         const hasChange = carrierChanges.has(carrier.id);
+                        const hasOverrides = hasCarrierOverrideStates(carrier.id);
+                        const overrideStatesList = hasOverrides ? getCarrierOverrideStates(carrier.id) : [];
                         
                         return (
                           <div
                             key={carrier.id}
-                            className={`flex items-center space-x-3 p-3 rounded-lg border ${
+                            className={`flex flex-col space-y-2 p-3 rounded-lg border ${
                               hasChange ? 'bg-blue-50 border-blue-200' : 'bg-background'
                             } hover:bg-accent transition-colors`}
                           >
-                            <Checkbox
-                              id={`carrier-${carrier.id}`}
-                              checked={isLicensed}
-                              onCheckedChange={(checked) => 
-                                handleCarrierToggle(carrier.id, checked as boolean)
-                              }
-                            />
-                            <label
-                              htmlFor={`carrier-${carrier.id}`}
-                              className="flex-1 text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              {carrier.carrier_name}
-                              {hasChange && (
-                                <Badge variant="secondary" className="ml-2 text-xs">
-                                  Modified
-                                </Badge>
+                            <div className="flex items-center space-x-3">
+                              <Checkbox
+                                id={`carrier-${carrier.id}`}
+                                checked={isLicensed}
+                                onCheckedChange={(checked) => 
+                                  handleCarrierToggle(carrier.id, checked as boolean)
+                                }
+                              />
+                              <label
+                                htmlFor={`carrier-${carrier.id}`}
+                                className="flex-1 text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                {carrier.carrier_name}
+                                {hasChange && (
+                                  <Badge variant="secondary" className="ml-2 text-xs">
+                                    Modified
+                                  </Badge>
+                                )}
+                              </label>
+                              {isLicensed && !hasChange && (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
                               )}
-                            </label>
-                            {isLicensed && !hasChange && (
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            </div>
+                            {hasOverrides && (
+                              <div className="ml-7 text-xs text-muted-foreground">
+                                <div className="flex items-start gap-1">
+                                  <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                  <span>
+                                    Requires upline license in: {overrideStatesList.slice(0, 3).join(', ')}
+                                    {overrideStatesList.length > 3 && ` +${overrideStatesList.length - 3} more`}
+                                  </span>
+                                </div>
+                              </div>
                             )}
                           </div>
                         );
@@ -527,42 +924,154 @@ export function AgentEligibilityPage() {
                       {states.map(state => {
                         const isLicensed = isStateLicensed(state.id);
                         const hasChange = stateChanges.has(state.id);
+                        const carrierOverrides = overrideStates.filter(os => os.state_id === state.id);
+                        const hasOverrides = carrierOverrides.length > 0;
                         
                         return (
                           <div
                             key={state.id}
-                            className={`flex items-center space-x-3 p-3 rounded-lg border ${
+                            className={`flex flex-col space-y-2 p-3 rounded-lg border ${
                               hasChange ? 'bg-blue-50 border-blue-200' : 'bg-background'
                             } hover:bg-accent transition-colors`}
                           >
-                            <Checkbox
-                              id={`state-${state.id}`}
-                              checked={isLicensed}
-                              onCheckedChange={(checked) => 
-                                handleStateToggle(state.id, checked as boolean)
-                              }
-                            />
-                            <label
-                              htmlFor={`state-${state.id}`}
-                              className="flex-1 text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                            >
-                              {state.state_name}
-                              <span className="text-xs text-muted-foreground ml-1">
-                                ({state.state_code})
-                              </span>
-                              {hasChange && (
-                                <Badge variant="secondary" className="ml-2 text-xs">
-                                  Modified
-                                </Badge>
+                            <div className="flex items-center space-x-3">
+                              <Checkbox
+                                id={`state-${state.id}`}
+                                checked={isLicensed}
+                                onCheckedChange={(checked) => 
+                                  handleStateToggle(state.id, checked as boolean)
+                                }
+                              />
+                              <label
+                                htmlFor={`state-${state.id}`}
+                                className="flex-1 text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                {state.state_name}
+                                <span className="text-xs text-muted-foreground ml-1">
+                                  ({state.state_code})
+                                </span>
+                                {hasChange && (
+                                  <Badge variant="secondary" className="ml-2 text-xs">
+                                    Modified
+                                  </Badge>
+                                )}
+                              </label>
+                              {isLicensed && !hasChange && (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
                               )}
-                            </label>
-                            {isLicensed && !hasChange && (
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            </div>
+                            {hasOverrides && (
+                              <div className="ml-7 text-xs text-amber-600 dark:text-amber-400">
+                                <div className="flex items-start gap-1">
+                                  <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                  <span>
+                                    {carrierOverrides.length} carrier{carrierOverrides.length > 1 ? 's' : ''} require upline
+                                  </span>
+                                </div>
+                              </div>
                             )}
                           </div>
                         );
                       })}
                     </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Override States Tab */}
+              <TabsContent value="overrides" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      Upline License Requirements
+                    </CardTitle>
+                    <CardDescription>
+                      These carrier/state combinations require the upline agent to also be licensed
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {overrideStates.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Info className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                        <p>No upline license requirements configured</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {/* Group by carrier */}
+                        {Array.from(new Set(overrideStates.map(os => os.carrier_name))).map(carrierName => {
+                          const carrierStates = overrideStates.filter(os => os.carrier_name === carrierName);
+                          const carrier = carriers.find(c => c.carrier_name === carrierName);
+                          const isAgentCarrierLicensed = carrier ? isCarrierLicensed(carrier.id) : false;
+
+                          return (
+                            <div key={carrierName} className="border rounded-lg p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <h3 className="font-semibold flex items-center gap-2">
+                                  <Building2 className="h-4 w-4" />
+                                  {carrierName}
+                                  {isAgentCarrierLicensed ? (
+                                    <Badge variant="default" className="bg-green-600">Licensed</Badge>
+                                  ) : (
+                                    <Badge variant="secondary">Not Licensed</Badge>
+                                  )}
+                                </h3>
+                                <span className="text-sm text-muted-foreground">
+                                  {carrierStates.length} state{carrierStates.length > 1 ? 's' : ''}
+                                </span>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                {carrierStates.map(os => {
+                                  const isAgentStateLicensed = isStateLicensed(os.state_id);
+                                  const uplineStatus = uplineInfo?.upline_user_id 
+                                    ? getUplineStatusForCarrierState(os.carrier_id, os.state_id)
+                                    : { required: true, uplineLicensed: false };
+
+                                  let badgeVariant: "default" | "secondary" | "destructive" = "secondary";
+                                  let badgeText = "Not Licensed";
+                                  
+                                  if (isAgentStateLicensed && uplineStatus.uplineLicensed) {
+                                    badgeVariant = "default";
+                                    badgeText = "✓ Ready";
+                                  } else if (isAgentStateLicensed && !uplineStatus.uplineLicensed) {
+                                    badgeVariant = "destructive";
+                                    badgeText = "⚠ Upline Missing";
+                                  }
+
+                                  return (
+                                    <div
+                                      key={os.state_id}
+                                      className={`text-sm p-2 rounded border ${
+                                        isAgentStateLicensed && uplineStatus.uplineLicensed
+                                          ? 'bg-green-50 border-green-200'
+                                          : isAgentStateLicensed
+                                          ? 'bg-amber-50 border-amber-200'
+                                          : 'bg-gray-50 border-gray-200'
+                                      }`}
+                                    >
+                                      <div className="font-medium">{os.state_name}</div>
+                                      <Badge variant={badgeVariant} className="text-xs mt-1">
+                                        {badgeText}
+                                      </Badge>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              {!uplineInfo?.upline_user_id && (
+                                <Alert variant="destructive" className="mt-3">
+                                  <AlertTriangle className="h-4 w-4" />
+                                  <AlertDescription className="text-xs">
+                                    Agent has no upline assigned. They will be blocked from receiving leads for these states.
+                                  </AlertDescription>
+                                </Alert>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>

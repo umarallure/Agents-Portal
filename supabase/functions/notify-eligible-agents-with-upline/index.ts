@@ -1,44 +1,53 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
+
 const SLACK_BOT_TOKEN = Deno.env.get('SLACK_BOT_TOKEN');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-serve(async (req)=>{
+
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: corsHeaders
     });
   }
+
   try {
     // Log incoming request for debugging
     const rawBody = await req.text();
-    console.log('[DEBUG] Notify eligible agents request:', rawBody);
+    console.log('[DEBUG] Notify eligible agents (with upline check) request:', rawBody);
+    
     const { carrier, state, lead_vendor } = JSON.parse(rawBody);
+
     if (!SLACK_BOT_TOKEN) {
       console.error('[ERROR] SLACK_BOT_TOKEN not configured');
       throw new Error('SLACK_BOT_TOKEN not configured');
     }
+
     if (!carrier || !state || !lead_vendor) {
       console.error('[ERROR] Missing required fields: carrier, state, or lead_vendor');
-      return new Response(JSON.stringify({
-        success: false,
-        message: 'Missing required fields: carrier, state, or lead_vendor'
-      }), {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Missing required fields: carrier, state, or lead_vendor'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      });
+      );
     }
+
     // Initialize Supabase client
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
     // Center mapping for different lead vendors
-    const leadVendorCenterMapping = {
+    const leadVendorCenterMapping: Record<string, string> = {
       "Ark Tech": "#orbit-team-ark-tech",
       "Lumenix BPO": "#orbit-team-lumenix-bpo",
       "GrowthOnics BPO": "#orbit-team-growthonics-bpo",
@@ -81,8 +90,9 @@ serve(async (req)=>{
       "StratiX BPO": "#orbit-team-stratix-bpo",
       "Test": "#test-bpo"
     };
+
     // Agent Slack ID mapping with full display names
-    const agentSlackIdMapping = {
+    const agentSlackIdMapping: Record<string, { slackId: string; displayName: string }> = {
       "Abdul": {
         slackId: "U07ULU99VD4",
         displayName: "Benjamin Wunder - Sales Manager"
@@ -104,34 +114,46 @@ serve(async (req)=>{
         displayName: "Isaac Reed - Insurance Agent"
       }
     };
+
     const centerChannel = leadVendorCenterMapping[lead_vendor];
     if (!centerChannel) {
       console.error(`[ERROR] No center channel mapping for vendor: ${lead_vendor}`);
-      return new Response(JSON.stringify({
-        success: false,
-        message: `No center channel mapping for vendor: ${lead_vendor}`
-      }), {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: `No center channel mapping for vendor: ${lead_vendor}`
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      });
+      );
     }
-    // Get eligible agents from database
-    console.log(`[DEBUG] Fetching eligible agents for carrier: ${carrier}, state: ${state}`);
-    const { data: eligibleAgents, error: agentsError } = await supabase.rpc('get_eligible_agents', {
-      p_carrier_name: carrier,
-      p_state_name: state
-    });
+
+    // Get eligible agents from database using the upline-aware function
+    console.log(`[DEBUG] Fetching eligible agents (with upline check) for carrier: ${carrier}, state: ${state}`);
+    const { data: eligibleAgents, error: agentsError } = await supabase.rpc(
+      'get_eligible_agents_with_upline_check',
+      {
+        p_carrier_name: carrier,
+        p_state_name: state
+      }
+    );
+
     if (agentsError) {
       console.error('[ERROR] Failed to fetch eligible agents:', agentsError);
       throw new Error(`Failed to fetch eligible agents: ${agentsError.message}`);
     }
-    console.log(`[DEBUG] Found ${eligibleAgents?.length || 0} eligible agents:`, eligibleAgents);
+
+    console.log(`[DEBUG] Found ${eligibleAgents?.length || 0} eligible agents (after upline check):`, eligibleAgents);
+
+    // Check if this is an override state
+    const hasOverrideState = eligibleAgents && eligibleAgents.length > 0 && eligibleAgents[0]?.upline_required;
+
     if (!eligibleAgents || eligibleAgents.length === 0) {
-      console.log('[INFO] No eligible agents found for this carrier/state combination');
-      // Send notification anyway but indicate no eligible agents
+      console.log('[INFO] No eligible agents found for this carrier/state combination (including upline checks)');
+      
+      // Send notification with additional context about override states
       const noAgentsMessage = {
         channel: centerChannel,
         text: `🚨 *New Lead Available* - No eligible agents found for ${carrier} in ${state}`,
@@ -149,18 +171,15 @@ serve(async (req)=>{
             fields: [
               {
                 type: 'mrkdwn',
-                text: `*Call Center:*
-${lead_vendor}`
+                text: `*Call Center:*\n${lead_vendor}`
               },
               {
                 type: 'mrkdwn',
-                text: `*Carrier:*
-${carrier}`
+                text: `*Carrier:*\n${carrier}`
               },
               {
                 type: 'mrkdwn',
-                text: `*State:*
-${state}`
+                text: `*State:*\n${state}`
               }
             ]
           },
@@ -168,11 +187,12 @@ ${state}`
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: '⚠️ *No eligible agents found for this carrier/state combination*'
+              text: '⚠️ *No eligible agents found for this carrier/state combination*\n\n_This may be due to upline license requirements for override states._'
             }
           }
         ]
       };
+
       const slackResponse = await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
         headers: {
@@ -181,101 +201,125 @@ ${state}`
         },
         body: JSON.stringify(noAgentsMessage)
       });
+
       const slackResult = await slackResponse.json();
       console.log('[DEBUG] Slack API response (no agents):', slackResult);
-      return new Response(JSON.stringify({
-        success: true,
-        eligible_agents_count: 0,
-        message: 'No eligible agents found, notification sent',
-        channel: centerChannel
-      }), {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          eligible_agents_count: 0,
+          message: 'No eligible agents found (after upline checks), notification sent',
+          channel: centerChannel
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      });
+      );
     }
+
     // Build agent mentions for Slack with full display names
     // Sort agents so Sales Managers appear at the bottom
-    const sortedAgents = [
-      ...eligibleAgents
-    ].sort((a, b)=>{
+    const sortedAgents = [...eligibleAgents].sort((a, b) => {
       const aInfo = agentSlackIdMapping[a.agent_name];
       const bInfo = agentSlackIdMapping[b.agent_name];
+      
       // If both have display names, check if one is a Sales Manager
       if (aInfo && bInfo) {
         const aIsSalesManager = aInfo.displayName.includes('Sales Manager');
         const bIsSalesManager = bInfo.displayName.includes('Sales Manager');
+        
         if (aIsSalesManager && !bIsSalesManager) return 1; // a (Sales Manager) goes after b
         if (!aIsSalesManager && bIsSalesManager) return -1; // b (Sales Manager) goes after a
       }
+      
       // Default alphabetical sort for same role types
       return a.agent_name.localeCompare(b.agent_name);
     });
-    const agentMentions = sortedAgents.map((agent)=>{
+
+    const agentMentions = sortedAgents.map((agent: any) => {
       const agentInfo = agentSlackIdMapping[agent.agent_name];
+      const uplineNote = agent.upline_name ? ` _(upline: ${agent.upline_name})_` : '';
+      
       if (agentInfo) {
-        return `• <@${agentInfo.slackId}>`;
+        return `• <@${agentInfo.slackId}>${uplineNote}`;
       }
-      return `• ${agent.agent_name}`;
+      return `• ${agent.agent_name}${uplineNote}`;
     }).join('\n');
+
     // Build the Slack message
     const slackText = `🔔 *New Lead Available for ${carrier} in ${state}*`;
+    const messageBlocks: any[] = [
+      {
+        type: 'header',
+        text: {
+          type: 'plain_text',
+          text: '🔔 New Lead Available',
+          emoji: true
+        }
+      },
+      {
+        type: 'section',
+        fields: [
+          {
+            type: 'mrkdwn',
+            text: `*Call Center:*\n${lead_vendor}`
+          },
+          {
+            type: 'mrkdwn',
+            text: `*Carrier:*\n${carrier}`
+          },
+          {
+            type: 'mrkdwn',
+            text: `*State:*\n${state}`
+          }
+        ]
+      }
+    ];
+
+    // Add override state warning if applicable
+    if (hasOverrideState) {
+      messageBlocks.push({
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: '⚠️ _This is an override state - upline licenses verified_'
+          }
+        ]
+      });
+    }
+
+    messageBlocks.push(
+      {
+        type: 'divider'
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*Agents who can take this call:*\n${agentMentions}`
+        }
+      },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `${eligibleAgents.length} eligible agent(s)${hasOverrideState ? ' (upline licenses verified)' : ''}`
+          }
+        ]
+      }
+    );
+
     const slackMessage = {
       channel: centerChannel,
       text: slackText,
-      blocks: [
-        {
-          type: 'header',
-          text: {
-            type: 'plain_text',
-            text: '🔔 New Lead Available',
-            emoji: true
-          }
-        },
-        {
-          type: 'section',
-          fields: [
-            {
-              type: 'mrkdwn',
-              text: `*Call Center:*
-${lead_vendor}`
-            },
-            {
-              type: 'mrkdwn',
-              text: `*Carrier:*
-${carrier}`
-            },
-            {
-              type: 'mrkdwn',
-              text: `*State:*
-${state}`
-            }
-          ]
-        },
-        {
-          type: 'divider'
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `*Agents who can take this call:*
-${agentMentions}`
-          }
-        },
-        {
-          type: 'context',
-          elements: [
-            {
-              type: 'mrkdwn',
-              text: `${eligibleAgents.length} eligible agent(s)`
-            }
-          ]
-        }
-      ]
+      blocks: messageBlocks
     };
+
     console.log('[DEBUG] Slack message payload:', JSON.stringify(slackMessage, null, 2));
+
     const slackResponse = await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
       headers: {
@@ -284,46 +328,54 @@ ${agentMentions}`
       },
       body: JSON.stringify(slackMessage)
     });
+
     const slackResult = await slackResponse.json();
     console.log('[DEBUG] Slack API response:', slackResult);
+
     if (!slackResult.ok) {
       console.error('[ERROR] Slack API error:', slackResult);
-      return new Response(JSON.stringify({
-        success: false,
-        message: slackResult.error,
-        debug: slackResult
-      }), {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: slackResult.error,
+          debug: slackResult
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      });
+      );
     }
-    return new Response(JSON.stringify({
-      success: true,
-      eligible_agents_count: eligibleAgents.length,
-      eligible_agents: eligibleAgents.map((a)=>a.agent_name),
-      messageTs: slackResult.ts,
-      channel: centerChannel,
-      debug: slackResult
-    }), {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        eligible_agents_count: eligibleAgents.length,
+        eligible_agents: eligibleAgents.map((a: any) => ({
+          name: a.agent_name,
+          upline: a.upline_name,
+          upline_required: a.upline_required
+        })),
+        override_state: hasOverrideState,
+        messageTs: slackResult.ts,
+        channel: centerChannel,
+        debug: slackResult
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-    });
+    );
   } catch (error) {
-    console.error('[ERROR] Exception in notify-eligible-agents function:', error);
-    return new Response(JSON.stringify({
-      error: error.message,
-      debug: String(error)
-    }), {
-      status: 500,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
+    console.error('[ERROR] Exception in notify-eligible-agents-with-upline function:', error);
+    return new Response(
+      JSON.stringify({
+        error: error.message,
+        debug: String(error)
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-    });
+    );
   }
 });
