@@ -103,6 +103,8 @@ const GHLSyncPage = () => {
     "Application Withdrawn",
     "Updated Banking/draft date",
     "Fulfilled carrier requirements",
+    "Pending Failed Payment Fix",
+    "Updated Banking and draft date",
     "Call Back Fix",
     "Call Never Sent",
     "Disconnected"
