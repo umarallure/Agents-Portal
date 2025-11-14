@@ -230,9 +230,8 @@ serve(async (req)=>{
     });
     const agentMentions = sortedAgents.map((agent)=>{
       const agentInfo = agentSlackIdMapping[agent.agent_name];
-      const uplineNote = agent.upline_name ? ` _(upline: ${agent.upline_name})_` : '';
       if (agentInfo) {
-        return `• <@${agentInfo.slackId}>${uplineNote}`;
+        return `• <@${agentInfo.slackId}>`;
       }
       return `• ${agent.agent_name}`;
     }).join('\n');
@@ -279,7 +278,7 @@ serve(async (req)=>{
       elements: [
         {
           type: 'mrkdwn',
-          text: `${eligibleAgents.length} eligible agent(s)${hasOverrideState ? ' (upline licenses verified)' : ''}`
+          text: `${eligibleAgents.length} eligible agent(s)`
         }
       ]
     });

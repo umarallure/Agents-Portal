@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ChevronLeft, ChevronRight, ExternalLink, RefreshCw, CheckSquare, Square, Play, X } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, ExternalLink, RefreshCw, CheckSquare, Square, Play, X, Copy } from 'lucide-react';
 import { GHLSyncRow } from '../GHLSyncPage';
 
 interface GHLSyncDataGridProps {
@@ -685,7 +685,6 @@ export const GHLSyncDataGrid = ({
                 </button>
               </TableHead>
               <TableHead className='w-[120px]'>Date</TableHead>
-              <TableHead className='w-[140px]'>Submission ID</TableHead>
               <TableHead className='w-[160px]'>Insured Name</TableHead>
               <TableHead className='w-[140px]'>Phone</TableHead>
               <TableHead className='w-[120px]'>Lead Vendor</TableHead>
@@ -693,6 +692,7 @@ export const GHLSyncDataGrid = ({
               <TableHead className='w-[120px]'>Status</TableHead>
               <TableHead className='w-[100px]'>Carrier</TableHead>
               <TableHead className='w-[100px]'>Face Amount</TableHead>
+              <TableHead className='w-[200px]'>Notes</TableHead>
               <TableHead className='w-[120px]'>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -717,9 +717,6 @@ export const GHLSyncDataGrid = ({
                 <TableCell className='font-medium'>
                   {formatDate(row.date)}
                 </TableCell>
-                <TableCell className='font-mono text-sm'>
-                  {row.submission_id}
-                </TableCell>
                 <TableCell>{row.insured_name || 'N/A'}</TableCell>
                 <TableCell className='font-mono text-sm'>
                   {row.client_phone_number || 'N/A'}
@@ -734,6 +731,29 @@ export const GHLSyncDataGrid = ({
                 <TableCell>{row.carrier || 'N/A'}</TableCell>
                 <TableCell className='text-right'>
                   {formatCurrency(row.face_amount)}
+                </TableCell>
+                <TableCell>
+                  {row.notes ? (
+                    <div className='flex items-center gap-1 max-w-[200px]'>
+                      <span className='truncate text-sm'>{row.notes}</span>
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        onClick={() => {
+                          navigator.clipboard.writeText(row.notes || '');
+                          toast({
+                            title: 'Copied!',
+                            description: 'Notes copied to clipboard',
+                          });
+                        }}
+                        className='h-6 w-6 p-0 flex-shrink-0'
+                      >
+                        <Copy className='h-3 w-3' />
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className='text-muted-foreground text-sm'>No notes</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   {row.sync_status?.toLowerCase() === 'synced' ? (

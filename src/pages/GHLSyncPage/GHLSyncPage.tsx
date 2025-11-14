@@ -43,7 +43,7 @@ const GHLSyncPage = () => {
   const [statusFilter, setStatusFilter] = useState("__ALL__");
   const [syncStatusFilter, setSyncStatusFilter] = useState("__ALL__");
 
-  const recordsPerPage = 50;
+  const recordsPerPage = 100;
 
   // Special constant to represent "All" selections (cannot use empty string with Radix UI)
   const ALL_OPTION = "__ALL__";

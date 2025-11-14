@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { NavigationHeader } from '@/components/NavigationHeader';
+import AetnaStateAvailabilityManager from '@/components/AetnaStateAvailabilityManager';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -835,7 +836,7 @@ export function AgentEligibilityPage() {
           {/* Eligibility Management */}
           {selectedAgentId && !loading && (
             <Tabs defaultValue="carriers" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="carriers" className="flex items-center gap-2">
                   <Building2 className="h-4 w-4" />
                   Carriers ({getCarrierStats().licensed}/{getCarrierStats().total})
@@ -843,6 +844,10 @@ export function AgentEligibilityPage() {
                 <TabsTrigger value="states" className="flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
                   States ({getStateStats().licensed}/{getStateStats().total})
+                </TabsTrigger>
+                <TabsTrigger value="aetna" className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-blue-600" />
+                  Aetna States
                 </TabsTrigger>
                 <TabsTrigger value="overrides" className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4" />
@@ -1106,6 +1111,24 @@ export function AgentEligibilityPage() {
                         })}
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Aetna States Tab */}
+              <TabsContent value="aetna" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-blue-600" />
+                      Aetna State Availability Management
+                    </CardTitle>
+                    <CardDescription>
+                      Manage agent-specific Aetna state availability. This is separate from general state licensing.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <AetnaStateAvailabilityManager />
                   </CardContent>
                 </Card>
               </TabsContent>

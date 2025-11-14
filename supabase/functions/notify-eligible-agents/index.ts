@@ -16,7 +16,7 @@ serve(async (req)=>{
   try {
     // Log incoming request for debugging
     const rawBody = await req.text();
-    console.log('[DEBUG] Notify eligible agents request:', rawBody);
+    console.log('[DEBUG] Notify eligible agents (with upline check) request:', rawBody);
     const { carrier, state, lead_vendor } = JSON.parse(rawBody);
     if (!SLACK_BOT_TOKEN) {
       console.error('[ERROR] SLACK_BOT_TOKEN not configured');
@@ -87,6 +87,10 @@ serve(async (req)=>{
         slackId: "U07ULU99VD4",
         displayName: "Benjamin Wunder - Sales Manager"
       },
+      "Benjamin": {
+        slackId: "U07ULU99VD4",
+        displayName: "Benjamin Wunder - Sales Manager"
+      },
       "Zack": {
         slackId: "U09AWBNGBQF",
         displayName: "Zack Lesnar - Insurance Agent"
@@ -118,20 +122,37 @@ serve(async (req)=>{
         }
       });
     }
-    // Get eligible agents from database
-    console.log(`[DEBUG] Fetching eligible agents for carrier: ${carrier}, state: ${state}`);
-    const { data: eligibleAgents, error: agentsError } = await supabase.rpc('get_eligible_agents', {
-      p_carrier_name: carrier,
-      p_state_name: state
-    });
+    // Get eligible agents from database using the upline-aware function
+    console.log(`[DEBUG] Fetching eligible agents (with upline check) for carrier: ${carrier}, state: ${state}`);
+    let eligibleAgents;
+    let agentsError;
+    // Special handling for Aetna - uses separate state availability table
+    if (carrier.toLowerCase() === 'aetna') {
+      console.log('[DEBUG] Using Aetna-specific eligibility function');
+      const result = await supabase.rpc('get_eligible_agents_for_aetna', {
+        p_state_name: state
+      });
+      eligibleAgents = result.data;
+      agentsError = result.error;
+    } else {
+      // Use existing function for other carriers
+      const result = await supabase.rpc('get_eligible_agents_with_upline_check', {
+        p_carrier_name: carrier,
+        p_state_name: state
+      });
+      eligibleAgents = result.data;
+      agentsError = result.error;
+    }
     if (agentsError) {
       console.error('[ERROR] Failed to fetch eligible agents:', agentsError);
       throw new Error(`Failed to fetch eligible agents: ${agentsError.message}`);
     }
-    console.log(`[DEBUG] Found ${eligibleAgents?.length || 0} eligible agents:`, eligibleAgents);
+    console.log(`[DEBUG] Found ${eligibleAgents?.length || 0} eligible agents (after upline check):`, eligibleAgents);
+    // Check if this is an override state
+    const hasOverrideState = eligibleAgents && eligibleAgents.length > 0 && eligibleAgents[0]?.upline_required;
     if (!eligibleAgents || eligibleAgents.length === 0) {
       console.log('[INFO] No eligible agents found for this carrier/state combination');
-      // Send notification anyway but indicate no eligible agents
+      // Send notification with additional context about override states
       const noAgentsMessage = {
         channel: centerChannel,
         text: `🚨 *New Lead Available* - No eligible agents found for ${carrier} in ${state}`,
@@ -149,18 +170,15 @@ serve(async (req)=>{
             fields: [
               {
                 type: 'mrkdwn',
-                text: `*Call Center:*
-${lead_vendor}`
+                text: `*Call Center:*\n${lead_vendor}`
               },
               {
                 type: 'mrkdwn',
-                text: `*Carrier:*
-${carrier}`
+                text: `*Carrier:*\n${carrier}`
               },
               {
                 type: 'mrkdwn',
-                text: `*State:*
-${state}`
+                text: `*State:*\n${state}`
               }
             ]
           },
@@ -186,7 +204,7 @@ ${state}`
       return new Response(JSON.stringify({
         success: true,
         eligible_agents_count: 0,
-        message: 'No eligible agents found, notification sent',
+        message: 'No eligible agents found (after upline checks), notification sent',
         channel: centerChannel
       }), {
         headers: {
@@ -206,13 +224,27 @@ ${state}`
       if (aInfo && bInfo) {
         const aIsSalesManager = aInfo.displayName.includes('Sales Manager');
         const bIsSalesManager = bInfo.displayName.includes('Sales Manager');
-        if (aIsSalesManager && !bIsSalesManager) return 1; // a (Sales Manager) goes after b
-        if (!aIsSalesManager && bIsSalesManager) return -1; // b (Sales Manager) goes after a
+        if (aIsSalesManager && !bIsSalesManager) return 1;
+        if (!aIsSalesManager && bIsSalesManager) return -1;
       }
-      // Default alphabetical sort for same role types
       return a.agent_name.localeCompare(b.agent_name);
     });
-    const agentMentions = sortedAgents.map((agent)=>{
+    
+    // Deduplicate agents by Slack ID to avoid duplicate mentions
+    const seenSlackIds = new Set();
+    const uniqueAgents = sortedAgents.filter((agent)=>{
+      const agentInfo = agentSlackIdMapping[agent.agent_name];
+      if (agentInfo) {
+        if (seenSlackIds.has(agentInfo.slackId)) {
+          return false; // Skip duplicate
+        }
+        seenSlackIds.add(agentInfo.slackId);
+        return true;
+      }
+      return true; // Keep agents without Slack ID mapping
+    });
+    
+    const agentMentions = uniqueAgents.map((agent)=>{
       const agentInfo = agentSlackIdMapping[agent.agent_name];
       if (agentInfo) {
         return `• <@${agentInfo.slackId}>`;
@@ -221,59 +253,55 @@ ${state}`
     }).join('\n');
     // Build the Slack message
     const slackText = `🔔 *New Lead Available for ${carrier} in ${state}*`;
+    const messageBlocks = [
+      {
+        type: 'header',
+        text: {
+          type: 'plain_text',
+          text: '🔔 New Lead Available',
+          emoji: true
+        }
+      },
+      {
+        type: 'section',
+        fields: [
+          {
+            type: 'mrkdwn',
+            text: `*Call Center:*\n${lead_vendor}`
+          },
+          {
+            type: 'mrkdwn',
+            text: `*Carrier:*\n${carrier}`
+          },
+          {
+            type: 'mrkdwn',
+            text: `*State:*\n${state}`
+          }
+        ]
+      }
+    ];
+    // Add override state warning if applicable
+    messageBlocks.push({
+      type: 'divider'
+    }, {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Agents who can take this call:*\n${agentMentions}`
+      }
+    }, {
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: `${eligibleAgents.length} eligible agent(s)`
+        }
+      ]
+    });
     const slackMessage = {
       channel: centerChannel,
       text: slackText,
-      blocks: [
-        {
-          type: 'header',
-          text: {
-            type: 'plain_text',
-            text: '🔔 New Lead Available',
-            emoji: true
-          }
-        },
-        {
-          type: 'section',
-          fields: [
-            {
-              type: 'mrkdwn',
-              text: `*Call Center:*
-${lead_vendor}`
-            },
-            {
-              type: 'mrkdwn',
-              text: `*Carrier:*
-${carrier}`
-            },
-            {
-              type: 'mrkdwn',
-              text: `*State:*
-${state}`
-            }
-          ]
-        },
-        {
-          type: 'divider'
-        },
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `*Agents who can take this call:*
-${agentMentions}`
-          }
-        },
-        {
-          type: 'context',
-          elements: [
-            {
-              type: 'mrkdwn',
-              text: `${eligibleAgents.length} eligible agent(s)`
-            }
-          ]
-        }
-      ]
+      blocks: messageBlocks
     };
     console.log('[DEBUG] Slack message payload:', JSON.stringify(slackMessage, null, 2));
     const slackResponse = await fetch('https://slack.com/api/chat.postMessage', {
@@ -303,7 +331,12 @@ ${agentMentions}`
     return new Response(JSON.stringify({
       success: true,
       eligible_agents_count: eligibleAgents.length,
-      eligible_agents: eligibleAgents.map((a)=>a.agent_name),
+      eligible_agents: eligibleAgents.map((a)=>({
+          name: a.agent_name,
+          upline: a.upline_name,
+          upline_required: a.upline_required
+        })),
+      override_state: hasOverrideState,
       messageTs: slackResult.ts,
       channel: centerChannel,
       debug: slackResult
@@ -314,7 +347,7 @@ ${agentMentions}`
       }
     });
   } catch (error) {
-    console.error('[ERROR] Exception in notify-eligible-agents function:', error);
+    console.error('[ERROR] Exception in notify-eligible-agents-with-upline function:', error);
     return new Response(JSON.stringify({
       error: error.message,
       debug: String(error)

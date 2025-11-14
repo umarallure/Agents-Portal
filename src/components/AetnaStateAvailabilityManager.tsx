@@ -106,6 +106,7 @@ export default function AetnaStateAvailabilityManager() {
   const fetchAgents = async () => {
     setLoading(true);
     try {
+      // Fetch profiles with display names - we'll use display_name as identifier
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('user_id, display_name, agent_code')
@@ -113,16 +114,11 @@ export default function AetnaStateAvailabilityManager() {
 
       if (profilesError) throw profilesError;
 
-      const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
-      if (usersError) throw usersError;
-
-      const agentsWithEmail = profilesData?.map(profile => {
-        const user = users?.find(u => u.id === profile.user_id);
-        return {
-          ...profile,
-          email: user?.email || 'N/A'
-        };
-      }) || [];
+      // Map profiles to agent format (using display_name as email fallback for UI)
+      const agentsWithEmail = profilesData?.map(profile => ({
+        ...profile,
+        email: profile.display_name || 'N/A'
+      })) || [];
 
       setAgents(agentsWithEmail);
     } catch (error) {
