@@ -28,6 +28,8 @@ import DealFlowLookup from "./pages/DealFlowLookup";
 import AgentLicensing from "./pages/AgentLicensing";
 import { AgentEligibilityPage } from "./pages/AgentEligibilityPage";
 import GHLSyncPage from "./pages/GHLSyncPage/GHLSyncPage";
+import BufferPerformanceReport from "./pages/BufferPerformanceReport";
+import LicensedAgentPerformanceReport from "./pages/LicensedAgentPerformanceReport";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
@@ -186,6 +188,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AgentEligibilityPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/buffer-performance-report" 
+              element={
+                <ProtectedRoute>
+                  <BufferPerformanceReport />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/licensed-agent-performance-report" 
+              element={
+                <ProtectedRoute>
+                  <LicensedAgentPerformanceReport />
                 </ProtectedRoute>
               } 
             />

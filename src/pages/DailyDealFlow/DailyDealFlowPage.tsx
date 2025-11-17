@@ -11,10 +11,11 @@ import { CreateEntryForm } from "./components/CreateEntryForm";
 import { EODReports } from "@/components/EODReports";
 import { WeeklyReports } from "@/components/WeeklyReports";
 import { GHLExport } from "@/components/GHLExport";
-import { Loader2, RefreshCw, Download, FileSpreadsheet, ChevronDown, MoreHorizontal } from "lucide-react";
+import { Loader2, RefreshCw, Download, FileSpreadsheet, ChevronDown, FileText, Calendar, BarChart3, UserCheck } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { canPerformWriteOperations } from "@/lib/userPermissions";
 import { dateObjectToESTString } from "@/lib/dateUtils";
+import { useNavigate } from "react-router-dom";
 
 export interface DailyDealFlowRow {
   id: string;
@@ -70,6 +71,7 @@ const DailyDealFlowPage = () => {
   
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   // Check if current user has write permissions
   const hasWritePermissions = canPerformWriteOperations(user?.id);
@@ -241,12 +243,182 @@ const DailyDealFlowPage = () => {
     fetchData(1, true);
   };
 
-  const handleExport = () => {
-    // TODO: Implement CSV export
-    toast({
-      title: "Coming Soon",
-      description: "Export functionality will be available soon",
-    });
+  const handleExport = async () => {
+    try {
+      // Fetch all filtered data (not just current page) for export
+      let query = supabase
+        .from('daily_deal_flow')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      // Apply all the same filters
+      if (dateFilter) {
+        const dateStr = dateObjectToESTString(dateFilter);
+        query = query.eq('date', dateStr);
+      }
+
+      if (dateFromFilter) {
+        const dateFromStr = dateObjectToESTString(dateFromFilter);
+        query = query.gte('date', dateFromStr);
+      }
+
+      if (dateToFilter) {
+        const dateToStr = dateObjectToESTString(dateToFilter);
+        query = query.lte('date', dateToStr);
+      }
+
+      if (bufferAgentFilter && bufferAgentFilter !== ALL_OPTION) {
+        query = query.eq('buffer_agent', bufferAgentFilter);
+      }
+
+      if (licensedAgentFilter && licensedAgentFilter !== ALL_OPTION) {
+        query = query.eq('licensed_agent_account', licensedAgentFilter);
+      }
+
+      if (leadVendorFilter && leadVendorFilter !== ALL_OPTION) {
+        query = query.eq('lead_vendor', leadVendorFilter);
+      }
+
+      if (statusFilter && statusFilter !== ALL_OPTION) {
+        query = query.eq('status', statusFilter);
+      }
+
+      if (carrierFilter && carrierFilter !== ALL_OPTION) {
+        query = query.eq('carrier', carrierFilter);
+      }
+
+      if (callResultFilter && callResultFilter !== ALL_OPTION) {
+        query = query.eq('call_result', callResultFilter);
+      }
+
+      if (retentionFilter && retentionFilter !== ALL_OPTION) {
+        const isRetention = retentionFilter === 'Retention';
+        query = query.eq('is_retention_call', isRetention);
+      }
+
+      if (incompleteUpdatesFilter && incompleteUpdatesFilter !== ALL_OPTION) {
+        if (incompleteUpdatesFilter === 'Incomplete') {
+          query = query.or('status.is.null,status.eq.');
+        } else if (incompleteUpdatesFilter === 'Complete') {
+          query = query.not('status', 'is', null).not('status', 'eq', '');
+        }
+      }
+
+      if (searchTerm) {
+        query = query.or(`insured_name.ilike.%${searchTerm}%,client_phone_number.ilike.%${searchTerm}%,submission_id.ilike.%${searchTerm}%,lead_vendor.ilike.%${searchTerm}%,agent.ilike.%${searchTerm}%,status.ilike.%${searchTerm}%,carrier.ilike.%${searchTerm}%,licensed_agent_account.ilike.%${searchTerm}%,buffer_agent.ilike.%${searchTerm}%`);
+      }
+
+      const { data: exportData, error } = await query;
+
+      if (error) {
+        console.error("Error fetching data for export:", error);
+        toast({
+          title: "Export Failed",
+          description: "Failed to fetch data for export",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!exportData || exportData.length === 0) {
+        toast({
+          title: "No Data",
+          description: "No data to export",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Define CSV headers
+      const headers = [
+        'Submission ID',
+        'Date',
+        'Insured Name',
+        'Lead Vendor',
+        'Phone Number',
+        'Buffer Agent',
+        'Agent',
+        'Licensed Agent',
+        'Status',
+        'Call Result',
+        'Carrier',
+        'Product Type',
+        'Draft Date',
+        'Monthly Premium',
+        'Face Amount',
+        'From Callback',
+        'Is Callback',
+        'Notes',
+        'Policy Number',
+        'Carrier Audit',
+        'Product Type Carrier',
+        'Level or GI',
+        'Created At',
+        'Updated At'
+      ];
+
+      // Generate CSV content
+      const csvContent = [
+        headers.join(','),
+        ...exportData.map(row => [
+          row.submission_id || '',
+          row.date || '',
+          row.insured_name || '',
+          row.lead_vendor || '',
+          row.client_phone_number || '',
+          row.buffer_agent || '',
+          row.agent || '',
+          row.licensed_agent_account || '',
+          row.status || '',
+          row.call_result || '',
+          row.carrier || '',
+          row.product_type || '',
+          row.draft_date || '',
+          row.monthly_premium || '',
+          row.face_amount || '',
+          row.from_callback ? 'Yes' : 'No',
+          row.is_callback ? 'Yes' : 'No',
+          (row.notes || '').replace(/"/g, '""'), // Escape quotes in notes
+          row.policy_number || '',
+          row.carrier_audit || '',
+          row.product_type_carrier || '',
+          row.level_or_gi || '',
+          row.created_at || '',
+          row.updated_at || ''
+        ].map(field => `"${field}"`).join(','))
+      ].join('\n');
+
+      // Create and download CSV file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Generate filename with current date and filter info
+      let filename = `daily-deal-flow-${new Date().toISOString().split('T')[0]}`;
+      if (dateFilter) {
+        filename += `-${dateObjectToESTString(dateFilter)}`;
+      } else if (dateFromFilter || dateToFilter) {
+        filename += `-range`;
+      }
+      filename += '.csv';
+      
+      link.download = filename;
+      link.click();
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export Complete",
+        description: `Successfully exported ${exportData.length} records to CSV`,
+      });
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      toast({
+        title: "Export Failed",
+        description: "An error occurred while exporting data",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -287,15 +459,50 @@ const DailyDealFlowPage = () => {
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuLabel className="text-base font-semibold">Export Reports</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <EODReports />
-                  <WeeklyReports />
-                  <GHLExport />
-                  <DropdownMenuItem onClick={handleExport}>
+                  
+                  <div className="px-2 py-1.5">
+                    <EODReports className="w-full justify-start text-sm font-medium" />
+                  </div>
+                  
+                  <div className="px-2 py-1.5">
+                    <WeeklyReports className="w-full justify-start text-sm font-medium" />
+                  </div>
+                  
+                  <div className="px-2 py-1.5">
+                    <GHLExport className="w-full justify-start text-sm font-medium" />
+                  </div>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <DropdownMenuItem onClick={handleExport} className="cursor-pointer">
                     <Download className="mr-2 h-4 w-4" />
-                    Export Current View
+                    <div className="flex flex-col">
+                      <span className="font-medium">Export Filtered Data</span>
+                      <span className="text-xs text-muted-foreground">Download current view as CSV</span>
+                    </div>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-base font-semibold">Performance Reports</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  
+                  <DropdownMenuItem onClick={() => navigate('/buffer-performance-report')} className="cursor-pointer">
+                    <BarChart3 className="mr-2 h-4 w-4 text-blue-500" />
+                    <div className="flex flex-col">
+                      <span className="font-medium">Buffer Agent Performance</span>
+                      <span className="text-xs text-muted-foreground">View buffer agent stats & status breakdown</span>
+                    </div>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem onClick={() => navigate('/licensed-agent-performance-report')} className="cursor-pointer">
+                    <UserCheck className="mr-2 h-4 w-4 text-green-500" />
+                    <div className="flex flex-col">
+                      <span className="font-medium">Licensed Agent Performance</span>
+                      <span className="text-xs text-muted-foreground">View licensed agent stats & status breakdown</span>
+                    </div>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
