@@ -323,6 +323,11 @@ const TaskDetailView = () => {
           });
       }
 
+      // If task is being marked as completed, send notifications and update daily deal flow
+      if (taskStatus === 'completed' && task?.status !== 'completed') {
+        await handleTaskCompletion();
+      }
+
       toast({
         title: "Success",
         description: "Task updated successfully",
@@ -341,6 +346,128 @@ const TaskDetailView = () => {
       });
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleTaskCompletion = async () => {
+    try {
+      if (!task) return;
+
+      // Fetch lead data for notifications and daily deal flow
+      const { data: leadData, error: leadError } = await supabase
+        .from("leads")
+        .select("*")
+        .eq("submission_id", task.submission_id)
+        .single();
+
+      if (leadError || !leadData) {
+        console.error("Error fetching lead data:", leadError);
+        return;
+      }
+
+      // 1. Send center notification about the completed fix
+      try {
+        const fixDescription = task.fix_type === 'banking_info' || task.fix_type === 'updated_banking_info'
+          ? `Banking information has been updated${bankingDetails ? ` - New draft date: ${format(new Date(bankingDetails.new_draft_date), 'MM/dd/yyyy')}` : ''}`
+          : task.fix_type === 'carrier_requirement'
+          ? `Carrier requirement has been fulfilled${carrierDetails ? ` - ${carrierDetails.carrier}` : ''}`
+          : 'Application fix has been completed';
+
+        const notificationData = {
+          submissionId: task.submission_id,
+          leadData: {
+            customer_full_name: leadData.customer_full_name,
+            phone_number: leadData.phone_number,
+            email: leadData.email,
+            lead_vendor: leadData.lead_vendor
+          },
+          callResult: {
+            application_submitted: false,
+            status: 'App Fix Completed',
+            notes: `Task completed by Licensed Agent: ${fixDescription}${statusNotes.trim() ? `\n\nNotes: ${statusNotes.trim()}` : ''}`,
+            buffer_agent: task.created_by_name || 'N/A',
+            agent_who_took_call: task.assigned_to_name || 'N/A',
+            lead_vendor: leadData.lead_vendor || 'N/A',
+            fix_type: task.fix_type
+          }
+        };
+
+        console.log("Sending center notification for completed task");
+        
+        const { error: centerError } = await supabase.functions.invoke('center-notification', {
+          body: notificationData
+        });
+
+        if (centerError) {
+          console.error("Error sending center notification:", centerError);
+        } else {
+          console.log("Center notification sent successfully");
+        }
+      } catch (centerError) {
+        console.error("Center notification failed:", centerError);
+        // Don't fail the entire process
+      }
+
+      // 2. Update daily deal flow entry
+      try {
+        console.log('Updating daily_deal_flow for completed task');
+
+        // Determine the appropriate status and notes based on fix type
+        let dailyDealStatus = 'Pending Approval'; // Default status after fix
+        let dailyDealNotes = '';
+        
+        if (task.fix_type === 'banking_info' || task.fix_type === 'updated_banking_info') {
+          dailyDealStatus = 'Pending Failed Payment Fix';
+          dailyDealNotes = `Banking information updated by ${task.assigned_to_name || 'Licensed Agent'}`;
+          if (bankingDetails) {
+            dailyDealNotes += `\nNew Draft Date: ${format(new Date(bankingDetails.new_draft_date), 'MM/dd/yyyy')}`;
+            dailyDealNotes += `\nNew Bank: ${bankingDetails.bank_institution_name}`;
+            dailyDealNotes += `\nAccount Type: ${bankingDetails.account_type}`;
+          }
+        } else if (task.fix_type === 'carrier_requirement') {
+          dailyDealStatus = 'Pending Approval';
+          dailyDealNotes = `Carrier requirement fulfilled by ${task.assigned_to_name || 'Licensed Agent'}`;
+          if (carrierDetails) {
+            dailyDealNotes += `\nCarrier: ${carrierDetails.carrier}`;
+            dailyDealNotes += `\nRequirement: ${carrierDetails.requirement_type}`;
+          }
+        }
+
+        if (statusNotes.trim()) {
+          dailyDealNotes += `\n\nCompletion Notes: ${statusNotes.trim()}`;
+        }
+
+        const { data: updateResult, error: updateError } = await supabase.functions.invoke('update-daily-deal-flow-entry', {
+          body: {
+            submission_id: task.submission_id,
+            call_source: 'First Time Transfer', // Required parameter for edge function
+            status: dailyDealStatus,
+            notes: dailyDealNotes,
+            buffer_agent: task.created_by_name || 'N/A',
+            agent: task.assigned_to_name || 'N/A',
+            licensed_agent_account: task.assigned_to_name || 'N/A',
+            call_result: 'App Fix Completed',
+            application_submitted: false, // This is a fix, not a new submission
+            // Include relevant banking info if it's a banking fix
+            ...(task.fix_type === 'banking_info' || task.fix_type === 'updated_banking_info') && bankingDetails ? {
+              draft_date: format(new Date(bankingDetails.new_draft_date), "yyyy-MM-dd")
+            } : {}
+          }
+        });
+
+        if (updateError) {
+          console.error('Error updating daily deal flow:', updateError);
+        } else {
+          console.log('Daily deal flow updated successfully:', updateResult);
+        }
+      } catch (syncError) {
+        console.error('Sync to daily_deal_flow failed:', syncError);
+        // Don't fail the entire process
+      }
+
+    } catch (error) {
+      console.error("Error in task completion handler:", error);
+      // Don't fail the main task update
     }
   };
 
