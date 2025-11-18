@@ -156,6 +156,10 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                       <Inbox className="mr-2 h-4 w-4" />
                       Task Inbox
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/deal-flow-lookup')}>
+                      <Search className="mr-2 h-4 w-4" />
+                      Deal Flow & Policy Lookup
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate('/agent-licensing')}>
                       <ShieldCheck className="mr-2 h-4 w-4" />
                       Find Eligible Agents
