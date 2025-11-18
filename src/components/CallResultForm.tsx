@@ -10,12 +10,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { CalendarIcon, CheckCircle, XCircle, Loader2, Shield } from "lucide-react";
+import { CalendarIcon, CheckCircle, XCircle, Loader2, Shield, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getTodayDateEST, getCurrentTimestampEST, formatDateESTLocale } from "@/lib/dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { logCallUpdate, getLeadInfo } from "@/lib/callLogging";
+import { AppFixTaskTypeSelector } from "@/components/AppFixTaskTypeSelector";
 
 interface CallResultFormProps {
   submissionId: string;
@@ -397,6 +398,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
   const [carrierAttempted1, setCarrierAttempted1] = useState("");
   const [carrierAttempted2, setCarrierAttempted2] = useState("");
   const [carrierAttempted3, setCarrierAttempted3] = useState("");
+  const [showAppFixForm, setShowAppFixForm] = useState(false);
   
   const { toast } = useToast();
 
@@ -1295,12 +1297,14 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Update Call Result</CardTitle>
-            {isRetentionCall && (
-              <Badge className="bg-purple-600 hover:bg-purple-700 flex items-center gap-1">
-                <Shield className="h-3 w-3" />
-                Retention Call
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {isRetentionCall && (
+                <Badge className="bg-purple-600 hover:bg-purple-700 flex items-center gap-1">
+                  <Shield className="h-3 w-3" />
+                  Retention Call
+                </Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -1314,7 +1318,10 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
               <Button
                 type="button"
                 variant={applicationSubmitted === true ? "default" : "outline"}
-                onClick={() => setApplicationSubmitted(true)}
+                onClick={() => {
+                  setApplicationSubmitted(true);
+                  setShowAppFixForm(false);
+                }}
                 className="flex items-center gap-2"
               >
                 <CheckCircle className="h-4 w-4" />
@@ -1323,33 +1330,50 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
               <Button
                 type="button"
                 variant={applicationSubmitted === false ? "default" : "outline"}
-                onClick={() => setApplicationSubmitted(false)}
+                onClick={() => {
+                  setApplicationSubmitted(false);
+                  setShowAppFixForm(false);
+                }}
                 className="flex items-center gap-2"
               >
                 <XCircle className="h-4 w-4" />
                 No
               </Button>
+              <Button
+                type="button"
+                variant={showAppFixForm ? "default" : "outline"}
+                onClick={() => {
+                  setShowAppFixForm(true);
+                  setApplicationSubmitted(null);
+                }}
+                className="flex items-center gap-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+              >
+                <Wrench className="h-4 w-4" />
+                App Fix
+              </Button>
             </div>
           </div>
 
-          {/* Call Source Dropdown - REQUIRED */}
-          <div>
-            <Label htmlFor="callSource" className="text-base font-semibold">
-              Call Source <span className="text-red-500">*</span>
-            </Label>
-            <Select value={callSource || undefined} onValueChange={setCallSource} required>
-              <SelectTrigger className={`${!callSource ? 'border-red-300 focus:border-red-500' : ''}`}>
-                <SelectValue placeholder="Select call source (required)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="BPO Transfer">BPO Transfer</SelectItem>
-                <SelectItem value="Agent Callback">Agent Callback</SelectItem>
-              </SelectContent>
-            </Select>
-            {!callSource && (
-              <p className="text-sm text-red-500 mt-1">Call source is required</p>
-            )}
-          </div>
+          {/* Call Source Dropdown - REQUIRED - Hidden when App Fix is shown */}
+          {!showAppFixForm && (
+            <div>
+              <Label htmlFor="callSource" className="text-base font-semibold">
+                Call Source <span className="text-red-500">*</span>
+              </Label>
+              <Select value={callSource || undefined} onValueChange={setCallSource} required>
+                <SelectTrigger className={`${!callSource ? 'border-red-300 focus:border-red-500' : ''}`}>
+                  <SelectValue placeholder="Select call source (required)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BPO Transfer">BPO Transfer</SelectItem>
+                  <SelectItem value="Agent Callback">Agent Callback</SelectItem>
+                </SelectContent>
+              </Select>
+              {!callSource && (
+                <p className="text-sm text-red-500 mt-1">Call source is required</p>
+              )}
+            </div>
+          )}
           {/* Fields for submitted applications */}
           {showSubmittedFields && (
             <>
@@ -1873,35 +1897,54 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
             </div>
           )}
 
-          <div className="flex justify-end">
-            <Button 
-              type="submit" 
-              disabled={
-                applicationSubmitted === null || 
-                !callSource || 
-                isSubmitting || 
-                (applicationSubmitted === false && (
-                  !agentWhoTookCall || 
-                  !status || 
-                  !notes.trim() || 
-                  (status === "GI - Currently DQ" && !carrierAttempted1)
-                ))
-              }
-              className="min-w-32"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Call Result"
-              )}
-            </Button>
-          </div>
+          {/* Save Button - Hidden when App Fix is shown */}
+          {!showAppFixForm && (
+            <div className="flex justify-end">
+              <Button 
+                type="submit" 
+                disabled={
+                  applicationSubmitted === null || 
+                  !callSource || 
+                  isSubmitting || 
+                  (applicationSubmitted === false && (
+                    !agentWhoTookCall || 
+                    !status || 
+                    !notes.trim() || 
+                    (status === "GI - Currently DQ" && !carrierAttempted1)
+                  ))
+                }
+                className="min-w-32"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Call Result"
+                )}
+              </Button>
+            </div>
+          )}
         </form>
       </CardContent>
     </Card>
+
+    {/* App Fix Task Type Selector Inline */}
+    {showAppFixForm && (
+      <AppFixTaskTypeSelector
+        submissionId={submissionId}
+        customerName={customerName}
+        onClose={() => setShowAppFixForm(false)}
+        onSuccess={() => {
+          toast({
+            title: "App Fix Task Created",
+            description: "The task has been assigned to a licensed agent",
+          });
+          setShowAppFixForm(false);
+        }}
+      />
+    )}
     </>
   );
 };

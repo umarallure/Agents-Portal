@@ -50,3 +50,34 @@ export const isCenterUser = async (userId: string | undefined): Promise<boolean>
     return false;
   }
 };
+
+/**
+ * Check if the current user is a buffer agent
+ * @param userId - The current user's ID
+ * @returns boolean indicating if user is a buffer agent
+ */
+export const isBufferAgent = async (userId: string | undefined): Promise<boolean> => {
+  if (!userId) return false;
+
+  try {
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) return false;
+
+    // Buffer agent names list
+    const bufferAgentNames = [
+      'Ira', 'Kyla', 'Syed Kazmi', 'Justine', 'Kaye', 'Viez', 
+      'Lourd', 'Mary', 'Nicole Mejia', 'Angelica', 'Laiza Batain'
+    ];
+
+    return bufferAgentNames.includes(data.display_name);
+  } catch (error) {
+    console.error('Error checking buffer agent:', error);
+    return false;
+  }
+};

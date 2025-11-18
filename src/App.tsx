@@ -30,6 +30,9 @@ import { AgentEligibilityPage } from "./pages/AgentEligibilityPage";
 import GHLSyncPage from "./pages/GHLSyncPage/GHLSyncPage";
 import BufferPerformanceReport from "./pages/BufferPerformanceReport";
 import LicensedAgentPerformanceReport from "./pages/LicensedAgentPerformanceReport";
+import LicensedAgentInbox from "./pages/LicensedAgentInbox";
+import TaskDetailView from "./pages/TaskDetailView";
+import RetentionTasksView from "./pages/RetentionTasksView";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
@@ -204,6 +207,30 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <LicensedAgentPerformanceReport />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/licensed-agent-inbox" 
+              element={
+                <ProtectedRoute>
+                  <LicensedAgentInbox />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/task/:taskId" 
+              element={
+                <ProtectedRoute>
+                  <TaskDetailView />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/retention-tasks" 
+              element={
+                <ProtectedRoute>
+                  <RetentionTasksView />
                 </ProtectedRoute>
               } 
             />

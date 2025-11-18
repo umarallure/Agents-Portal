@@ -2,13 +2,14 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, Search, ArrowLeft, DollarSign, ShieldCheck, Zap, Users, Calendar } from 'lucide-react';
+import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, Search, ArrowLeft, DollarSign, ShieldCheck, Zap, Users, Calendar, Inbox } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLicensedAgent } from '@/hooks/useLicensedAgent';
 import { useCenterUser } from '@/hooks/useCenterUser';
-import { canAccessNavigation } from '@/lib/userPermissions';
+import { canAccessNavigation, isBufferAgent as checkIsBufferAgent } from '@/lib/userPermissions';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { TaskNotificationPanel } from './TaskNotificationPanel';
 
 interface NavigationHeaderProps {
   title: string;
@@ -22,13 +23,15 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
   const { isCenterUser, loading: centerLoading } = useCenterUser();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isBufferAgent, setIsBufferAgent] = useState(false);
+  const [bufferLoading, setBufferLoading] = useState(true);
   
   const isBen = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79';
   const isAuthorizedUser = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79' || user?.id === '9c004d97-b5fb-4ed6-805e-e2c383fe8b6f' || user?.id === 'c2f07638-d3d2-4fe9-9a65-f57395745695' || user?.id === '30b23a3f-df6b-40af-85d1-84d3e6f0b8b4'|| user?.id === 'd68d18e4-9deb-4282-b4d0-1e6e6a0789e9';
   const hasNavigationAccess = canAccessNavigation(user?.id);
   
-  // Licensed agents, center users, and Ben should see navigation menu
-  const shouldShowNavigation = (isAuthorizedUser && hasNavigationAccess) || (isLicensedAgent && !licensedLoading) || (isCenterUser && !centerLoading);
+  // Licensed agents, center users, buffer agents, and Ben should see navigation menu
+  const shouldShowNavigation = (isAuthorizedUser && hasNavigationAccess) || (isLicensedAgent && !licensedLoading) || (isCenterUser && !centerLoading) || (isBufferAgent && !bufferLoading);
   
   // Find Eligible Agents should be visible to Ben, licensed agents, and center users
   const canAccessAgentFinder = isBen || (isLicensedAgent && !licensedLoading) || (isCenterUser && !centerLoading);
@@ -47,7 +50,24 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
       }
     };
 
+    const checkBufferStatus = async () => {
+      if (!user) {
+        setBufferLoading(false);
+        return;
+      }
+      
+      try {
+        const result = await checkIsBufferAgent(user.id);
+        setIsBufferAgent(result);
+      } catch (error) {
+        console.error('Error checking buffer agent status:', error);
+      } finally {
+        setBufferLoading(false);
+      }
+    };
+
     checkAdminStatus();
+    checkBufferStatus();
   }, [user]);
 
   console.log('[NavigationHeader] Navigation visibility:', {
@@ -90,6 +110,9 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
           </Badge>
         </div>
         <div className="flex items-center space-x-2">
+          {/* Task Notification Panel for Licensed Agents */}
+          {isLicensedAgent && !licensedLoading && <TaskNotificationPanel />}
+          
           {/* Main Navigation Menu - Show for authorized users OR licensed agents */}
           {shouldShowNavigation && (
             <DropdownMenu>
@@ -129,6 +152,10 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                       <DollarSign className="mr-2 h-4 w-4" />
                       Commission Portal
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/licensed-agent-inbox')}>
+                      <Inbox className="mr-2 h-4 w-4" />
+                      Task Inbox
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate('/agent-licensing')}>
                       <ShieldCheck className="mr-2 h-4 w-4" />
                       Find Eligible Agents
@@ -156,6 +183,22 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                     <DropdownMenuItem onClick={() => navigate('/agent-licensing')}>
                       <ShieldCheck className="mr-2 h-4 w-4" />
                       Find Eligible Agents
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                
+                {/* Buffer/Retention Agent - Available for buffer agents */}
+                {isBufferAgent && !bufferLoading && !isLicensedAgent && !isCenterUser && !isAuthorizedUser && (
+                  <>
+                    <DropdownMenuLabel>Retention Agent</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => navigate('/retention-tasks')}>
+                      <Inbox className="mr-2 h-4 w-4" />
+                      My Created Tasks
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                      <Grid3X3 className="mr-2 h-4 w-4" />
+                      Dashboard
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
