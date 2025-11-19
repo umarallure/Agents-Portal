@@ -59,6 +59,7 @@ const GHLSyncPage = () => {
     "Corebiz",
     "Digicon",
     "Ambition",
+    "TechPlanet",
     "StratiX BPO",
     "Argon Comm",
     "AJ BPO",

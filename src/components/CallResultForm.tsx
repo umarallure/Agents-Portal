@@ -148,6 +148,7 @@ const leadVendorOptions = [
 "Lumenix BPO",
 "All-Star BPO",
 "DownTown BPO",
+"TechPlanet",
 "Livik BPO",
 "NexGen BPO",
 "Quoted-Leads BPO",
