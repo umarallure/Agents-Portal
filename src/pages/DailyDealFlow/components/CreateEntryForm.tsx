@@ -67,7 +67,16 @@ const leadVendorOptions = [
   "Leads BPO",
   "StratiX BPO",
   "Helix BPO",
-  "Exito BPO"
+  "Exito BPO",
+  "Lumenix BPO",
+  "All-Star BPO",
+  "DownTown BPO",
+  "Livik BPO",
+  "NexGen BPO",
+  "Quoted-Leads BPO",
+  "SellerZ BPO",
+  "Venom BPO",
+  "WinBPO"
 ];
 
 // Function to generate unique CB submission ID

@@ -61,7 +61,16 @@ export const EODReports = ({ className }: EODReportsProps) => {
     "Leads BPO",
     "Helix BPO",
     "Exito BPO",
-    "StratiX BPO"
+    "StratiX BPO",
+    "Lumenix BPO",
+    "All-Star BPO",
+    "DownTown BPO",
+    "Livik BPO",
+    "NexGen BPO",
+    "Quoted-Leads BPO",
+    "SellerZ BPO",
+    "Venom BPO",
+    "WinBPO"
   ];
 
   // Base columns for all reports
