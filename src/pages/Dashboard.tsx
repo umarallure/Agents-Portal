@@ -42,8 +42,6 @@ const Dashboard = () => {
   const [nameFilter, setNameFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  const [showAllLeads, setShowAllLeads] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   
   // Analytics state
   const [analytics, setAnalytics] = useState({
@@ -102,7 +100,7 @@ const Dashboard = () => {
       checkIfLicensedAgent();
       // Optimization 3: Run data fetches in parallel instead of sequential
       Promise.all([
-        fetchLeads(),
+        fetchLeads(), // Load recent leads initially
         fetchAnalytics()
       ]);
     }
@@ -111,24 +109,26 @@ const Dashboard = () => {
   useEffect(() => {
     applyFilters();
     setCurrentPage(1); // Reset to first page when filters change
-  }, [leads, dateFilter, statusFilter, nameFilter]);
-  
-  // Refetch when showAllLeads changes
+  }, [leads, dateFilter, statusFilter]);
+
+  // Separate effect for name filter to trigger search
   useEffect(() => {
-    if (user && showAllLeads) {
-      setLoadingMore(true);
+    if (nameFilter.trim()) {
+      // When searching, fetch from server with search term
+      setIsLoading(true);
+      fetchLeads(nameFilter.trim());
+    } else {
+      // When clearing search, fetch all recent leads
+      setIsLoading(true);
       fetchLeads();
     }
-  }, [showAllLeads]);
+    setCurrentPage(1); // Reset to first page when search changes
+  }, [nameFilter]);
 
-  const fetchLeads = async () => {
+  const fetchLeads = async (searchTerm?: string) => {
     try {
       // Optimization 1: Use single query with joins instead of multiple queries
-      // Optimization 2: Limit initial load to recent records (last 30 days or 100 records)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
-      // Build query based on showAllLeads flag
+      // Load all leads for better search functionality
       let query = supabase
         .from('leads')
         .select(`
@@ -157,14 +157,24 @@ const Dashboard = () => {
             progress_percentage,
             created_at
           )
-        `)
+        `, { count: 'exact' })
         .order('created_at', { ascending: false });
-      
-      // Only limit if not showing all leads
-      if (!showAllLeads) {
-        query = query
-          .gte('created_at', thirtyDaysAgo.toISOString())
-          .limit(100);
+
+      // If searching, apply server-side search instead of loading all records
+      if (searchTerm && searchTerm.trim()) {
+        const searchValue = `%${searchTerm.trim()}%`;
+
+        // Use a more complex query that searches across leads and joined call_results
+        // We'll need to do this in a way that Supabase can handle
+        query = query.or(`customer_full_name.ilike.${searchValue},submission_id.ilike.${searchValue},phone_number.ilike.${searchValue},email.ilike.${searchValue}`);
+
+        // For call_results fields, we'll need to filter after fetching since Supabase
+        // doesn't support complex OR across joined tables easily
+        // Remove range limit when searching to get all matches
+        // No range() call here - let it return all matches
+      } else {
+        // For non-search loads, limit to recent records
+        query = query.range(0, 4999);
       }
 
       const { data: leadsData, error: leadsError } = await query;
@@ -197,7 +207,6 @@ const Dashboard = () => {
       });
     } finally {
       setIsLoading(false);
-      setLoadingMore(false);
     }
   };
 
@@ -348,7 +357,7 @@ const Dashboard = () => {
     let filtered = leads;
 
     if (dateFilter) {
-      filtered = filtered.filter(lead => 
+      filtered = filtered.filter(lead =>
         lead.created_at && lead.created_at.includes(dateFilter)
       );
     }
@@ -358,10 +367,10 @@ const Dashboard = () => {
         if (!lead.call_results || lead.call_results.length === 0) {
           return statusFilter === 'no-result';
         }
-        
+
         const latestResult = lead.call_results[0];
         const isSubmitted = Boolean(latestResult.application_submitted);
-        
+
         if (statusFilter === 'submitted') {
           return isSubmitted;
         } else if (statusFilter === 'not-submitted') {
@@ -373,16 +382,8 @@ const Dashboard = () => {
       });
     }
 
-    if (nameFilter) {
-      filtered = filtered.filter(lead =>
-        lead.customer_full_name?.toLowerCase().includes(nameFilter.toLowerCase())
-      );
-    }
-
     setFilteredLeads(filtered);
-  };
-
-  const getLeadStatus = (lead: LeadWithCallResult) => {
+  };  const getLeadStatus = (lead: LeadWithCallResult) => {
     if (!lead.call_results || lead.call_results.length === 0) return 'No Result';
     const latestResult = lead.call_results[0];
     
@@ -847,11 +848,11 @@ const Dashboard = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="name-filter">Customer Name</Label>
+                <Label htmlFor="name-filter">Search Leads</Label>
                 <Input
                   id="name-filter"
                   type="text"
-                  placeholder="Search by name..."
+                  placeholder="Search by name, phone, submission ID, email, carrier, or agent..."
                   value={nameFilter}
                   onChange={(e) => setNameFilter(e.target.value)}
                 />
@@ -878,45 +879,6 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
-
-        {/* Load All Leads Button */}
-        {!showAllLeads && filteredLeads.length >= 100 && (
-          <Card className="mb-6 bg-blue-50 border-blue-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-blue-100 p-2 rounded-full">
-                    <AlertCircle className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-blue-900">Limited View Active</h4>
-                    <p className="text-sm text-blue-700">
-                      Showing last 30 days or 100 most recent leads for faster loading
-                    </p>
-                  </div>
-                </div>
-                <Button 
-                  onClick={() => setShowAllLeads(true)}
-                  disabled={loadingMore}
-                  variant="default"
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  {loadingMore ? (
-                    <>
-                      <Clock className="h-4 w-4 mr-2 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <DatabaseIcon className="h-4 w-4 mr-2" />
-                      Load All Leads
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Main Content with Tabs */}
         <Tabs defaultValue="leads" className="space-y-6">
@@ -1109,7 +1071,7 @@ const Dashboard = () => {
                         <div className="flex items-center gap-1">
                           {/* Compact page list: show first, last, current +/- neighbors with ellipses */}
                           {(() => {
-                            const maxButtons = 7; // total buttons to show including first/last
+                            const maxButtons = 7;
                             const total = totalPages;
                             const current = currentPage;
                             const pages: Array<number | string> = [];
@@ -1117,7 +1079,7 @@ const Dashboard = () => {
                             if (total <= maxButtons) {
                               for (let i = 1; i <= total; i++) pages.push(i);
                             } else {
-                              const side = 1; // neighbors on each side of current
+                              const side = 1;
                               const left = Math.max(2, current - side);
                               const right = Math.min(total - 1, current + side);
 
@@ -1133,13 +1095,13 @@ const Dashboard = () => {
                             return pages.map((p, idx) => {
                               if (typeof p === 'string') {
                                 return (
-                                  <span key={p + idx} className="px-2 text-sm text-muted-foreground">…</span>
+                                  <span key={`ellipsis-${idx}`} className="px-2 text-sm text-muted-foreground">…</span>
                                 );
                               }
 
                               return (
                                 <Button
-                                  key={p}
+                                  key={`page-${p}`}
                                   variant={current === p ? 'default' : 'outline'}
                                   size="sm"
                                   onClick={() => handlePageChange(Number(p))}

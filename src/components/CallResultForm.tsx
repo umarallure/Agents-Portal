@@ -65,10 +65,8 @@ const productTypeOptions = [
 ];
 
 const bufferAgentOptions = [
-  "Kyla",
   "Justine",
   "Nicole Mejia",
-  "Angelica",
   "Laiza Batain",
   "Aqib Afridi",
   "Qasim Raja",
