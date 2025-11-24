@@ -65,18 +65,15 @@ const productTypeOptions = [
 ];
 
 const bufferAgentOptions = [
-  "N/A",
-  "Ira",
   "Kyla",
-  "Syed Kazmi",
   "Justine",
-  "Kaye",
-  "Viez",
-  "Lourd",
-  "Mary",
   "Nicole Mejia",
   "Angelica",
-  "Laiza Batain"
+  "Laiza Batain",
+  "Aqib Afridi",
+  "Qasim Raja",
+  "Hussain Khan",
+  "N/A",
 ];
 
 const agentOptions = [

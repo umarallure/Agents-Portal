@@ -67,11 +67,15 @@ export const GridToolbar = ({
   // Filter options (these should match your database values)
   const bufferAgentOptions = [
     "All Buffer Agents",
-    "Justine",
     "Kyla",
-    "Laiza Batain",
+    "Justine",
+    "Nicole Mejia",
     "Angelica",
-    "N/A"
+    "Laiza Batain",
+    "Aqib Afridi",
+    "Qasim Raja",
+    "Hussain Khan",
+    "N/A",
   ];
 
   const licensedAgentOptions = [

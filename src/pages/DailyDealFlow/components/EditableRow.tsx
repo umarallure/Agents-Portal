@@ -50,6 +50,9 @@ const bufferAgentOptions = [
     "Kyla",
     "Laiza Batain",
     "Angelica",
+    "Aqib Afridi",
+    "Qasim Raja",
+    "Hussain Khan",
     "N/A"
 ];
 

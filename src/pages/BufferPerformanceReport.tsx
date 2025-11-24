@@ -145,14 +145,11 @@ const BufferPerformanceReport = () => {
     try {
       // Predefined list of buffer agents
       const predefinedAgents = [
-        'Justine',
-        'Nicole Mejia',
-        'Angelica',
-        'Mary',
-        'Laiza Batain',
-        'Kyla',
-        'Ira',
-        'Angy'
+        "Justine",
+        "Kyla",
+        "Laiza Batain",
+        "Angelica",
+        "N/A"
       ];
       
       setAvailableAgents(predefinedAgents.sort());
