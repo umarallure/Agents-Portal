@@ -26,6 +26,7 @@ const bufferAgentOptions = [
     "Angelica",
     "Aqib Afridi",
     "Qasim Raja",
+    "Noah Akins",
     "Hussain Khan",
     "N/A"
 ];

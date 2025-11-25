@@ -55,6 +55,7 @@ const BUFFER_AGENT_OPTIONS = [
   "Laiza Batain",
   "Aqib Afridi",
   "Qasim Raja",
+  "Noah Akins",
   "Hussain Khan",
   "N/A",
 ];
