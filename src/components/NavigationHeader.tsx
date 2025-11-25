@@ -218,7 +218,7 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                     </DropdownMenuItem>
                     {isBen && (
                       <>
-                        <DropdownMenuItem onClick={() => navigate('/admin-analytics')}>
+                        <DropdownMenuItem onClick={() => navigate('/admin-analytics/agents')}>
                           <BarChart3 className="mr-2 h-4 w-4" />
                           Admin Analytics
                         </DropdownMenuItem>

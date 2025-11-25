@@ -66,7 +66,7 @@ const licensedAccountOptions = [
 ];
 
 const carrierOptions = [
-  "Liberty", "SBLI", "Corebridge", "MOH", "Transamerica", "RNA", "ANAM",
+  "Liberty", "SBLI", "Corebridge", "MOH", "Transamerica", "RNA", "AMAM",
   "GTL", "Aetna", "Americo", "CICA", "N/A"
 ];
 

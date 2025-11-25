@@ -35,7 +35,7 @@ const carrierOptions = [
   "MOH",
   "Transamerica",
   "RNA",
-  "ANAM",
+  "AMAM",
   "GTL",
   "Aetna",
   "Americo",

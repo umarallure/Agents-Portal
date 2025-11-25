@@ -34,6 +34,7 @@ import LicensedAgentInbox from "./pages/LicensedAgentInbox";
 import TaskDetailView from "./pages/TaskDetailView";
 import RetentionTasksView from "./pages/RetentionTasksView";
 import AdminAnalytics from "./pages/AdminAnalytics";
+import { AgentsPage, VendorsPage, DailyPage, CarriersPage } from "./pages/AdminAnalytics/pages";
 import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
 
@@ -248,8 +249,13 @@ const App = () => (
                 <ProtectedRoute>
                   <AdminAnalytics />
                 </ProtectedRoute>
-              } 
-            />
+              }
+            >
+              <Route path="agents" element={<AgentsPage />} />
+              <Route path="vendors" element={<VendorsPage />} />
+              <Route path="daily" element={<DailyPage />} />
+              <Route path="carriers" element={<CarriersPage />} />
+            </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
