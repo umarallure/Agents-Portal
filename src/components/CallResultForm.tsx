@@ -349,10 +349,9 @@ const generateSubmittedApplicationNotes = (
     })}`);
   }
 
-  // Sent to Underwriting (only if sentToUnderwriting is true) - point 7
-  if (sentToUnderwriting === true) {
-    parts.push('7. Sent to Underwriting');
-  }
+  // Sent to Underwriting (point 7) - always include Yes/No/Unknown
+  const sentText = sentToUnderwriting === true ? 'Yes' : sentToUnderwriting === false ? 'No' : 'Unknown';
+  parts.push(`7. Sent to Underwriting: ${sentText}`);
 
   // --- Carrier-specific commission rules as the final point ---
   let commissionNote = "";
