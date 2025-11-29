@@ -69,6 +69,17 @@ export const GHLSyncDataGrid = ({
       console.log('🐛 DEBUG: Full row data:', JSON.stringify(row, null, 2));
     }
 
+    // If there is no status on the row, skip syncing entirely and do not mark as failed
+    if (!row.status) {
+      console.warn('⏭️ Skipping sync because row has no status:', row.id, row.submission_id);
+      toast({
+        title: 'Skipped',
+        description: `Row ${row.insured_name || row.submission_id || row.id} has no status — skipping sync.`,
+        variant: 'default',
+      });
+      return;
+    }
+
     setSyncingRows(prev => new Set(prev).add(row.id));
 
     try {
@@ -429,9 +440,11 @@ export const GHLSyncDataGrid = ({
       return;
     }
 
+    // Only include selected rows that are not already synced and that have a status
     const rowsToSync = data.filter(row =>
       selectedRows.has(row.id) &&
-      row.sync_status?.toLowerCase() !== 'synced'
+      row.sync_status?.toLowerCase() !== 'synced' &&
+      Boolean(row.status)
     );
 
     if (rowsToSync.length === 0) {
@@ -502,7 +515,8 @@ export const GHLSyncDataGrid = ({
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       const syncableRowIds = data
-        .filter(row => row.sync_status?.toLowerCase() !== 'synced')
+        // Only select rows that are not already synced and have a status
+        .filter(row => row.sync_status?.toLowerCase() !== 'synced' && Boolean(row.status))
         .map(row => row.id);
       setSelectedRows(new Set(syncableRowIds));
     } else {
@@ -690,6 +704,7 @@ export const GHLSyncDataGrid = ({
               <TableHead className='w-[120px]'>Lead Vendor</TableHead>
               <TableHead className='w-[100px]'>Agent</TableHead>
               <TableHead className='w-[120px]'>Status</TableHead>
+              <TableHead className='w-[120px]'>Sync Status</TableHead>
               <TableHead className='w-[100px]'>Carrier</TableHead>
               <TableHead className='w-[100px]'>Face Amount</TableHead>
               <TableHead className='w-[200px]'>Notes</TableHead>
@@ -724,10 +739,17 @@ export const GHLSyncDataGrid = ({
                 <TableCell>{row.lead_vendor || 'N/A'}</TableCell>
                 <TableCell>{row.agent || 'N/A'}</TableCell>
                 <TableCell>
-                  <Badge variant={getStatusBadgeVariant(row.status, row.sync_status)}>
-                    {row.sync_status || row.status || 'N/A'}
+                  <Badge variant={getStatusBadgeVariant(row.status, undefined)}>
+                    {row.status || 'N/A'}
                   </Badge>
                 </TableCell>
+
+                <TableCell>
+                  <Badge variant={getStatusBadgeVariant(undefined, row.sync_status)}>
+                    {row.sync_status || 'N/A'}
+                  </Badge>
+                </TableCell>
+
                 <TableCell>{row.carrier || 'N/A'}</TableCell>
                 <TableCell className='text-right'>
                   {formatCurrency(row.face_amount)}
@@ -766,7 +788,7 @@ export const GHLSyncDataGrid = ({
                       variant='outline'
                       size='sm'
                       onClick={() => handleSyncToGHL(row)}
-                      disabled={!hasWritePermissions || syncingRows.has(row.id)}
+                      disabled={!hasWritePermissions || syncingRows.has(row.id) || !row.status}
                       className='flex items-center gap-1'
                     >
                       {syncingRows.has(row.id) ? (
@@ -774,7 +796,7 @@ export const GHLSyncDataGrid = ({
                       ) : (
                         <RefreshCw className='h-3 w-3' />
                       )}
-                      {row.sync_status?.toLowerCase() === 'sync failed' ? 'Retry Sync' : 'Sync'}
+                        {row.status ? (row.sync_status?.toLowerCase() === 'sync failed' ? 'Retry Sync' : 'Sync') : 'No Status'}
                     </Button>
                   )}
                 </TableCell>

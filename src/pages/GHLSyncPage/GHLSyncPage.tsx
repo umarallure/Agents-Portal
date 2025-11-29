@@ -41,6 +41,7 @@ const GHLSyncPage = () => {
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [leadVendorFilter, setLeadVendorFilter] = useState("__ALL__");
   const [statusFilter, setStatusFilter] = useState("__ALL__");
+  const [statusPresenceFilter, setStatusPresenceFilter] = useState("__ALL__");
   const [syncStatusFilter, setSyncStatusFilter] = useState("__ALL__");
 
   const recordsPerPage = 100;
@@ -120,6 +121,12 @@ const GHLSyncPage = () => {
     "Disconnected"
   ];
 
+  const statusPresenceOptions = [
+    "All",
+    "Incomplete",
+    "Complete"
+  ];
+
   const syncStatusOptions = [
     "All Sync Statuses",
     "Synced",
@@ -166,6 +173,17 @@ const GHLSyncPage = () => {
       // Apply status filter if set
       if (statusFilter && statusFilter !== "__ALL__") {
         query = query.eq('status', statusFilter);
+      }
+
+      // Apply status presence filter (Complete = has a status, Incomplete = no status)
+      if (statusPresenceFilter && statusPresenceFilter !== "__ALL__") {
+        if (statusPresenceFilter === 'Incomplete') {
+          // status is null OR empty string
+          query = query.or('status.is.null,status.eq.');
+        } else if (statusPresenceFilter === 'Complete') {
+          // status is not null and not empty
+          query = query.not('status', 'is', null).neq('status', '');
+        }
       }
 
       // Apply sync status filter if set
@@ -243,7 +261,7 @@ const GHLSyncPage = () => {
   useEffect(() => {
     setCurrentPage(1); // Reset to first page when filters change
     fetchData(1);
-  }, [dateFilter, leadVendorFilter, statusFilter, syncStatusFilter]);
+  }, [dateFilter, leadVendorFilter, statusFilter, syncStatusFilter, statusPresenceFilter]);
 
   // Refetch when search term changes (debounced)
   useEffect(() => {
@@ -313,7 +331,7 @@ const GHLSyncPage = () => {
               <CardTitle>Filters</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                 <div>
                   <Label className="text-sm font-medium">Search</Label>
                   <Input
@@ -369,6 +387,25 @@ const GHLSyncPage = () => {
                       {statusOptions.map((status) => (
                         <SelectItem key={status} value={status === "All Statuses" ? ALL_OPTION : status}>
                           {status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium">
+                    Status Presence
+                    {statusPresenceFilter && statusPresenceFilter !== ALL_OPTION && <span className="text-blue-600 ml-1">●</span>}
+                  </Label>
+                  <Select value={statusPresenceFilter || ALL_OPTION} onValueChange={setStatusPresenceFilter}>
+                    <SelectTrigger className={cn("mt-1", statusPresenceFilter && statusPresenceFilter !== ALL_OPTION && "ring-2 ring-blue-200")}>
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusPresenceOptions.map((opt) => (
+                        <SelectItem key={opt} value={opt === "All" ? ALL_OPTION : opt}>
+                          {opt}
                         </SelectItem>
                       ))}
                     </SelectContent>
