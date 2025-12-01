@@ -37,6 +37,7 @@ const Dashboard = () => {
   const [leads, setLeads] = useState<LeadWithCallResult[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<LeadWithCallResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [dateFilter, setDateFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [nameFilter, setNameFilter] = useState('');
@@ -111,18 +112,25 @@ const Dashboard = () => {
     setCurrentPage(1); // Reset to first page when filters change
   }, [leads, dateFilter, statusFilter]);
 
-  // Separate effect for name filter to trigger search
+  // Separate effect for name filter to trigger search (debounced, min 4 chars)
   useEffect(() => {
-    if (nameFilter.trim()) {
-      // When searching, fetch from server with search term
-      setIsLoading(true);
-      fetchLeads(nameFilter.trim());
-    } else {
+    const trimmed = nameFilter.trim();
+    
+    // Only search if user typed at least 4 characters, or cleared the field
+    if (trimmed.length >= 4) {
+      const timeoutId = setTimeout(() => {
+        setIsSearching(true);
+        fetchLeads(trimmed).finally(() => setIsSearching(false));
+        setCurrentPage(1);
+      }, 400); // 400ms debounce
+      return () => clearTimeout(timeoutId);
+    } else if (trimmed.length === 0) {
       // When clearing search, fetch all recent leads
-      setIsLoading(true);
-      fetchLeads();
+      setIsSearching(true);
+      fetchLeads().finally(() => setIsSearching(false));
+      setCurrentPage(1);
     }
-    setCurrentPage(1); // Reset to first page when search changes
+    // If 1-3 chars, do nothing (wait for more input)
   }, [nameFilter]);
 
   const fetchLeads = async (searchTerm?: string) => {
@@ -849,13 +857,21 @@ const Dashboard = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="name-filter">Search Leads</Label>
-                <Input
-                  id="name-filter"
-                  type="text"
-                  placeholder="Search by name, phone, submission ID, email, carrier, or agent..."
-                  value={nameFilter}
-                  onChange={(e) => setNameFilter(e.target.value)}
-                />
+                <div className="relative">
+                  <Input
+                    id="name-filter"
+                    type="text"
+                    placeholder="Search by name, phone, submission ID, email, carrier, or agent..."
+                    value={nameFilter}
+                    onChange={(e) => setNameFilter(e.target.value)}
+                    className={isSearching ? 'pr-10' : ''}
+                  />
+                  {isSearching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </CardContent>
