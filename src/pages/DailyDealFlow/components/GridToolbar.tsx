@@ -146,6 +146,8 @@ export const GridToolbar = ({
   const statusOptions = [
     "All Statuses",
     "Pending Approval",
+    "Pending Failed Payment Fix",
+    "Fulfilled carrier requirements",
     "Previously Sold BPO",
     "Needs BPO Callback",
     "Incomplete Transfer",
@@ -154,7 +156,6 @@ export const GridToolbar = ({
     "Future Submission Date",
     "Application Withdrawn",
     "Updated Banking/draft date",
-    "Fulfilled carrier requirements",
     "Call Back Fix",
     "Call Never Sent",
     "Disconnected"
