@@ -162,6 +162,8 @@ export const GridToolbar = ({
   const statusOptions = [
     "All Statuses",
     "Pending Approval",
+    "Pending Failed Payment Fix",
+    "Fulfilled carrier requirements",
     "Previously Sold BPO",
     "Needs BPO Callback",
     "Incomplete Transfer",
