@@ -25,6 +25,8 @@ export interface DailyDealFlowRow {
   date?: string;
   insured_name?: string;
   buffer_agent?: string;
+  retention_agent?: string;
+  retention_agent_id?: string;
   agent?: string;
   licensed_agent_account?: string;
   status?: string;
@@ -36,6 +38,7 @@ export interface DailyDealFlowRow {
   face_amount?: number;
   from_callback?: boolean;
   is_callback?: boolean;
+  is_retention_call?: boolean;
   notes?: string;
   policy_number?: string;
   carrier_audit?: string;
@@ -59,6 +62,7 @@ const DailyDealFlowPage = () => {
   const [dateFromFilter, setDateFromFilter] = useState<Date | undefined>(undefined);
   const [dateToFilter, setDateToFilter] = useState<Date | undefined>(undefined);
   const [bufferAgentFilter, setBufferAgentFilter] = useState(ALL_OPTION);
+  const [retentionAgentFilter, setRetentionAgentFilter] = useState(ALL_OPTION);
   const [licensedAgentFilter, setLicensedAgentFilter] = useState(ALL_OPTION);
   const [leadVendorFilter, setLeadVendorFilter] = useState(ALL_OPTION);
   const [statusFilter, setStatusFilter] = useState(ALL_OPTION);
@@ -138,6 +142,10 @@ const DailyDealFlowPage = () => {
         query = query.eq('buffer_agent', bufferAgentFilter);
       }
 
+      if (retentionAgentFilter && retentionAgentFilter !== ALL_OPTION) {
+        query = query.eq('retention_agent', retentionAgentFilter);
+      }
+
       if (licensedAgentFilter && licensedAgentFilter !== ALL_OPTION) {
         query = query.eq('licensed_agent_account', licensedAgentFilter);
       }
@@ -176,7 +184,7 @@ const DailyDealFlowPage = () => {
 
       // Apply search filter if set
       if (searchTerm) {
-        query = query.or(`insured_name.ilike.%${searchTerm}%,client_phone_number.ilike.%${searchTerm}%,submission_id.ilike.%${searchTerm}%,lead_vendor.ilike.%${searchTerm}%,agent.ilike.%${searchTerm}%,status.ilike.%${searchTerm}%,carrier.ilike.%${searchTerm}%,licensed_agent_account.ilike.%${searchTerm}%,buffer_agent.ilike.%${searchTerm}%`);
+        query = query.or(`insured_name.ilike.%${searchTerm}%,client_phone_number.ilike.%${searchTerm}%,submission_id.ilike.%${searchTerm}%,lead_vendor.ilike.%${searchTerm}%,agent.ilike.%${searchTerm}%,status.ilike.%${searchTerm}%,carrier.ilike.%${searchTerm}%,licensed_agent_account.ilike.%${searchTerm}%,buffer_agent.ilike.%${searchTerm}%,retention_agent.ilike.%${searchTerm}%`);
       }
 
       const { data: pageData, error, count } = await query;
@@ -218,7 +226,7 @@ const DailyDealFlowPage = () => {
   useEffect(() => {
     setCurrentPage(1); // Reset to first page when filters change
     fetchData(1);
-  }, [dateFilter, dateFromFilter, dateToFilter, bufferAgentFilter, licensedAgentFilter, leadVendorFilter, statusFilter, carrierFilter, callResultFilter, retentionFilter, incompleteUpdatesFilter]);
+  }, [dateFilter, dateFromFilter, dateToFilter, bufferAgentFilter, retentionAgentFilter, licensedAgentFilter, leadVendorFilter, statusFilter, carrierFilter, callResultFilter, retentionFilter, incompleteUpdatesFilter]);
 
   // Refetch when search term changes (debounced)
   useEffect(() => {
@@ -533,6 +541,8 @@ const DailyDealFlowPage = () => {
           onDateToFilterChange={handleDateToFilterChange}
           bufferAgentFilter={bufferAgentFilter}
           onBufferAgentFilterChange={setBufferAgentFilter}
+          retentionAgentFilter={retentionAgentFilter}
+          onRetentionAgentFilterChange={setRetentionAgentFilter}
           licensedAgentFilter={licensedAgentFilter}
           onLicensedAgentFilterChange={setLicensedAgentFilter}
           leadVendorFilter={leadVendorFilter}

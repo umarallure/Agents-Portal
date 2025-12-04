@@ -37,7 +37,7 @@ export const DataGrid = ({
   useEffect(() => {
     const fetchDistinctValues = async () => {
       try {
-        const fields = ['lead_vendor', 'buffer_agent', 'agent', 'licensed_agent_account'];
+        const fields = ['lead_vendor', 'buffer_agent', 'retention_agent', 'agent', 'licensed_agent_account'];
         const distinctValues: {[key: string]: string[]} = {};
 
         for (const field of fields) {
@@ -73,6 +73,7 @@ export const DataGrid = ({
     { value: 'none', label: 'No Grouping' },
     { value: 'lead_vendor', label: 'Lead Vendor' },
     { value: 'buffer_agent', label: 'Buffer Agent' },
+    { value: 'retention_agent', label: 'Retention Agent' },
     { value: 'agent', label: 'Agent' },
     { value: 'licensed_agent_account', label: 'Licensed Agent' },
     { value: 'status', label: 'Status' },
@@ -84,7 +85,7 @@ export const DataGrid = ({
   ];
 
   const columns = [
-    "S.No", "Date", "Lead Vendor", "Insured Name", "Phone Number", "Buffer Agent", "Agent", "Licensed Account", "Status",
+    "S.No", "Date", "Lead Vendor", "Insured Name", "Phone Number", "Buffer Agent", "Retention Agent", "Agent", "Licensed Account", "Status",
     "Call Result", "Carrier", "Product Type", "Draft Date", "MP", "Face Amount", "Notes"
   ];
   

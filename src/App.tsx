@@ -37,6 +37,8 @@ import AdminAnalytics from "./pages/AdminAnalytics";
 import { AgentsPage, VendorsPage, DailyPage, CarriersPage } from "./pages/AdminAnalytics/pages";
 import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
+import LAReadyPage from "./pages/LAReadyPage";
+import RetentionCallNotificationPopup from "./components/RetentionCallNotificationPopup";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +49,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <RetentionCallNotificationPopup />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
@@ -240,6 +243,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <UserManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/la-ready" 
+              element={
+                <ProtectedRoute>
+                  <LAReadyPage />
                 </ProtectedRoute>
               } 
             />

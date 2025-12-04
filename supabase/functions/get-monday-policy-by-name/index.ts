@@ -87,17 +87,19 @@ serve(async (req) => {
     const primaryVariation = nameVariations[0];
     
     const query = `query {
-      boards(ids: 8595002703) {
+      boards(ids: 18027763264) {
         items_page {
           cursor
           items {
             id
             name
             column_values(ids: [
-              "subitems", "status", "date1", "text_mkpx3j6w", "color_mknkq2qd",
-              "numbers", "text_mknk5m2r", "color_mkp5sj20", "link_to_contacts_",
-              "person", "pulse_updated_mknkqf59", "color_mkq0rkaw", "text_mkq196kp",
-              "date_mkq1d86z", "dropdown_mkq2x0kx", "text_mkq268v3", "long_text_mksd6zg1"
+              "subitems", "text_mkw44vx", "text_mkwjexhw", "status", "date1",
+              "text_mkpx3j6w", "color_mknkq2qd", "numbers", "numeric_mkw47t5d",
+              "text_mknk5m2r", "color_mkp5sj20", "pulse_updated_mknkqf59",
+              "color_mkq0rkaw", "text_mkwwrq3b", "text_mkq196kp", "date_mkq1d86z",
+              "dropdown_mkq2x0kx", "text_mkq268v3", "date_mkw9tyc9", "date_mkw94jj0",
+              "text_mkw9mq04", "text_mkxdrsg2"
             ]) {
               id
               text

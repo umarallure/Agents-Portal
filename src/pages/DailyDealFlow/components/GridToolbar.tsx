@@ -18,6 +18,8 @@ interface GridToolbarProps {
   onDateToFilterChange: (date: Date | undefined) => void;
   bufferAgentFilter: string;
   onBufferAgentFilterChange: (value: string) => void;
+  retentionAgentFilter: string;
+  onRetentionAgentFilterChange: (value: string) => void;
   licensedAgentFilter: string;
   onLicensedAgentFilterChange: (value: string) => void;
   leadVendorFilter: string;
@@ -46,6 +48,8 @@ export const GridToolbar = ({
   onDateToFilterChange,
   bufferAgentFilter,
   onBufferAgentFilterChange,
+  retentionAgentFilter,
+  onRetentionAgentFilterChange,
   licensedAgentFilter,
   onLicensedAgentFilterChange,
   leadVendorFilter,
@@ -81,6 +85,18 @@ export const GridToolbar = ({
 
   const licensedAgentOptions = [
     "All Licensed Agents",
+    "Claudia",
+    "Lydia",
+    "Isaac",
+    "Trinity",
+    "Benjamin",
+    "Tatumn",
+    "Noah",
+    "N/A"
+  ];
+
+  const retentionAgentOptions = [
+    "All Retention Agents",
     "Claudia",
     "Lydia",
     "Isaac",
@@ -154,6 +170,7 @@ export const GridToolbar = ({
     "Future Submission Date",
     "Application Withdrawn",
     "Updated Banking/draft date",
+    "Pending Failed Payment Fix",
     "Fulfilled carrier requirements",
     "Call Back Fix",
     "Call Never Sent",
@@ -407,6 +424,26 @@ export const GridToolbar = ({
             <SelectContent>
               {bufferAgentOptions.map((agent) => (
                 <SelectItem key={agent} value={agent === "All Buffer Agents" ? ALL_OPTION : agent}>
+                  {agent}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Retention Agent Filter */}
+        <div>
+          <Label className="text-sm font-medium">
+            Retention Agent
+            {retentionAgentFilter && retentionAgentFilter !== ALL_OPTION && <span className="text-blue-600 ml-1">●</span>}
+          </Label>
+          <Select value={retentionAgentFilter || ALL_OPTION} onValueChange={onRetentionAgentFilterChange}>
+            <SelectTrigger className={cn("mt-1", retentionAgentFilter && retentionAgentFilter !== ALL_OPTION && "ring-2 ring-blue-200")}>
+              <SelectValue placeholder="All Retention Agents" />
+            </SelectTrigger>
+            <SelectContent>
+              {retentionAgentOptions.map((agent) => (
+                <SelectItem key={agent} value={agent === "All Retention Agents" ? ALL_OPTION : agent}>
                   {agent}
                 </SelectItem>
               ))}

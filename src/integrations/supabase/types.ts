@@ -666,6 +666,68 @@ export type Database = {
         }
         Relationships: []
       }
+      retention_call_notifications: {
+        Row: {
+          acknowledged_at: string | null
+          buffer_agent_id: string | null
+          buffer_agent_name: string | null
+          created_at: string | null
+          customer_name: string | null
+          id: string
+          la_ready_at: string | null
+          lead_vendor: string | null
+          licensed_agent_id: string | null
+          licensed_agent_name: string | null
+          notification_type: string
+          status: string
+          submission_id: string
+          updated_at: string | null
+          verification_session_id: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          buffer_agent_id?: string | null
+          buffer_agent_name?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          id?: string
+          la_ready_at?: string | null
+          lead_vendor?: string | null
+          licensed_agent_id?: string | null
+          licensed_agent_name?: string | null
+          notification_type: string
+          status?: string
+          submission_id: string
+          updated_at?: string | null
+          verification_session_id?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          buffer_agent_id?: string | null
+          buffer_agent_name?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          id?: string
+          la_ready_at?: string | null
+          lead_vendor?: string | null
+          licensed_agent_id?: string | null
+          licensed_agent_name?: string | null
+          notification_type?: string
+          status?: string
+          submission_id?: string
+          updated_at?: string | null
+          verification_session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retention_call_notifications_verification_session_id_fkey"
+            columns: ["verification_session_id"]
+            isOneToOne: false
+            referencedRelation: "verification_sessions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       user_roles: {
         Row: {
           id: string

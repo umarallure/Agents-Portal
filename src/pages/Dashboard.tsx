@@ -36,13 +36,12 @@ const Dashboard = () => {
   const { toast } = useToast();
   const [leads, setLeads] = useState<LeadWithCallResult[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<LeadWithCallResult[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
-  const [dateFilter, setDateFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [nameFilter, setNameFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(25);
   
   // Analytics state
   const [analytics, setAnalytics] = useState({
@@ -75,15 +74,25 @@ const Dashboard = () => {
   const [claimModalOpen, setClaimModalOpen] = useState(false);
   const [claimSessionId, setClaimSessionId] = useState<string | null>(null);
   const [claimSubmissionId, setClaimSubmissionId] = useState<string | null>(null);
-  const [claimAgentType, setClaimAgentType] = useState<'buffer' | 'licensed'>('buffer');
+  const [claimAgentType, setClaimAgentType] = useState<'buffer' | 'licensed' | 'retention'>('buffer');
   const [claimBufferAgent, setClaimBufferAgent] = useState<string>("");
   const [claimLicensedAgent, setClaimLicensedAgent] = useState<string>("");
+  const [claimRetentionAgent, setClaimRetentionAgent] = useState<string>("");
   const [claimIsRetentionCall, setClaimIsRetentionCall] = useState(false);
   const [claimLoading, setClaimLoading] = useState(false);
   const [claimLead, setClaimLead] = useState<any>(null);
   const [bufferAgents, setBufferAgents] = useState<any[]>([]);
   const [licensedAgents, setLicensedAgents] = useState<any[]>([]);
+  const [retentionAgents, setRetentionAgents] = useState<any[]>([]);
   const [fetchingAgents, setFetchingAgents] = useState(false);
+  
+  // Retention workflow specific state
+  const [retentionType, setRetentionType] = useState<'new_sale' | 'fixed_payment' | 'carrier_requirements' | ''>('');
+  const [retentionNotes, setRetentionNotes] = useState<string>('');
+  const [quoteCarrier, setQuoteCarrier] = useState<string>('');
+  const [quoteProduct, setQuoteProduct] = useState<string>('');
+  const [quoteCoverage, setQuoteCoverage] = useState<string>('');
+  const [quoteMP, setQuoteMP] = useState<string>('');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -99,18 +108,20 @@ const Dashboard = () => {
   useEffect(() => {
     if (user) {
       checkIfLicensedAgent();
-      // Optimization 3: Run data fetches in parallel instead of sequential
+      // Fetch analytics and initial page of leads
       Promise.all([
-        fetchLeads(), // Load recent leads initially
+        fetchLeads(),
         fetchAnalytics()
       ]);
     }
   }, [user]);
 
+  // Refetch when filters or pagination changes
   useEffect(() => {
-    applyFilters();
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [leads, dateFilter, statusFilter]);
+    if (user && !isLoading) {
+      fetchLeads();
+    }
+  }, [currentPage]);
 
   // Separate effect for name filter to trigger search (debounced, min 4 chars)
   useEffect(() => {
@@ -120,23 +131,28 @@ const Dashboard = () => {
     if (trimmed.length >= 4) {
       const timeoutId = setTimeout(() => {
         setIsSearching(true);
+        setCurrentPage(1); // Reset to page 1 when searching
         fetchLeads(trimmed).finally(() => setIsSearching(false));
-        setCurrentPage(1);
       }, 400); // 400ms debounce
       return () => clearTimeout(timeoutId);
-    } else if (trimmed.length === 0) {
-      // When clearing search, fetch all recent leads
+    } else if (trimmed.length === 0 && leads.length > 0) {
+      // When clearing search, reset to page 1 and fetch
+      setCurrentPage(1);
       setIsSearching(true);
       fetchLeads().finally(() => setIsSearching(false));
-      setCurrentPage(1);
     }
     // If 1-3 chars, do nothing (wait for more input)
   }, [nameFilter]);
 
   const fetchLeads = async (searchTerm?: string) => {
     try {
-      // Optimization 1: Use single query with joins instead of multiple queries
-      // Load all leads for better search functionality
+      setIsLoading(true);
+      
+      // Calculate pagination range
+      const from = (currentPage - 1) * itemsPerPage;
+      const to = from + itemsPerPage - 1;
+
+      // Build query with server-side pagination
       let query = supabase
         .from('leads')
         .select(`
@@ -165,37 +181,32 @@ const Dashboard = () => {
             progress_percentage,
             created_at
           )
-        `, { count: 'exact' })
-        .order('created_at', { ascending: false });
+        `, { count: 'exact' });
 
-      // If searching, apply server-side search instead of loading all records
+      // Apply search filter if provided
       if (searchTerm && searchTerm.trim()) {
         const searchValue = `%${searchTerm.trim()}%`;
-
-        // Use a more complex query that searches across leads and joined call_results
-        // We'll need to do this in a way that Supabase can handle
         query = query.or(`customer_full_name.ilike.${searchValue},submission_id.ilike.${searchValue},phone_number.ilike.${searchValue},email.ilike.${searchValue}`);
-
-        // For call_results fields, we'll need to filter after fetching since Supabase
-        // doesn't support complex OR across joined tables easily
-        // Remove range limit when searching to get all matches
-        // No range() call here - let it return all matches
-      } else {
-        // For non-search loads, limit to recent records
-        query = query.range(0, 4999);
       }
 
-      const { data: leadsData, error: leadsError } = await query;
+      // Apply pagination and ordering
+      query = query
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      const { data: leadsData, error: leadsError, count } = await query;
 
       if (leadsError) throw leadsError;
 
       if (!leadsData) {
         setLeads([]);
+        setFilteredLeads([]);
+        setTotalCount(0);
         setIsLoading(false);
         return;
       }
 
-      // Data is already joined, just need to format for compatibility
+      // Format data
       const leadsWithData = leadsData.map(lead => {
         const { call_results, verification_sessions, ...leadData } = lead;
         return {
@@ -205,7 +216,9 @@ const Dashboard = () => {
         } as LeadWithCallResult;
       });
 
-      setLeads(leadsWithData || []);
+      setLeads(leadsWithData);
+      setFilteredLeads(leadsWithData);
+      setTotalCount(count || 0);
     } catch (error) {
       console.error('Error fetching leads:', error);
       toast({
@@ -361,37 +374,7 @@ const Dashboard = () => {
     }
   };
 
-  const applyFilters = () => {
-    let filtered = leads;
-
-    if (dateFilter) {
-      filtered = filtered.filter(lead =>
-        lead.created_at && lead.created_at.includes(dateFilter)
-      );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(lead => {
-        if (!lead.call_results || lead.call_results.length === 0) {
-          return statusFilter === 'no-result';
-        }
-
-        const latestResult = lead.call_results[0];
-        const isSubmitted = Boolean(latestResult.application_submitted);
-
-        if (statusFilter === 'submitted') {
-          return isSubmitted;
-        } else if (statusFilter === 'not-submitted') {
-          return !isSubmitted;
-        } else if (statusFilter === 'no-result') {
-          return false; // Already handled above
-        }
-        return true;
-      });
-    }
-
-    setFilteredLeads(filtered);
-  };  const getLeadStatus = (lead: LeadWithCallResult) => {
+  const getLeadStatus = (lead: LeadWithCallResult) => {
     if (!lead.call_results || lead.call_results.length === 0) return 'No Result';
     const latestResult = lead.call_results[0];
     
@@ -415,20 +398,21 @@ const Dashboard = () => {
 
   // Pagination functions
   const getPaginatedLeads = () => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredLeads.slice(startIndex, endIndex);
+    // Data is already paginated from server
+    return filteredLeads;
   };
 
   const getTotalPages = () => {
-    return Math.ceil(filteredLeads.length / itemsPerPage);
+    return Math.ceil(totalCount / itemsPerPage);
   };
 
   const handlePageChange = (page: number) => {
-  const total = getTotalPages();
-  if (page < 1) page = 1;
-  if (page > total) page = total;
-  setCurrentPage(page);
+    const total = getTotalPages();
+    if (page < 1) page = 1;
+    if (page > total) page = total;
+    if (page !== currentPage) {
+      setCurrentPage(page);
+    }
   };
 
   // Claim call functions
@@ -561,24 +545,43 @@ const Dashboard = () => {
   };
 
   // Fetch agents for dropdowns
-  const fetchAgents = async (type: 'buffer' | 'licensed') => {
+  const fetchAgents = async (type: 'buffer' | 'licensed' | 'retention') => {
     setFetchingAgents(true);
     try {
-      const { data: agentStatus } = await supabase
-        .from('agent_status')
-        .select('user_id')
-        .eq('agent_type', type);
-      const ids = agentStatus?.map(a => a.user_id) || [];
-      let profiles = [];
-      if (ids.length > 0) {
+      if (type === 'retention') {
+        // Specific retention agents
+        const retentionAgentIds = [
+          '5c2822bb-225d-4fbc-8d3f-92f9c2562eac', // Justine
+          '2fff235c-963c-4543-9262-b7d5ae4da9f3', // Laiza Batain
+          'c631ede0-3946-47f6-b728-a15bb38fc7fa', // Hussain Khan (Dalton)
+          'd3ee44f1-5d2d-4702-a230-330cfdccafee', // Qasim Raja
+          '1bf9165d-583a-4bb5-8edf-6d810d9d157a'  // Aqib Afridi
+        ];
+        
         const { data } = await supabase
           .from('profiles')
           .select('user_id, display_name')
-          .in('user_id', ids);
-        profiles = data || [];
+          .in('user_id', retentionAgentIds);
+        
+        setRetentionAgents(data || []);
+      } else {
+        // For buffer and licensed agents, fetch from agent_status
+        const { data: agentStatus } = await supabase
+          .from('agent_status')
+          .select('user_id')
+          .eq('agent_type', type);
+        const ids = agentStatus?.map(a => a.user_id) || [];
+        let profiles = [];
+        if (ids.length > 0) {
+          const { data } = await supabase
+            .from('profiles')
+            .select('user_id, display_name')
+            .in('user_id', ids);
+          profiles = data || [];
+        }
+        if (type === 'buffer') setBufferAgents(profiles);
+        else if (type === 'licensed') setLicensedAgents(profiles);
       }
-      if (type === 'buffer') setBufferAgents(profiles);
-      else setLicensedAgents(profiles);
     } catch (error) {
       // Optionally handle error
     } finally {
@@ -587,17 +590,38 @@ const Dashboard = () => {
   };
 
   // Handle workflow type change
-  const handleAgentTypeChange = (type: 'buffer' | 'licensed') => {
+  const handleAgentTypeChange = (type: 'buffer' | 'licensed' | 'retention') => {
     setClaimAgentType(type);
     setClaimBufferAgent("");
     setClaimLicensedAgent("");
+    setClaimRetentionAgent("");
+    setRetentionType('');
+    setRetentionNotes('');
+    setQuoteCarrier('');
+    setQuoteProduct('');
+    setQuoteCoverage('');
+    setQuoteMP('');
     fetchAgents(type);
   };
 
   const handleClaimCall = async () => {
     setClaimLoading(true);
     try {
-      let agentId = claimAgentType === 'buffer' ? claimBufferAgent : claimLicensedAgent;
+      let agentId: string;
+      let agentName: string;
+      
+      if (claimAgentType === 'buffer') {
+        agentId = claimBufferAgent;
+        agentName = bufferAgents.find(a => a.user_id === agentId)?.display_name || 'Buffer Agent';
+      } else if (claimAgentType === 'licensed') {
+        agentId = claimLicensedAgent;
+        agentName = licensedAgents.find(a => a.user_id === agentId)?.display_name || 'Licensed Agent';
+      } else {
+        // Retention workflow
+        agentId = claimRetentionAgent;
+        agentName = retentionAgents.find(a => a.user_id === agentId)?.display_name || 'Retention Agent';
+      }
+      
       if (!agentId) {
         toast({
           title: "Error",
@@ -607,15 +631,36 @@ const Dashboard = () => {
         return;
       }
 
+      // Build retention notes object for retention workflow
+      let retentionNotesObj = null;
+      if (claimAgentType === 'retention') {
+        retentionNotesObj = {
+          type: retentionType,
+          notes: retentionNotes,
+          ...(retentionType === 'new_sale' && {
+            quote: {
+              carrier: quoteCarrier,
+              product: quoteProduct,
+              coverage: quoteCoverage,
+              monthly_premium: quoteMP
+            }
+          })
+        };
+      }
+
       // Update verification session
       const updateFields: any = {
         status: 'in_progress',
-        is_retention_call: claimIsRetentionCall
+        is_retention_call: claimAgentType === 'retention' || claimIsRetentionCall
       };
+      
       if (claimAgentType === 'buffer') {
         updateFields.buffer_agent_id = agentId;
-      } else {
+      } else if (claimAgentType === 'licensed') {
         updateFields.licensed_agent_id = agentId;
+      } else if (claimAgentType === 'retention') {
+        updateFields.retention_agent_id = agentId;
+        updateFields.retention_notes = retentionNotesObj;
       }
 
       await supabase
@@ -626,56 +671,87 @@ const Dashboard = () => {
       // Update the lead with retention flag
       await supabase
         .from('leads')
-        .update({ is_retention_call: claimIsRetentionCall } as any)
+        .update({ is_retention_call: claimAgentType === 'retention' || claimIsRetentionCall } as any)
         .eq('submission_id', claimSubmissionId);
-
-      // Log the call claim event
-      const agentName = claimAgentType === 'buffer'
-        ? bufferAgents.find(a => a.user_id === agentId)?.display_name || 'Buffer Agent'
-        : licensedAgents.find(a => a.user_id === agentId)?.display_name || 'Licensed Agent';
 
       const { customerName, leadVendor } = await getLeadInfo(claimSubmissionId!);
       
+      // Log the call claim event
       await logCallUpdate({
         submissionId: claimSubmissionId!,
         agentId: agentId,
-        agentType: claimAgentType,
+        agentType: claimAgentType === 'retention' ? 'buffer' : claimAgentType, // Use buffer for logging compatibility
         agentName: agentName,
         eventType: 'call_claimed',
         eventDetails: {
           verification_session_id: claimSessionId,
           claimed_at: new Date().toISOString(),
           claimed_from_dashboard: true,
-          claim_type: 'manual_claim'
+          claim_type: 'manual_claim',
+          workflow_type: claimAgentType,
+          ...(claimAgentType === 'retention' && { retention_details: retentionNotesObj })
         },
         verificationSessionId: claimSessionId!,
         customerName,
         leadVendor,
-        isRetentionCall: claimIsRetentionCall
+        isRetentionCall: claimAgentType === 'retention' || claimIsRetentionCall,
+        retentionAgentId: claimAgentType === 'retention' ? agentId : undefined
       });
 
-      // Update daily_deal_flow if entry exists for today's date (buffer workflow only)
-      if (claimAgentType === 'buffer') {
-        const bufferAgentName = bufferAgents.find(a => a.user_id === agentId)?.display_name || 'N/A';
-        const todayDateString = getTodayDateEST();
-        
-        // Check if daily_deal_flow entry exists with matching submission_id and today's date
-        const { data: existingDailyDealEntry } = await supabase
-          .from('daily_deal_flow')
-          .select('id, date, submission_id')
-          .eq('submission_id', claimSubmissionId)
-          .eq('date', todayDateString)
-          .maybeSingle();
+      // Handle daily_deal_flow entry
+      const todayDateString = getTodayDateEST();
+      const { data: existingDailyDealEntry } = await supabase
+        .from('daily_deal_flow')
+        .select('id, date, submission_id')
+        .eq('submission_id', claimSubmissionId)
+        .eq('date', todayDateString)
+        .maybeSingle();
 
-        if (existingDailyDealEntry) {
-          // Update the buffer_agent field only if entry exists AND date matches today
-          await supabase
+      if (existingDailyDealEntry) {
+        // Update existing entry
+        const updateData: any = {
+          is_retention_call: claimAgentType === 'retention' || claimIsRetentionCall
+        };
+        
+        if (claimAgentType === 'buffer') {
+          updateData.buffer_agent = agentName;
+        } else if (claimAgentType === 'retention') {
+          updateData.retention_agent = agentName;
+          updateData.retention_agent_id = agentId;
+        }
+        
+        await supabase
+          .from('daily_deal_flow')
+          .update(updateData as any)
+          .eq('id', existingDailyDealEntry.id);
+      } else if (claimAgentType === 'retention') {
+        // Create new entry for retention workflow
+        try {
+          // Fetch complete lead data including phone number
+          const { data: leadData } = await supabase
+            .from('leads')
+            .select('phone_number, customer_full_name, lead_vendor')
+            .eq('submission_id', claimSubmissionId)
+            .single();
+
+          const { error: insertError } = await supabase
             .from('daily_deal_flow')
-            .update({ 
-              buffer_agent: bufferAgentName,
-              is_retention_call: claimIsRetentionCall
-            } as any)
-            .eq('id', existingDailyDealEntry.id);
+            .insert({
+              submission_id: claimSubmissionId,
+              date: todayDateString,
+              insured_name: customerName || leadData?.customer_full_name || claimLead?.customer_full_name,
+              client_phone_number: leadData?.phone_number || claimLead?.phone_number,
+              lead_vendor: leadVendor || leadData?.lead_vendor || claimLead?.lead_vendor,
+              retention_agent: agentName,
+              retention_agent_id: agentId,
+              is_retention_call: true
+            } as any);
+
+          if (insertError) {
+            console.error('Error creating daily_deal_flow entry for retention:', insertError);
+          }
+        } catch (error) {
+          console.error('Failed to create daily_deal_flow entry:', error);
         }
       }
 
@@ -690,6 +766,113 @@ const Dashboard = () => {
         }
       });
 
+      // If this is a retention workflow, send notification with retention details
+      if (claimAgentType === 'retention') {
+        try {
+          // Create notification record
+          const { data: notificationRecord, error: notificationError } = await supabase
+            .from('retention_call_notifications')
+            .insert({
+              verification_session_id: claimSessionId,
+              submission_id: claimSubmissionId,
+              buffer_agent_id: agentId,
+              buffer_agent_name: agentName,
+              customer_name: customerName || claimLead?.customer_full_name,
+              lead_vendor: leadVendor || claimLead?.lead_vendor,
+              notification_type: 'buffer_connected',
+              status: 'pending'
+            })
+            .select()
+            .single();
+
+          if (notificationError) {
+            console.error('Error creating retention notification record:', notificationError);
+          }
+
+          console.log('[Retention] Notification record created:', notificationRecord);
+
+          // Send Slack notification to callback portal with LA Ready button
+          const { data: slackResult, error: slackError } = await supabase.functions.invoke('retention-call-notification', {
+            body: {
+              type: 'buffer_connected',
+              submissionId: claimSubmissionId,
+              verificationSessionId: claimSessionId,
+              bufferAgentId: agentId,
+              bufferAgentName: agentName,
+              customerName: customerName || claimLead?.customer_full_name,
+              leadVendor: leadVendor || claimLead?.lead_vendor,
+              notificationId: notificationRecord?.id,
+              retentionType: retentionType,
+              retentionNotes: retentionNotes,
+              quoteDetails: retentionType === 'new_sale' ? {
+                carrier: quoteCarrier,
+                product: quoteProduct,
+                coverage: quoteCoverage,
+                monthlyPremium: quoteMP
+              } : null
+            }
+          });
+
+          if (slackError) {
+            console.error('Error sending retention Slack notification:', slackError);
+          } else {
+            console.log('[Retention] Slack notification sent successfully:', slackResult);
+          }
+        } catch (error) {
+          console.error('Error sending retention notification:', error);
+        }
+      }
+      
+      // If this is a retention call and claimed by buffer agent, send notification to buffer callback portal
+      if (claimIsRetentionCall && claimAgentType === 'buffer') {
+        try {
+          // Create notification record first
+          const { data: notificationRecord, error: notificationError } = await supabase
+            .from('retention_call_notifications')
+            .insert({
+              verification_session_id: claimSessionId,
+              submission_id: claimSubmissionId,
+              buffer_agent_id: agentId,
+              buffer_agent_name: agentName,
+              customer_name: customerName || claimLead?.customer_full_name,
+              lead_vendor: leadVendor || claimLead?.lead_vendor,
+              notification_type: 'buffer_connected',
+              status: 'pending'
+            })
+            .select()
+            .single();
+
+          if (notificationError) {
+            console.error('Error creating retention notification record:', notificationError);
+          }
+
+          console.log('[DEBUG] Notification record created:', notificationRecord);
+          console.log('[DEBUG] Notification ID:', notificationRecord?.id);
+
+          // Send Slack notification to buffer callback portal
+          const { data: slackResult, error: slackError } = await supabase.functions.invoke('retention-call-notification', {
+            body: {
+              type: 'buffer_connected',
+              submissionId: claimSubmissionId,
+              verificationSessionId: claimSessionId,
+              bufferAgentId: agentId,
+              bufferAgentName: agentName,
+              customerName: customerName || claimLead?.customer_full_name,
+              leadVendor: leadVendor || claimLead?.lead_vendor,
+              notificationId: notificationRecord?.id
+            }
+          });
+
+          if (slackError) {
+            console.error('Error invoking retention notification function:', slackError);
+          }
+          console.log('[DEBUG] Slack notification result:', slackResult);
+        } catch (retentionError) {
+          console.error('Error sending retention notification:', retentionError);
+          // Don't fail the entire claim process if retention notification fails
+        }
+      }
+
       // Store submissionId before clearing state for redirect
       const submissionIdForRedirect = claimSubmissionId;
 
@@ -699,7 +882,14 @@ const Dashboard = () => {
       setClaimLead(null);
       setClaimBufferAgent("");
       setClaimLicensedAgent("");
+      setClaimRetentionAgent("");
       setClaimIsRetentionCall(false);
+      setRetentionType('');
+      setRetentionNotes('');
+      setQuoteCarrier('');
+      setQuoteProduct('');
+      setQuoteCoverage('');
+      setQuoteMP('');
       
       toast({
         title: "Success",
@@ -728,12 +918,21 @@ const Dashboard = () => {
   const paginatedLeads = getPaginatedLeads();
   const totalPages = getTotalPages();
 
-  if (loading || isLoading) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-muted-foreground">Loading your dashboard...</p>
+      <div className="min-h-screen bg-background">
+        <NavigationHeader title="Agent Dashboard" />
+        <div className="flex items-center justify-center h-[calc(100vh-80px)]">
+          <div className="text-center space-y-4">
+            <div className="relative w-16 h-16 mx-auto">
+              <div className="absolute inset-0 rounded-full border-4 border-primary/20"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-lg font-medium text-foreground">Loading Dashboard</p>
+              <p className="text-sm text-muted-foreground">Please wait while we fetch your data...</p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -824,54 +1023,24 @@ const Dashboard = () => {
 
         {/* Filters */}
         <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Filter className="h-5 w-5" />
-              <span>Filters</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="date-filter">Date</Label>
+          <CardContent className="pt-6">
+            <div className="space-y-2">
+              <Label htmlFor="name-filter">Search Leads</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  id="date-filter"
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
+                  id="name-filter"
+                  type="text"
+                  placeholder="Search by name, phone, submission ID, or email (min 4 characters)..."
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                  className={`pl-10 ${isSearching ? 'pr-10' : ''}`}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="status-filter">Status</Label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="submitted">Submitted</SelectItem>
-                    <SelectItem value="not-submitted">Not Submitted</SelectItem>
-                    <SelectItem value="no-result">No Result</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name-filter">Search Leads</Label>
-                <div className="relative">
-                  <Input
-                    id="name-filter"
-                    type="text"
-                    placeholder="Search by name, phone, submission ID, email, carrier, or agent..."
-                    value={nameFilter}
-                    onChange={(e) => setNameFilter(e.target.value)}
-                    className={isSearching ? 'pr-10' : ''}
-                  />
-                  {isSearching && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                    </div>
-                  )}
-                </div>
+                {isSearching && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -1073,7 +1242,7 @@ const Dashboard = () => {
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between mt-6">
                       <div className="text-sm text-muted-foreground">
-                        Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredLeads.length)} of {filteredLeads.length} entries
+                        Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} entries
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
@@ -1158,14 +1327,29 @@ const Dashboard = () => {
         agentType={claimAgentType}
         bufferAgents={bufferAgents}
         licensedAgents={licensedAgents}
+        retentionAgents={retentionAgents}
         fetchingAgents={fetchingAgents}
         claimBufferAgent={claimBufferAgent}
         claimLicensedAgent={claimLicensedAgent}
+        claimRetentionAgent={claimRetentionAgent}
         isRetentionCall={claimIsRetentionCall}
+        retentionType={retentionType}
+        retentionNotes={retentionNotes}
+        quoteCarrier={quoteCarrier}
+        quoteProduct={quoteProduct}
+        quoteCoverage={quoteCoverage}
+        quoteMP={quoteMP}
         onAgentTypeChange={handleAgentTypeChange}
         onBufferAgentChange={setClaimBufferAgent}
         onLicensedAgentChange={setClaimLicensedAgent}
+        onRetentionAgentChange={setClaimRetentionAgent}
         onRetentionCallChange={setClaimIsRetentionCall}
+        onRetentionTypeChange={setRetentionType}
+        onRetentionNotesChange={setRetentionNotes}
+        onQuoteCarrierChange={setQuoteCarrier}
+        onQuoteProductChange={setQuoteProduct}
+        onQuoteCoverageChange={setQuoteCoverage}
+        onQuoteMPChange={setQuoteMP}
         onCancel={() => setClaimModalOpen(false)}
         onClaim={handleClaimCall}
       />

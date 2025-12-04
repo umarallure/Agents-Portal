@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { StartVerificationModal } from "@/components/StartVerificationModal";
 import { VerificationPanel } from "@/components/VerificationPanel";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { TopVerificationProgress } from "@/components/TopVerificationProgress";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Lead {
   id: string;
@@ -50,19 +51,184 @@ interface Lead {
   lead_vendor?: string;
 }
 
+// Global tracking to prevent duplicate notifications across re-renders
+const laReadyInProgress = new Map<string, Promise<void>>();
+
 const CallResultUpdate = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const submissionId = searchParams.get("submissionId");
   const formId = searchParams.get("formId");
   const fromCallback = searchParams.get("fromCallback");
+  const sessionIdFromUrl = searchParams.get("sessionId");
+  const notificationIdFromUrl = searchParams.get("notificationId");
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [verificationSessionId, setVerificationSessionId] = useState<string | null>(null);
   const [showVerificationPanel, setShowVerificationPanel] = useState(false);
+  const laReadyTriggeredRef = useRef(false);
 
   const { toast } = useToast();
+
+  // Handle LA Ready flow - when LA clicks the button from Slack and lands here
+  useEffect(() => {
+    const triggerLAReadyNotification = async () => {
+      console.log('[LA Ready FLOW] Effect triggered with:', {
+        notificationIdFromUrl,
+        hasUser: !!user,
+        refTriggered: laReadyTriggeredRef.current,
+        timestamp: new Date().toISOString()
+      });
+
+      // Only trigger if we have notificationId (coming from Slack LA-Ready button)
+      // and haven't triggered yet
+      if (!notificationIdFromUrl || !user) {
+        console.log('[LA Ready FLOW] Exiting early:', {
+          noNotificationId: !notificationIdFromUrl,
+          noUser: !user
+        });
+        return;
+      }
+
+      // Create a unique key for this notification attempt
+      const notificationKey = `${notificationIdFromUrl}-${user.id}`;
+
+      // Check if this notification is already being processed
+      if (laReadyInProgress.has(notificationKey)) {
+        console.log('[LA Ready FLOW] Already in progress, waiting for existing promise...');
+        await laReadyInProgress.get(notificationKey);
+        return;
+      }
+
+      // Also check the ref guard
+      if (laReadyTriggeredRef.current) {
+        console.log('[LA Ready FLOW] Ref already triggered, skipping');
+        return;
+      }
+
+      laReadyTriggeredRef.current = true;
+      console.log('[LA Ready FLOW] Setting ref to true, proceeding with notification');
+
+      // Create a promise for this notification and store it
+      const notificationPromise = (async () => {
+        try {
+          // Get the LA's profile for their name
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('display_name')
+            .eq('user_id', user.id)
+            .single();
+
+          const licensedAgentName = profile?.display_name || 'Licensed Agent';
+          console.log('[LA Ready FLOW] Got LA profile:', licensedAgentName);
+
+          // Get the notification to find buffer agent info
+          const { data: notification, error: notifError } = await supabase
+            .from('retention_call_notifications')
+            .select('*')
+            .eq('id', notificationIdFromUrl)
+            .single();
+
+          if (notifError || !notification) {
+            console.error('[LA Ready FLOW] Notification not found:', notifError);
+            return;
+          }
+
+          console.log('[LA Ready FLOW] Found original notification:', {
+            id: notification.id,
+            bufferAgent: notification.buffer_agent_name,
+            sessionId: notification.verification_session_id
+          });
+
+          const sessionId = sessionIdFromUrl || notification.verification_session_id;
+
+          // Check if an la_ready notification already exists for this session, submission, and LA within the last 60 seconds
+          const sixtySecondsAgo = new Date(Date.now() - 60000).toISOString();
+          console.log('[LA Ready FLOW] Checking for duplicates since:', sixtySecondsAgo);
+          
+          const { data: recentNotifications, error: checkError } = await supabase
+            .from('retention_call_notifications')
+            .select('id, created_at')
+            .eq('verification_session_id', sessionId)
+            .eq('submission_id', submissionId)
+            .eq('licensed_agent_id', user.id)
+            .eq('notification_type', 'la_ready')
+            .gte('created_at', sixtySecondsAgo)
+            .order('created_at', { ascending: false });
+
+          console.log('[LA Ready FLOW] Duplicate check result:', {
+            found: recentNotifications?.length || 0,
+            notifications: recentNotifications
+          });
+
+          if (recentNotifications && recentNotifications.length > 0) {
+            console.log('[LA Ready FLOW] DUPLICATE DETECTED - Skipping notification creation');
+            toast({
+              title: "Already Notified",
+              description: "The buffer agent has already been notified.",
+            });
+            return;
+          }
+
+          console.log('[LA Ready FLOW] No duplicates found, calling edge function...');
+
+          // Call the edge function to notify the buffer agent
+          const { data: fnResult, error: fnError } = await supabase.functions.invoke('retention-call-notification', {
+            body: {
+              type: 'la_ready',
+              submissionId,
+              verificationSessionId: sessionId,
+              bufferAgentId: notification.buffer_agent_id,
+              bufferAgentName: notification.buffer_agent_name,
+              licensedAgentId: user.id,
+              licensedAgentName,
+              customerName: notification.customer_name,
+              leadVendor: notification.lead_vendor,
+              notificationId: notificationIdFromUrl
+            }
+          });
+
+          if (fnError) {
+            console.error('[LA Ready FLOW] Edge function error:', fnError);
+          } else {
+            console.log('[LA Ready FLOW] Edge function success:', fnResult);
+            toast({
+              title: "Buffer Agent Notified",
+              description: "The buffer agent has been notified that you're ready to take the call.",
+            });
+          }
+
+          // Update verification session if we have one
+          if (sessionIdFromUrl) {
+            console.log('[LA Ready FLOW] Updating verification session status...');
+            await supabase
+              .from('verification_sessions')
+              .update({
+                licensed_agent_id: user.id,
+                status: 'ready_for_transfer',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', sessionIdFromUrl);
+          }
+        } catch (err) {
+          console.error('[LA Ready FLOW] Exception:', err);
+        } finally {
+          // Clean up the promise from the map after completion
+          laReadyInProgress.delete(notificationKey);
+        }
+      })();
+
+      // Store the promise
+      laReadyInProgress.set(notificationKey, notificationPromise);
+
+      // Wait for it to complete
+      await notificationPromise;
+    };
+
+    triggerLAReadyNotification();
+  }, [notificationIdFromUrl, user, submissionId, sessionIdFromUrl, toast]);
 
   useEffect(() => {
     if (!submissionId) {
@@ -76,8 +242,15 @@ const CallResultUpdate = () => {
     }
 
     fetchLead();
-    checkExistingVerificationSession();
-  }, [submissionId]);
+    
+    // If sessionId is passed in URL (from LA Ready flow), use it directly
+    if (sessionIdFromUrl) {
+      setVerificationSessionId(sessionIdFromUrl);
+      setShowVerificationPanel(true);
+    } else {
+      checkExistingVerificationSession();
+    }
+  }, [submissionId, sessionIdFromUrl]);
 
   const checkExistingVerificationSession = async () => {
     try {
@@ -292,21 +465,23 @@ const CallResultUpdate = () => {
           </>
         ) : (
           /* Original layout when no verification panel */
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-            {/* Lead Details */}
-            <div className="space-y-6">
-              <DetailedLeadInfoCard lead={lead} />
+          <>
+            <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+              {/* Lead Details */}
+              <div className="space-y-6">
+                <DetailedLeadInfoCard lead={lead} />
+              </div>
+              
+              {/* Call Result Form */}
+              <div>
+                <CallResultForm 
+                  submissionId={submissionId!} 
+                  customerName={lead.customer_full_name}
+                  onSuccess={() => navigate(`/call-result-journey?submissionId=${submissionId}`)}
+                />
+              </div>
             </div>
-            
-            {/* Call Result Form */}
-            <div>
-              <CallResultForm 
-                submissionId={submissionId!} 
-                customerName={lead.customer_full_name}
-                onSuccess={() => navigate(`/call-result-journey?submissionId=${submissionId}`)}
-              />
-            </div>
-          </div>
+          </>
         )}
       </div>
     </div>

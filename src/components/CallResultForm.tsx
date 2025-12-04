@@ -9,8 +9,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { format } from "date-fns";
-import { CalendarIcon, CheckCircle, XCircle, Loader2, Shield, Wrench } from "lucide-react";
+import { CalendarIcon, CheckCircle, XCircle, Loader2, Shield, Wrench, Copy, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getTodayDateEST, getCurrentTimestampEST, formatDateESTLocale } from "@/lib/dateUtils";
@@ -71,6 +72,7 @@ const bufferAgentOptions = [
   "Aqib Afridi",
   "Qasim Raja",
   "Noah Akins",
+  "Molli Reynolds",
   "Hussain Khan",
   "N/A",
 ];
@@ -150,6 +152,7 @@ const leadVendorOptions = [
 "Quoted-Leads BPO",
 "SellerZ BPO",
 "Venom BPO",
+"Core Marketing",
 "WinBPO"
 ];
 
@@ -214,6 +217,7 @@ const getReasonOptions = (status: string) => {
 const mapStatusToSheetValue = (userSelectedStatus: string) => {
   const statusMap: { [key: string]: string } = {
     "Needs callback": "Needs BPO Callback",
+    "GI - Currently DQ": "Returned To Center - DQ",
     "Call Never Sent": "Incomplete Transfer",
     "Not Interested": "Returned To Center - DQ",
     "Fulfilled carrier requirements": "Pending Approval",
@@ -222,8 +226,8 @@ const mapStatusToSheetValue = (userSelectedStatus: string) => {
     "Chargeback DQ": "DQ'd Can't be sold",
     "Future Submission Date": "Application Withdrawn",
     "Disconnected": "Incomplete Transfer",
-    "Disconnected - Never Retransferred": "Incomplete Transfer",
-    "GI - Currently DQ": "Returned To Center - DQ"
+    "Disconnected - Never Retransferred": "Incomplete Transfer"
+    
   };
   return statusMap[userSelectedStatus] || userSelectedStatus;
 };
@@ -276,6 +280,33 @@ const getNoteText = (status: string, reason: string, clientName: string = "[Clie
 const generateCallbackSubmissionId = (originalSubmissionId: string): string => {
   const randomDigits = Math.floor(1000 + Math.random() * 9000); // 4-digit random number
   return `CBB${randomDigits}${originalSubmissionId}`;
+};
+
+// Lead vendor to DID mapping for GI - Currently DQ transfers
+const leadVendorDIDMapping: { [key: string]: string } = {
+  "AJ BPO": "Contact AJ BPO",
+  "Ambition": "8036808613",
+  "Argon Comm": "Contact Argon Comm",
+  "Avenue Consultancy": "3465896057",
+  "Corebiz": "Contact Corebiz",
+  "CrossNotch": "9298101908",
+  "Crown Connect BPO": "Contact Crown Connect BPO",
+  "DownTown BPO": "Contact DownTown BPO",
+  "Exito BPO": "Contact Exito BPO",
+  "Leads BPO": "Contact Leads BPO",
+  "NanoTech": "4696296367",
+  "Rock BPO": "9182486011",
+  "SellerZ BPO": "9086641503",
+  "StratiX BPO": "7273545717",
+  "TechPlanet": "+1 (833) 817-1810",
+  "Quoted-Leads BPO": "12179961427",
+  "WinBPO": "+12163009420",
+  "Zupax Marketing": "Contact Zupax Marketing"
+};
+
+// Function to get DID for lead vendor
+const getLeadVendorDID = (leadVendor: string): string | null => {
+  return leadVendorDIDMapping[leadVendor] || null;
 };
 
 // Function to check if entry exists and get its date
@@ -403,6 +434,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
   const [carrierAttempted1, setCarrierAttempted1] = useState("");
   const [carrierAttempted2, setCarrierAttempted2] = useState("");
   const [carrierAttempted3, setCarrierAttempted3] = useState("");
+  const [carrierRequirementCarrier, setCarrierRequirementCarrier] = useState("");
   const [showAppFixForm, setShowAppFixForm] = useState(false);
   
   const { toast } = useToast();
@@ -573,6 +605,11 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
       setCarrierAttempted2("");
       setCarrierAttempted3("");
       setNotes("");
+    } else if (status === "Fulfilled carrier requirements") {
+      // Reset carrier requirement carrier field
+      setCarrierRequirementCarrier("");
+      setStatusReason("");
+      setNotes("");
     } else {
       setStatusReason("");
       setNotes("");
@@ -598,7 +635,22 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
   const showStatusReasonDropdown = applicationSubmitted === false && ["⁠DQ", "Chargeback DQ", "Needs callback", "Not Interested", "Future Submission Date", "Updated Banking/draft date", "Fulfilled carrier requirements"].includes(status);
   const showNewDraftDateField = applicationSubmitted === false && status === "Updated Banking/draft date" && statusReason;
   const showCarrierAttemptedFields = applicationSubmitted === false && status === "GI - Currently DQ";
+  const showCarrierRequirementField = applicationSubmitted === false && status === "Fulfilled carrier requirements";
   const currentReasonOptions = getReasonOptions(status);
+  
+  // Show DID warning for GI - Currently DQ status
+  const showDIDWarning = applicationSubmitted === false && status === "GI - Currently DQ" && leadVendor;
+  const vendorDID = leadVendor ? getLeadVendorDID(leadVendor) : null;
+
+  const handleCopyDID = () => {
+    if (vendorDID) {
+      navigator.clipboard.writeText(vendorDID);
+      toast({
+        title: "DID Copied",
+        description: `${vendorDID} copied to clipboard`,
+      });
+    }
+  };
 
   const handleStatusReasonChange = (reason: string) => {
     setStatusReason(reason);
@@ -636,6 +688,17 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
     let finalSubmissionId = submissionId;
 
     try {
+      // Validation for Fulfilled carrier requirements
+      if (status === "Fulfilled carrier requirements" && !carrierRequirementCarrier) {
+        toast({
+          title: "Carrier Required",
+          description: "Please select a carrier for the fulfilled requirement.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       // Determine status based on underwriting field
       let finalStatus = status;
       if (applicationSubmitted === true) {
@@ -1238,6 +1301,81 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         }
       }
 
+      // Send retention team notification if this is a retention call
+      if (isRetentionCall) {
+        try {
+          console.log('Sending retention team notification');
+
+          // Fetch lead data for retention notification
+          const { data: leadData, error: leadError } = await supabase
+            .from("leads")
+            .select("customer_full_name, lead_vendor")
+            .eq("submission_id", submissionId)
+            .single();
+
+          if (leadError) {
+            console.error("Error fetching lead data for retention notification:", leadError);
+          } else {
+            // Determine notification type based on status
+            let notificationType = null;
+            let notificationData: any = {
+              submissionId: submissionId,
+              customerName: leadData?.customer_full_name || customerName,
+              leadVendor: leadData?.lead_vendor || leadVendor,
+              retentionAgent: bufferAgent || 'N/A', // Use buffer agent as retention agent
+              isRetentionCall: true
+            };
+
+            if (applicationSubmitted === true) {
+              // Application submitted notification
+              notificationType = 'application_submitted';
+              notificationData = {
+                ...notificationData,
+                carrier: carrier || 'N/A',
+                productType: productType || 'N/A',
+                draftDate: draftDate ? format(draftDate, 'yyyy-MM-dd') : 'N/A',
+                monthlyPremium: monthlyPremium || '0.00',
+                coverageAmount: coverageAmount || '0'
+              };
+            } else if (status === "Updated Banking/draft date") {
+              // Fixed banking notification
+              notificationType = 'fixed_banking';
+              notificationData = {
+                ...notificationData,
+                carrier: carrier || 'N/A',
+                newDraftDate: newDraftDate ? format(newDraftDate, 'yyyy-MM-dd') : 'N/A'
+              };
+            } else if (status === "Fulfilled carrier requirements") {
+              // Fulfilled carrier requirements notification
+              notificationType = 'fulfilled_carrier_requirements';
+              notificationData = {
+                ...notificationData,
+                carrier: carrierRequirementCarrier || 'N/A' // Use the specific carrier field
+              };
+            }
+
+            if (notificationType) {
+              const { error: retentionError } = await supabase.functions.invoke('retention-team-notification', {
+                body: {
+                  type: notificationType,
+                  ...notificationData
+                }
+              });
+
+              if (retentionError) {
+                console.error("Error sending retention team notification:", retentionError);
+                // Don't fail the entire process if retention notification fails
+              } else {
+                console.log("Retention team notification sent successfully");
+              }
+            }
+          }
+        } catch (retentionError) {
+          console.error("Retention team notification failed:", retentionError);
+          // Don't fail the entire process if retention notification fails
+        }
+      }
+
       toast({
         title: "Success",
         description: existingResult ? "Call result updated successfully" : "Call result saved successfully",
@@ -1271,6 +1409,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           setCarrierAttempted1("");
           setCarrierAttempted2("");
           setCarrierAttempted3("");
+          setCarrierRequirementCarrier("");
         }
       }
 
@@ -1769,6 +1908,78 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* DID Warning Card - shows for GI - Currently DQ status with lead vendor */}
+              {showDIDWarning && (
+                <Alert className="border-orange-500 bg-orange-50">
+                  <AlertTriangle className="h-5 w-5 text-orange-600" />
+                  <AlertTitle className="text-orange-800 font-bold text-lg">
+                    ⚠️ Transfer Back to Lead Vendor Required
+                  </AlertTitle>
+                  <AlertDescription className="space-y-3">
+                    <p className="text-orange-900 font-medium">
+                      This caller needs to be transferred back to <strong>{leadVendor}</strong>
+                    </p>
+                    {vendorDID ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3 p-3 bg-white border border-orange-200 rounded-md">
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-600 font-medium">Transfer DID Number:</p>
+                            <p className="text-2xl font-bold text-orange-700">{vendorDID}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            onClick={handleCopyDID}
+                            variant="outline"
+                            size="sm"
+                            className="border-orange-300 hover:bg-orange-100"
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy DID
+                          </Button>
+                        </div>
+                        <p className="text-sm text-orange-800">
+                          📞 Use this DID number to transfer the caller back to {leadVendor} for further assistance.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-white border border-orange-200 rounded-md">
+                        <p className="text-sm text-orange-800">
+                          ℹ️ Please contact <strong>{leadVendor}</strong> to complete the transfer.
+                        </p>
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Carrier Requirement field - shows only for Fulfilled carrier requirements status */}
+              {showCarrierRequirementField && (
+                <div className="space-y-4 p-4 border rounded-lg bg-green-50">
+                  <h4 className="font-semibold text-green-800">Carrier Requirement Details</h4>
+                  
+                  <div>
+                    <Label htmlFor="carrierRequirementCarrier">
+                      Carrier <span className="text-red-500">*</span>
+                    </Label>
+                    <Select value={carrierRequirementCarrier} onValueChange={setCarrierRequirementCarrier} required>
+                      <SelectTrigger className={`${!carrierRequirementCarrier ? 'border-red-300 focus:border-red-500' : ''}`}>
+                        <SelectValue placeholder="Select carrier (required)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {carrierOptions.map((carrier) => (
+                          <SelectItem key={carrier} value={carrier}>
+                            {carrier}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!carrierRequirementCarrier && (
+                      <p className="text-sm text-red-500 mt-1">Carrier is required for carrier requirements</p>
+                    )}
                   </div>
                 </div>
               )}

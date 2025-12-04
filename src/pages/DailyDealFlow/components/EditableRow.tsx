@@ -583,6 +583,27 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
             </div>
 
             <div>
+              <Label className="text-sm font-medium">Retention Agent</Label>
+              {isEditing ? (
+                <Select
+                  value={editData.retention_agent || ''}
+                  onValueChange={(value) => updateField('retention_agent', value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select retention agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {licensedAccountOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.retention_agent || 'N/A'}</div>
+              )}
+            </div>
+
+            <div>
               <Label className="text-sm font-medium">Agent</Label>
               {isEditing ? (
                 <Select
@@ -1054,6 +1075,23 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
             </Select>
           </td>
 
+          {/* Retention Agent */}
+          <td className="border border-border px-3 py-2">
+            <Select
+              value={editData.retention_agent || ''}
+              onValueChange={(value) => updateField('retention_agent', value)}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Retention Agent" />
+              </SelectTrigger>
+              <SelectContent>
+                {licensedAccountOptions.map(option => (
+                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </td>
+
           {/* Agent */}
           <td className="border border-border px-3 py-2">
             <Select
@@ -1296,6 +1334,15 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
           {row.buffer_agent ? (
             <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap inline-block ${getBufferAgentBadge(row.buffer_agent)}`}>
               {row.buffer_agent}
+            </span>
+          ) : ''}
+        </td>
+
+        {/* Retention Agent */}
+        <td className="border border-border px-2 py-2 text-sm w-24">
+          {row.retention_agent ? (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap inline-block ${getLicensedAgentBadge(row.retention_agent)}`}>
+              {row.retention_agent}
             </span>
           ) : ''}
         </td>

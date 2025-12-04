@@ -34,7 +34,7 @@ serve(async (req) => {
 
     const query = `query {
       items_page_by_column_values(
-        board_id: 8595002703,
+        board_id: 18027763264,
         columns: [{column_id: "text_mkq268v3", column_values: ["${normalizedPhone}"]}]
       ) {
         cursor
@@ -42,10 +42,12 @@ serve(async (req) => {
           id
           name
           column_values(ids: [
-            "subitems", "status", "date1", "text_mkpx3j6w", "color_mknkq2qd",
-            "numbers", "text_mknk5m2r", "color_mkp5sj20", "link_to_contacts_",
-            "person", "pulse_updated_mknkqf59", "color_mkq0rkaw", "text_mkq196kp",
-            "date_mkq1d86z", "dropdown_mkq2x0kx", "text_mkq268v3", "long_text_mksd6zg1"
+            "subitems", "text_mkw44vx", "text_mkwjexhw", "status", "date1",
+            "text_mkpx3j6w", "color_mknkq2qd", "numbers", "numeric_mkw47t5d",
+            "text_mknk5m2r", "color_mkp5sj20", "pulse_updated_mknkqf59",
+            "color_mkq0rkaw", "text_mkwwrq3b", "text_mkq196kp", "date_mkq1d86z",
+            "dropdown_mkq2x0kx", "text_mkq268v3", "date_mkw9tyc9", "date_mkw94jj0",
+            "text_mkw9mq04", "text_mkxdrsg2"
           ]) {
             id
             text
