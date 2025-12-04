@@ -896,7 +896,6 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 level_or_gi: null,
                 from_callback: callSource === "Agent Callback",
                 is_callback: submissionId.startsWith('CB') || submissionId.startsWith('CBB'), // Track if this is a callback with CB or CBB prefix
-                is_retention_call: isRetentionCall,
                 // Add the new parameters for proper status determination
                 application_submitted: applicationSubmitted,
                 sent_to_underwriting: sentToUnderwriting,

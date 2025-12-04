@@ -1098,7 +1098,10 @@ const Dashboard = () => {
                         <div className="flex justify-between items-start">
                           <div className="space-y-3 flex-1">
                             <div className="flex items-center space-x-3">
-                              <h3 className="text-lg font-semibold">{lead.customer_full_name}</h3>
+                              <h3 className="text-lg font-semibold">
+                                {lead.customer_full_name}
+                                {lead.lead_vendor && <span className="text-muted-foreground"> - {lead.lead_vendor}</span>}
+                              </h3>
                               <Badge className={getStatusColor(getLeadStatus(lead))}>
                                 {getLeadStatus(lead)}
                               </Badge>

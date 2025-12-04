@@ -11,7 +11,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 // The target channel for buffer callback portal notifications
-const BUFFER_CALLBACK_CHANNEL = '#sample-center-transfer-channel';
+const BUFFER_CALLBACK_CHANNEL = '#sales-team-callback-portal';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
