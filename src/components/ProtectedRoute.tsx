@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { isRestrictedUser, isCenterUser } from '@/lib/userPermissions';
+import { isRestrictedUser, isCenterUser, isBufferAgent as checkIsBufferAgent } from '@/lib/userPermissions';
 import { useLicensedAgent } from '@/hooks/useLicensedAgent';
 
 interface ProtectedRouteProps {
@@ -14,6 +14,8 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [centerCheckLoading, setCenterCheckLoading] = useState(false);
+  const [isBufferAgent, setIsBufferAgent] = useState(false);
+  const [bufferLoading, setBufferLoading] = useState(false);
 
   useEffect(() => {
     const checkUserAccess = async () => {
@@ -25,6 +27,10 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         isLicensedAgent,
         currentPath: location.pathname
       });
+
+      // Check buffer agent status
+      const bufferStatus = await checkIsBufferAgent(user.id);
+      setIsBufferAgent(bufferStatus);
 
       // Licensed agents can access commission-portal and dashboard
       if (isLicensedAgent) {
@@ -43,6 +49,18 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         // Licensed agents can access commission-portal and dashboard, no redirect needed
         console.log('[ProtectedRoute] Licensed agent accessing:', location.pathname);
         return;
+      }
+
+      // Buffer agents can access deal-flow-lookup
+      if (bufferStatus) {
+        console.log('[ProtectedRoute] Buffer agent detected');
+        const currentPath = location.pathname;
+        
+        // Allow buffer agents to access deal-flow-lookup
+        if (['/deal-flow-lookup', '/dashboard'].includes(currentPath)) {
+          console.log('[ProtectedRoute] Buffer agent accessing:', currentPath);
+          return;
+        }
       }
 
       console.log('[ProtectedRoute] Not a licensed agent, checking center user status');
@@ -81,7 +99,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     checkUserAccess();
   }, [user, loading, licensedLoading, isLicensedAgent, navigate, location.pathname]);
 
-  if (loading || licensedLoading || centerCheckLoading) {
+  if (loading || licensedLoading || centerCheckLoading || bufferLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
