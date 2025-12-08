@@ -28,7 +28,7 @@ interface CallResultFormProps {
 const statusOptions = [
   "Needs callback",
   "Not Interested",
-  "⁠DQ",
+  "DQ",
   "Chargeback DQ",
   "Future Submission Date",
   "Updated Banking/draft date",

@@ -148,6 +148,7 @@ export const GridToolbar = ({
     "Leads BPO",
     "Helix BPO",
     "Exito BPO",
+    "Core Marketing",
     "Lumenix BPO",
     "All-Star BPO",
     "DownTown BPO",
