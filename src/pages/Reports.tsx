@@ -234,6 +234,10 @@ export const ReportsPage = () => {
       "Juan",
       "Kaye",
       "Laiza Batain",
+      "Aqib Afridi",
+      "Qasim Raja",
+      "Hussain Khan",
+      "Ayan Ali",
       "Juan Buffer",  // Alternative name
       "Angy Camacho", // Alternative name
       "Tatumn"        // From logs

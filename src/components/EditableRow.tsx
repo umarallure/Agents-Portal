@@ -53,10 +53,11 @@ const BUFFER_AGENT_OPTIONS = [
   "Nicole Mejia",
   "Angelica",
   "Laiza Batain",
+  "Noah Akins",
   "Aqib Afridi",
   "Qasim Raja",
-  "Noah Akins",
   "Hussain Khan",
+  "Ayan Ali",
   "N/A",
 ];
 

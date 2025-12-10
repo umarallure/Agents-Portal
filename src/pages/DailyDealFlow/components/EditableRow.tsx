@@ -65,6 +65,16 @@ const licensedAccountOptions = [
   "Claudia", "Lydia", "Isaac", "Noah","Trinity", "Benjamin", "Erica", "N/A","Tatumn"
 ];
 
+// Retention agent options (explicit list so the Retention Agent dropdown can contain buffer/retention names)
+const retentionAgentOptions = [
+  "All Retention Agents",
+  "Aqib Afridi",
+  "Qasim Raja",
+  "Hussain Khan",
+  "Ayan Ali",
+  "N/A"
+];
+
 const carrierOptions = [
   "Liberty", "SBLI", "Corebridge", "MOH", "Transamerica", "RNA", "AMAM",
   "GTL", "Aetna", "Americo", "CICA", "N/A"
@@ -593,7 +603,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
                     <SelectValue placeholder="Select retention agent" />
                   </SelectTrigger>
                   <SelectContent>
-                    {licensedAccountOptions.map(option => (
+                    {retentionAgentOptions.map(option => (
                       <SelectItem key={option} value={option}>{option}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1085,7 +1095,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
                 <SelectValue placeholder="Retention Agent" />
               </SelectTrigger>
               <SelectContent>
-                {licensedAccountOptions.map(option => (
+                {retentionAgentOptions.map(option => (
                   <SelectItem key={option} value={option}>{option}</SelectItem>
                 ))}
               </SelectContent>

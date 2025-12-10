@@ -80,6 +80,7 @@ export const GridToolbar = ({
     "Qasim Raja",
     "Noah Akins",
     "Hussain Khan",
+    "Ayan Ali",
     "N/A",
   ];
 
@@ -97,13 +98,10 @@ export const GridToolbar = ({
 
   const retentionAgentOptions = [
     "All Retention Agents",
-    "Claudia",
-    "Lydia",
-    "Isaac",
-    "Trinity",
-    "Benjamin",
-    "Tatumn",
-    "Noah",
+    "Aqib Afridi",
+    "Qasim Raja",
+    "Hussain Khan",
+    "Ayan Ali",
     "N/A"
   ];
 
