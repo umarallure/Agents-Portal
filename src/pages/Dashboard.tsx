@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Filter, Phone, User, DollarSign, CheckCircle, BarChart3, Eye, Clock, Grid3X3, Search, UserPlus, AlertCircle, Database as DatabaseIcon } from 'lucide-react';
+import { Calendar, Filter, Phone, User, DollarSign, CheckCircle, BarChart3, Eye, Clock, Grid3X3, Search, UserPlus, AlertCircle, Database as DatabaseIcon, Shield } from 'lucide-react';
 import { NavigationHeader } from '@/components/NavigationHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -555,7 +555,8 @@ const Dashboard = () => {
           '2fff235c-963c-4543-9262-b7d5ae4da9f3', // Laiza Batain
           'c631ede0-3946-47f6-b728-a15bb38fc7fa', // Hussain Khan (Dalton)
           'd3ee44f1-5d2d-4702-a230-330cfdccafee', // Qasim Raja
-          '1bf9165d-583a-4bb5-8edf-6d810d9d157a'  // Aqib Afridi
+          '1bf9165d-583a-4bb5-8edf-6d810d9d157a', // Aqib Afridi
+          '54282520-9416-42bd-9e7a-6c97f5b666a9'  // Ayan Khan
         ];
         
         const { data } = await supabase
@@ -1224,6 +1225,16 @@ const Dashboard = () => {
                             >
                               <UserPlus className="h-4 w-4" />
                               Claim Call
+                            </Button>
+
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => navigate(`/retention-flow?submissionId=${lead.submission_id}`)}
+                              className="flex items-center gap-2 bg-purple-100 text-purple-900 hover:bg-purple-200"
+                            >
+                              <Shield className="h-4 w-4" />
+                              Claim Retention
                             </Button>
                             
                             <Button

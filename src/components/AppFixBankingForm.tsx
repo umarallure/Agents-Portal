@@ -16,6 +16,15 @@ interface AppFixBankingFormProps {
   customerName?: string;
   onClose: () => void;
   onSuccess?: () => void;
+  initialData?: {
+    bankAccountOwner?: string;
+    bankInstitutionName?: string;
+    routingNumber?: string;
+    accountNumber?: string;
+    accountType?: string;
+    newDraftDate?: Date;
+    policyStatus?: string;
+  };
 }
 
 const licensedAgentOptions = [
@@ -31,19 +40,31 @@ export const AppFixBankingForm = ({
   submissionId, 
   customerName, 
   onClose,
-  onSuccess 
+  onSuccess,
+  initialData
 }: AppFixBankingFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [bankAccountOwner, setBankAccountOwner] = useState("");
-  const [bankInstitutionName, setBankInstitutionName] = useState("");
-  const [routingNumber, setRoutingNumber] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [accountType, setAccountType] = useState("");
-  const [newDraftDate, setNewDraftDate] = useState<Date>();
+  const [bankAccountOwner, setBankAccountOwner] = useState(initialData?.bankAccountOwner || "");
+  const [bankInstitutionName, setBankInstitutionName] = useState(initialData?.bankInstitutionName || "");
+  const [routingNumber, setRoutingNumber] = useState(initialData?.routingNumber || "");
+  const [accountNumber, setAccountNumber] = useState(initialData?.accountNumber || "");
+  const [accountType, setAccountType] = useState(initialData?.accountType || "");
+  const [newDraftDate, setNewDraftDate] = useState<Date | undefined>(initialData?.newDraftDate);
   const [bankingInfoSource, setBankingInfoSource] = useState("");
   const [policyAction, setPolicyAction] = useState("");
   const [additionalNotes, setAdditionalNotes] = useState("");
-  const [assignedTo, setAssignedTo] = useState("");
+  const [assignedTo, setAssignedTo] = useState("Lydia"); // Default to Lydia as requested in RetentionFlow context
+  
+  // Initialize policy action based on status if provided
+  useEffect(() => {
+    if (initialData?.policyStatus) {
+      if (initialData.policyStatus === 'issued') {
+        setPolicyAction("Redate Policy");
+      } else if (initialData.policyStatus === 'pending') {
+        setPolicyAction("Update Banking Info");
+      }
+    }
+  }, [initialData?.policyStatus]);
   
   // Existing bank details from lead table
   const [existingBankDetails, setExistingBankDetails] = useState<{

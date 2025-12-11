@@ -72,6 +72,7 @@ const retentionAgentOptions = [
   "Qasim Raja",
   "Hussain Khan",
   "Ayan Ali",
+  "Ayan Khan",
   "N/A"
 ];
 

@@ -11,15 +11,26 @@ interface AppFixTaskTypeSelectorProps {
   customerName?: string;
   onClose: () => void;
   onSuccess: () => void;
+  initialData?: {
+    fixType?: string;
+    bankAccountOwner?: string;
+    bankInstitutionName?: string;
+    routingNumber?: string;
+    accountNumber?: string;
+    accountType?: string;
+    newDraftDate?: Date;
+    policyStatus?: string;
+  };
 }
 
 export const AppFixTaskTypeSelector = ({
   submissionId,
   customerName,
   onClose,
-  onSuccess
+  onSuccess,
+  initialData
 }: AppFixTaskTypeSelectorProps) => {
-  const [taskType, setTaskType] = useState<string>("");
+  const [taskType, setTaskType] = useState<string>(initialData?.fixType || "");
 
   return (
     <div className="space-y-4">
@@ -77,6 +88,7 @@ export const AppFixTaskTypeSelector = ({
           customerName={customerName}
           onClose={onClose}
           onSuccess={onSuccess}
+          initialData={initialData}
         />
       )}
 
@@ -86,6 +98,7 @@ export const AppFixTaskTypeSelector = ({
           customerName={customerName}
           onClose={onClose}
           onSuccess={onSuccess}
+          initialData={initialData}
         />
       )}
     </div>

@@ -14,6 +14,7 @@ interface AppFixCarrierFormProps {
   customerName?: string;
   onClose: () => void;
   onSuccess: () => void;
+  initialData?: any; // Placeholder for future use if needed
 }
 
 const licensedAgentOptions = [
@@ -55,10 +56,11 @@ export const AppFixCarrierForm = ({
   submissionId,
   customerName,
   onClose,
-  onSuccess
+  onSuccess,
+  initialData
 }: AppFixCarrierFormProps) => {
   const [loading, setLoading] = useState(false);
-  const [assignedTo, setAssignedTo] = useState("");
+  const [assignedTo, setAssignedTo] = useState("Lydia"); // Default to Lydia
   const [carrier, setCarrier] = useState("");
   const [requirementType, setRequirementType] = useState("");
   const [requirementDetails, setRequirementDetails] = useState("");

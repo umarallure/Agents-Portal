@@ -38,6 +38,7 @@ import { AgentsPage, VendorsPage, DailyPage, CarriersPage } from "./pages/AdminA
 import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
 import LAReadyPage from "./pages/LAReadyPage";
+import RetentionFlow from "./pages/RetentionFlow";
 import RetentionCallNotificationPopup from "./components/RetentionCallNotificationPopup";
 
 const queryClient = new QueryClient();
@@ -251,6 +252,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <LAReadyPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/retention-flow" 
+              element={
+                <ProtectedRoute>
+                  <RetentionFlow />
                 </ProtectedRoute>
               } 
             />
