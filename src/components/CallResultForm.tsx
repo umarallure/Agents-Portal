@@ -155,7 +155,9 @@ const leadVendorOptions = [
 "SellerZ BPO",
 "Venom BPO",
 "Core Marketing",
-"WinBPO"
+"WinBPO",
+"Everest BPO",
+"Riztech BPO"
 ];
 
 const dqReasonOptions = [

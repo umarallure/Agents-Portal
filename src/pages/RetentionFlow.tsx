@@ -4,6 +4,7 @@ import { NavigationHeader } from '@/components/NavigationHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -72,6 +73,32 @@ interface Lead {
   writing_number?: string | null;
 }
 
+// Helper for string distance
+const levenshteinDistance = (a: string, b: string) => {
+  if (!a) return b ? b.length : 0;
+  if (!b) return a ? a.length : 0;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1)
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+};
+
 const RetentionFlow = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -108,6 +135,7 @@ const RetentionFlow = () => {
   const [draftDate, setDraftDate] = useState('');
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [rnaRequirementType, setRnaRequirementType] = useState<'banking' | 'other' | ''>('');
+  const [mohFixType, setMohFixType] = useState<'incorrect_banking' | 'insufficient_funds' | 'pending_manual' | 'pending_lapse' | ''>('');
 
   // Agent Info (Mocked for now as not in DB)
   const [agentInfo, setAgentInfo] = useState({
@@ -285,8 +313,14 @@ const RetentionFlow = () => {
       ssnLast4: ssnLast4
     });
     
+    const isMOH = carrier.toUpperCase().includes('MOH') || carrier.toUpperCase().includes('MUTUAL OF OMAHA');
+
     if (retentionType === 'fixed_payment') {
-      setStep(3);
+      if (isMOH) {
+        setStep(5); // Go to MOH Selection
+      } else {
+        setStep(3);
+      }
     } else if (retentionType === 'carrier_requirements') {
       setStep(4); // Skip banking form for carrier requirements
     }
@@ -443,7 +477,10 @@ const RetentionFlow = () => {
     </Card>
   );
 
-  const renderStep3 = () => (
+  const renderStep3 = () => {
+    const isMOH = selectedPolicy?.carrier?.toUpperCase().includes('MOH') || selectedPolicy?.carrier?.toUpperCase().includes('MUTUAL OF OMAHA');
+    
+    return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle>Banking Information</CardTitle>
@@ -500,8 +537,56 @@ const RetentionFlow = () => {
         </div>
       </CardContent>
       <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
+        <Button variant="outline" onClick={() => setStep(isMOH ? 5 : 2)}>Back</Button>
         <Button onClick={handleBankingSubmit}>Next</Button>
+      </CardFooter>
+    </Card>
+  );
+  };
+
+  const renderMOHSelection = () => (
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle>Mutual of Omaha Fix Type</CardTitle>
+        <CardDescription>Select the type of fix required</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <RadioGroup value={mohFixType} onValueChange={(val) => setMohFixType(val as any)}>
+          <div className="flex items-center space-x-2 p-3 border rounded hover:bg-accent cursor-pointer">
+            <RadioGroupItem value="incorrect_banking" id="incorrect_banking" />
+            <Label htmlFor="incorrect_banking" className="cursor-pointer flex-1">Providing new banking information (FDPF Incorrect Banking Information)</Label>
+          </div>
+          <div className="flex items-center space-x-2 p-3 border rounded hover:bg-accent cursor-pointer">
+            <RadioGroupItem value="insufficient_funds" id="insufficient_funds" />
+            <Label htmlFor="insufficient_funds" className="cursor-pointer flex-1">Redating/Redrafting w/ Same Banking (FDPF Insufficient Funds)</Label>
+          </div>
+          <div className="flex items-center space-x-2 p-3 border rounded hover:bg-accent cursor-pointer">
+            <RadioGroupItem value="pending_manual" id="pending_manual" />
+            <Label htmlFor="pending_manual" className="cursor-pointer flex-1">Providing new banking information (For Pending Manual Action/Non Issued Policy)</Label>
+          </div>
+          <div className="flex items-center space-x-2 p-3 border rounded hover:bg-accent cursor-pointer">
+            <RadioGroupItem value="pending_lapse" id="pending_lapse" />
+            <Label htmlFor="pending_lapse" className="cursor-pointer flex-1">Fixing Pending Lapse Policy</Label>
+          </div>
+        </RadioGroup>
+      </CardContent>
+      <CardFooter className="flex justify-between">
+        <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
+        <Button 
+          onClick={() => {
+            if (!mohFixType) {
+              toast({ title: "Required", description: "Please select a fix type", variant: "destructive" });
+              return;
+            }
+            if (mohFixType === 'insufficient_funds') {
+              setStep(4); // Skip banking
+            } else {
+              setStep(3); // Go to banking
+            }
+          }}
+        >
+          Next
+        </Button>
       </CardFooter>
     </Card>
   );
@@ -513,6 +598,7 @@ const RetentionFlow = () => {
     const isCorebridge = selectedPolicy?.carrier?.toLowerCase().includes('corebridge');
     const isRoyalNeighbors = selectedPolicy?.carrier?.toLowerCase().includes('royal neighbors');
     const isAetna = selectedPolicy?.carrier?.toLowerCase().includes('aetna');
+    const isMOH = selectedPolicy?.carrier?.toUpperCase().includes('MOH') || selectedPolicy?.carrier?.toUpperCase().includes('MUTUAL OF OMAHA');
     
     // Check time for RNA (After 6 PM EST) and Aetna (After 5 PM EST)
     const now = new Date();
@@ -527,6 +613,45 @@ const RetentionFlow = () => {
         content = renderTaskCreation("Corebridge policy requires an App Fix Task for banking updates.");
       } else if (retentionType === 'carrier_requirements') {
         content = renderTaskCreation("Corebridge policy requires an App Fix Task for carrier requirements.");
+      }
+    } else if (isMOH) {
+      if (retentionType === 'carrier_requirements') {
+        content = renderTaskCreation(
+          "Email to: liferequirements@mutualofomaha.com\nPut Policy number in the subject line\nDocusign with completion form is required (do not need voided check)"
+        );
+      } else if (retentionType === 'fixed_payment') {
+        if (mohFixType === 'insufficient_funds') {
+          content = renderCallInstructions(
+            `I am the assistant to ${agentInfo.name}. I have ${lead?.customer_full_name || 'the client'} on the line to redate their policy for their active policy. Can you please direct me to the correct department`,
+            "800-775-7896",
+            "Press Option 1"
+          );
+        } else {
+          // Check banking info differences
+          const portalRouting = lead?.beneficiary_routing || '';
+          const portalAccount = lead?.beneficiary_account || '';
+          
+          const routingDiffers = routingNumber !== portalRouting;
+          const accountDiff = levenshteinDistance(accountNumber, portalAccount);
+          
+          if (routingDiffers) {
+            content = renderTaskCreation(
+              "Routing Number differs from portal. Email to: liferequirements@mutualofomaha.com\nPut Policy number in the subject line\nDocusign with completion form is required (do not need voided check)"
+            );
+          } else if (accountDiff > 2) {
+            content = renderTaskCreation(
+              "Account Number is more than 2 digits off. Email to: liferequirements@mutualofomaha.com\nPut Policy number in the subject line\nDocusign with completion form is required (do not need voided check)"
+            );
+          } else {
+            // Account diff <= 2
+            const phoneNumber = mohFixType === 'pending_lapse' ? "800-775-6000" : "800-775-7896";
+            content = renderCallInstructions(
+              `I am the assistant to ${agentInfo.name}. I have ${lead?.customer_full_name || 'the client'} on the line to provide new banking information for their active policy. Can you please direct me to the correct department`,
+              phoneNumber,
+              "Press Option 1"
+            );
+          }
+        }
       }
     } else if (isAetna) {
       if (isAfter5PM) {
@@ -737,89 +862,147 @@ const RetentionFlow = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50/50">
       <NavigationHeader title="Retention Flow" />
-      <div className="container mx-auto px-4 py-8">
-        <Button variant="ghost" className="mb-6" onClick={() => navigate('/dashboard')}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
-        </Button>
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="mb-6">
+          <Button variant="ghost" className="hover:bg-transparent hover:text-primary pl-0" onClick={() => navigate('/dashboard')}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
+          </Button>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Side - Lead Info */}
-          <div className="lg:col-span-1">
-            <Card className="sticky top-8">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Lead Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {lead ? (
-                  <>
-                    <div>
-                      <Label className="text-muted-foreground text-xs uppercase tracking-wider">Customer Name</Label>
-                      <div className="font-medium text-lg">{lead.customer_full_name || 'N/A'}</div>
-                    </div>
-                    
-                    <div>
-                      <Label className="text-muted-foreground text-xs uppercase tracking-wider">Phone Number</Label>
-                      <div className="font-medium flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        {lead.phone_number || 'N/A'}
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-muted-foreground text-xs uppercase tracking-wider">Email</Label>
-                      <div className="font-medium">{lead.email || 'N/A'}</div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-muted-foreground text-xs uppercase tracking-wider">State</Label>
-                        <div className="font-medium">{lead.state || 'N/A'}</div>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground text-xs uppercase tracking-wider">Vendor</Label>
-                        <div className="font-medium">{lead.lead_vendor || 'N/A'}</div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-muted-foreground text-xs uppercase tracking-wider">Date of Birth</Label>
-                      <div className="font-medium">{lead.date_of_birth || 'N/A'}</div>
-                    </div>
-
-                    <div className="pt-4 border-t">
-                      <Label className="text-muted-foreground text-xs uppercase tracking-wider mb-2 block">Banking Info (On File)</Label>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Routing:</span>
-                          <span className="font-mono">{lead.beneficiary_routing || 'N/A'}</span>
+        <div className="bg-white rounded-xl shadow-sm border p-6 md:p-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            {/* Left Side - Lead Info */}
+            <div className="lg:col-span-4 space-y-6">
+              <Card className="border-0 shadow-none bg-gray-50">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <User className="h-5 w-5 text-primary" />
+                    Lead Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {lead ? (
+                    <>
+                      <div className="space-y-4">
+                        <div>
+                          <Label className="text-muted-foreground text-xs uppercase tracking-wider mb-1 block">Customer Name</Label>
+                          <div className="font-semibold text-lg text-gray-900">{lead.customer_full_name || 'N/A'}</div>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Account:</span>
-                          <span className="font-mono">•••• {lead.beneficiary_account ? lead.beneficiary_account.slice(-4) : 'N/A'}</span>
+                        
+                        <div>
+                          <Label className="text-muted-foreground text-xs uppercase tracking-wider mb-1 block">Contact</Label>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                              <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                              {lead.phone_number || 'N/A'}
+                            </div>
+                            <div className="text-sm text-muted-foreground pl-5.5 break-all">
+                              {lead.email || 'N/A'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-muted-foreground text-xs uppercase tracking-wider mb-1 block">State</Label>
+                            <div className="font-medium text-sm">{lead.state || 'N/A'}</div>
+                          </div>
+                          <div>
+                            <Label className="text-muted-foreground text-xs uppercase tracking-wider mb-1 block">Vendor</Label>
+                            <div className="font-medium text-sm">{lead.lead_vendor || 'N/A'}</div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label className="text-muted-foreground text-xs uppercase tracking-wider mb-1 block">Date of Birth</Label>
+                          <div className="font-medium text-sm">{lead.date_of_birth || 'N/A'}</div>
                         </div>
                       </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* Right Side - Flow Steps */}
-          <div className="lg:col-span-2">
-            {step === 1 && renderStep1()}
-            {step === 2 && renderStep2()}
-            {step === 3 && renderStep3()}
-            {step === 4 && renderStep4()}
+                      <div className="pt-4 border-t border-gray-200">
+                        <Label className="text-muted-foreground text-xs uppercase tracking-wider mb-3 block flex items-center gap-2">
+                          <CreditCard className="h-3 w-3" /> Banking Info (On File)
+                        </Label>
+                        <div className="space-y-2 text-sm bg-white p-3 rounded border border-gray-100">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground text-xs">Routing</span>
+                            <span className="font-mono font-medium">{lead.beneficiary_routing || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground text-xs">Account</span>
+                            <span className="font-mono font-medium">•••• {lead.beneficiary_account ? lead.beneficiary_account.slice(-4) : 'N/A'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {selectedPolicy && (
+                        <div className="pt-4 border-t border-gray-200">
+                          <Label className="text-muted-foreground text-xs uppercase tracking-wider mb-3 block flex items-center gap-2">
+                            <FileText className="h-3 w-3" /> Selected Policy
+                          </Label>
+                          <div className="space-y-3 text-sm bg-white p-3 rounded border border-gray-100">
+                            <div>
+                              <span className="text-muted-foreground text-xs block mb-0.5">Carrier</span>
+                              <span className="font-medium text-primary">{selectedPolicy.carrier}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <span className="text-muted-foreground text-xs block mb-0.5">Policy Number</span>
+                                <span className="font-medium">{selectedPolicy.policy_number}</span>
+                              </div>
+                              <Badge variant="outline" className="text-xs font-normal bg-gray-50">
+                                {selectedPolicy.status}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {step > 3 && retentionType === 'fixed_payment' && accountHolderName && (
+                        <div className="pt-4 border-t border-gray-200">
+                          <Label className="text-muted-foreground text-xs uppercase tracking-wider mb-3 block flex items-center gap-2">
+                            <CreditCard className="h-3 w-3" /> New Banking Info
+                          </Label>
+                          <div className="space-y-2 text-sm bg-blue-50/50 p-3 rounded border border-blue-100">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground text-xs">Bank</span>
+                              <span className="font-medium">{bankName}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground text-xs">Routing</span>
+                              <span className="font-mono font-medium">{routingNumber}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground text-xs">Account</span>
+                              <span className="font-mono font-medium">•••• {accountNumber.slice(-4)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground text-xs">Draft</span>
+                              <span className="font-medium">{draftDate}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right Side - Flow Steps */}
+            <div className="lg:col-span-8">
+              {step === 1 && renderStep1()}
+              {step === 2 && renderStep2()}
+              {step === 3 && renderStep3()}
+              {step === 4 && renderStep4()}
+              {step === 5 && renderMOHSelection()}
+            </div>
           </div>
         </div>
       </div>
