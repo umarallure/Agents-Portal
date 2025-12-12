@@ -938,11 +938,34 @@ const RetentionFlow = () => {
         accountNumber: accountNumber,
         accountType: accountType,
         newDraftDate: draftDate ? new Date(draftDate) : undefined,
-        policyStatus: policyStatus
+        policyStatus: policyStatus,
+        notes: reason
       };
 
       return (
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto space-y-6">
+          {/* Past Banking Information Card */}
+          <Card className="border-blue-200 bg-blue-50/30">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-blue-600" />
+                Past Banking Information (On File)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground text-xs block mb-1">Routing Number</span>
+                  <span className="font-mono font-medium">{lead?.beneficiary_routing || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground text-xs block mb-1">Account Number</span>
+                  <span className="font-mono font-medium">{lead?.beneficiary_account || 'N/A'}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <AppFixTaskTypeSelector
             submissionId={submissionId || ''}
             customerName={lead?.customer_full_name || ''}
@@ -1053,6 +1076,24 @@ const RetentionFlow = () => {
         notes: shortFormNotes,
         action: 'retention_short_form_update'
       });
+
+      // 3. Create daily deal flow entry
+      const { error: ddfError } = await supabase
+        .from('daily_deal_flow')
+        .insert({
+          submission_id: submissionId,
+          lead_vendor: lead?.lead_vendor,
+          insured_name: lead?.customer_full_name,
+          client_phone_number: lead?.phone_number,
+          date: getTodayDateEST(),
+          retention_agent: retentionAgent,
+          is_retention_call: true,
+          from_callback: true,
+          status: shortFormStatus,
+          notes: shortFormNotes
+        });
+
+      if (ddfError) throw ddfError;
 
       toast({
         title: "Success",
@@ -1191,7 +1232,7 @@ const RetentionFlow = () => {
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground text-xs">Account</span>
-                            <span className="font-mono font-medium">•••• {lead.beneficiary_account ? lead.beneficiary_account.slice(-4) : 'N/A'}</span>
+                            <span className="font-mono font-medium">{lead.beneficiary_account || 'N/A'}</span>
                           </div>
                         </div>
                       </div>
@@ -1235,7 +1276,7 @@ const RetentionFlow = () => {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground text-xs">Account</span>
-                              <span className="font-mono font-medium">•••• {accountNumber.slice(-4)}</span>
+                              <span className="font-mono font-medium">{accountNumber}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground text-xs">Draft</span>

@@ -20,6 +20,7 @@ interface AppFixTaskTypeSelectorProps {
     accountType?: string;
     newDraftDate?: Date;
     policyStatus?: string;
+    notes?: string;
   };
 }
 

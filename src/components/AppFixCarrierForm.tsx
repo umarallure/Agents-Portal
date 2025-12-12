@@ -14,7 +14,9 @@ interface AppFixCarrierFormProps {
   customerName?: string;
   onClose: () => void;
   onSuccess: () => void;
-  initialData?: any; // Placeholder for future use if needed
+  initialData?: {
+    notes?: string;
+  };
 }
 
 const licensedAgentOptions = [
@@ -64,7 +66,7 @@ export const AppFixCarrierForm = ({
   const [carrier, setCarrier] = useState("");
   const [requirementType, setRequirementType] = useState("");
   const [requirementDetails, setRequirementDetails] = useState("");
-  const [additionalNotes, setAdditionalNotes] = useState("");
+  const [additionalNotes, setAdditionalNotes] = useState(initialData?.notes || "");
 
   const { toast } = useToast();
 

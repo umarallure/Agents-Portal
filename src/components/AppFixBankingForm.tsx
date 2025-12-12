@@ -24,6 +24,7 @@ interface AppFixBankingFormProps {
     accountType?: string;
     newDraftDate?: Date;
     policyStatus?: string;
+    notes?: string;
   };
 }
 
@@ -52,7 +53,7 @@ export const AppFixBankingForm = ({
   const [newDraftDate, setNewDraftDate] = useState<Date | undefined>(initialData?.newDraftDate);
   const [bankingInfoSource, setBankingInfoSource] = useState("");
   const [policyAction, setPolicyAction] = useState("");
-  const [additionalNotes, setAdditionalNotes] = useState("");
+  const [additionalNotes, setAdditionalNotes] = useState(initialData?.notes || "");
   const [assignedTo, setAssignedTo] = useState("Lydia"); // Default to Lydia as requested in RetentionFlow context
   
   // Initialize policy action based on status if provided
