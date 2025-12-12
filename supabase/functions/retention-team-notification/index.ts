@@ -7,7 +7,7 @@ const corsHeaders = {
 
 const SLACK_BOT_TOKEN = Deno.env.get('SLACK_BOT_TOKEN');
 const RETENTION_CHANNEL = '#retention-team-portal';
-const CALLBACK_PORTAL_CHANNEL = '#callback-portal';
+const CALLBACK_PORTAL_CHANNEL = '#retention-team-portal';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -116,8 +116,8 @@ serve(async (req) => {
                     emoji: true
                   },
                   style: "primary",
-                  value: `la_ready_${submissionId}`,
-                  action_id: "la_ready_button"
+                  url: `http://localhost:8080/call-result-update?submissionId=${submissionId}`,
+                  // Remove action_id and value - using url instead
                 }
               ]
             }

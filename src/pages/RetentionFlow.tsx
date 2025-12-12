@@ -7,14 +7,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, ArrowLeft, CheckCircle, AlertCircle, Phone, FileText, User, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
 import { fetchPoliciesByGhlName } from '@/lib/mondayRetentionApi';
 import { AppFixTaskTypeSelector } from '@/components/AppFixTaskTypeSelector';
+import { CallResultForm } from '@/components/CallResultForm';
 
 // Agent Mappings
 const ANAM_WRITING_NUMBERS: Record<string, string> = {
@@ -47,6 +48,52 @@ const retentionAgentOptions = [
   "Ayan Khan",
   "N/A"
 ];
+
+const carrierOptions = [
+  "Liberty",
+  "SBLI",
+  "Corebridge",
+  "MOH",
+  "Transamerica",
+  "RNA",
+  "AMAM",
+  "GTL",
+  "Aetna",
+  "Americo",
+  "CICA",
+  "N/A"
+];
+
+const productTypeOptions = [
+  "Preferred",
+  "Standard",
+  "Graded",
+  "Modified",
+  "GI",
+  "Immediate",
+  "Level",
+  "ROP",
+  "N/A"
+];
+
+// EST timezone utility functions
+const getTodayDateEST = () => {
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  };
+  
+  const formatter = new Intl.DateTimeFormat('en-US', options);
+  const parts = formatter.formatToParts(new Date());
+  
+  const year = parts.find((p) => p.type === 'year')?.value;
+  const month = parts.find((p) => p.type === 'month')?.value;
+  const day = parts.find((p) => p.type === 'day')?.value;
+  
+  return `${year}-${month}-${day}`;
+};
 
 type RetentionType = 'new_sale' | 'fixed_payment' | 'carrier_requirements';
 
@@ -119,6 +166,7 @@ const RetentionFlow = () => {
   const [quoteProduct, setQuoteProduct] = useState('');
   const [quoteCoverage, setQuoteCoverage] = useState('');
   const [quotePremium, setQuotePremium] = useState('');
+  const [quoteNotes, setQuoteNotes] = useState('');
 
   // Step 2 State (Policy Selection)
   const [policies, setPolicies] = useState<Lead[]>([]);
@@ -136,6 +184,11 @@ const RetentionFlow = () => {
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [rnaRequirementType, setRnaRequirementType] = useState<'banking' | 'other' | ''>('');
   const [mohFixType, setMohFixType] = useState<'incorrect_banking' | 'insufficient_funds' | 'pending_manual' | 'pending_lapse' | ''>('');
+
+  // Short Form State
+  const [shortFormStatus, setShortFormStatus] = useState<string>('');
+  const [shortFormNotes, setShortFormNotes] = useState<string>('');
+  const [submittingShortForm, setSubmittingShortForm] = useState(false);
 
   // Agent Info (Mocked for now as not in DB)
   const [agentInfo, setAgentInfo] = useState({
@@ -249,15 +302,20 @@ const RetentionFlow = () => {
     }
 
     if (retentionType === 'new_sale') {
-      // Create notification in callback portal in slack
+      // Create notification and daily deal flow entry
       try {
         setLoading(true);
-        await supabase.functions.invoke('center-transfer-notification', {
+        
+        // Send notification to retention team
+        await supabase.functions.invoke('retention-team-notification', {
           body: {
-            type: 'retention_new_sale',
+            type: 'buffer_connected',
             submissionId,
             agentName: retentionAgent,
-            leadData: lead,
+            customerName: lead?.customer_full_name,
+            leadVendor: lead?.lead_vendor,
+            retentionType: 'new_sale',
+            retentionNotes: quoteNotes,
             quoteDetails: {
               carrier: quoteCarrier,
               product: quoteProduct,
@@ -266,18 +324,34 @@ const RetentionFlow = () => {
             }
           }
         });
+        
+        // Create daily deal flow entry directly
+        const { error: insertError } = await supabase
+          .from('daily_deal_flow')
+          .insert({
+            submission_id: submissionId,
+            lead_vendor: lead?.lead_vendor,
+            insured_name: lead?.customer_full_name,
+            client_phone_number: lead?.phone_number,
+            date: getTodayDateEST(), // YYYY-MM-DD in EST
+            retention_agent: retentionAgent,
+            is_retention_call: true,
+            from_callback: true
+          });
+
+        if (insertError) throw insertError;
+        
         toast({
-          title: "Notification Sent",
-          description: "Slack notification sent for New Sale.",
+          title: "New Sale Submitted",
+          description: "Notification sent and daily deal flow entry created.",
         });
-        // End flow or redirect? Prompt doesn't specify, but implies action is done.
-        // I'll just show a success message and maybe redirect back.
+        
         navigate('/dashboard');
       } catch (error) {
-        console.error('Error sending notification:', error);
+        console.error('Error processing new sale:', error);
         toast({
           title: "Error",
-          description: "Failed to send notification",
+          description: "Failed to process new sale",
           variant: "destructive",
         });
       } finally {
@@ -379,11 +453,29 @@ const RetentionFlow = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Carrier</Label>
-                <Input placeholder="e.g., SBLI" value={quoteCarrier} onChange={e => setQuoteCarrier(e.target.value)} />
+                <Select value={quoteCarrier} onValueChange={setQuoteCarrier}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Carrier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {carrierOptions.map(carrier => (
+                      <SelectItem key={carrier} value={carrier}>{carrier}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Product Level</Label>
-                <Input placeholder="e.g., Level" value={quoteProduct} onChange={e => setQuoteProduct(e.target.value)} />
+                <Select value={quoteProduct} onValueChange={setQuoteProduct}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Product Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productTypeOptions.map(product => (
+                      <SelectItem key={product} value={product}>{product}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Coverage Amount</Label>
@@ -393,6 +485,15 @@ const RetentionFlow = () => {
                 <Label>Monthly Premium</Label>
                 <Input placeholder="e.g., $50.00" value={quotePremium} onChange={e => setQuotePremium(e.target.value)} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea 
+                value={quoteNotes} 
+                onChange={(e) => setQuoteNotes(e.target.value)} 
+                placeholder="Enter any additional notes for the quote..."
+                className="min-h-[80px]"
+              />
             </div>
           </div>
         )}
@@ -607,6 +708,7 @@ const RetentionFlow = () => {
     const isAfter5PM = estTime.getHours() >= 17;
 
     let content = null;
+    let isInstructionFlow = false;
 
     if (isCorebridge) {
       if (retentionType === 'fixed_payment') {
@@ -626,6 +728,7 @@ const RetentionFlow = () => {
             "800-775-7896",
             "Press Option 1"
           );
+          isInstructionFlow = true;
         } else {
           // Check banking info differences
           const portalRouting = lead?.beneficiary_routing || '';
@@ -650,6 +753,7 @@ const RetentionFlow = () => {
               phoneNumber,
               "Press Option 1"
             );
+            isInstructionFlow = true;
           }
         }
       }
@@ -663,12 +767,14 @@ const RetentionFlow = () => {
             "800-264-4000",
             "Press Option 1, then Option 3, then Option 1"
           );
+          isInstructionFlow = true;
         } else if (retentionType === 'carrier_requirements') {
           content = renderCallInstructions(
             `I'm the assistant to ${agentInfo.name}, I have ${lead?.customer_full_name || 'the client'} on the line. There is an additional requirement on their pending application we'd like to fulfill. Can you please direct us to the correct department`,
             "866-272-6630",
             "Press Option 3, then Option 3"
           );
+          isInstructionFlow = true;
         }
       }
     } else if (isRoyalNeighbors) {
@@ -682,6 +788,7 @@ const RetentionFlow = () => {
             "800-627-4762",
             "Press Option 1, then Option 4"
           );
+          isInstructionFlow = true;
         } else if (retentionType === 'carrier_requirements') {
           if (!rnaRequirementType) {
             content = (
@@ -713,6 +820,7 @@ const RetentionFlow = () => {
               "800-627-4762",
               "Press Option 1, then Option 4"
             );
+            isInstructionFlow = true;
           } else {
             content = renderTaskCreation("This request requires a licensed agent task.");
           }
@@ -725,10 +833,12 @@ const RetentionFlow = () => {
         content = renderCallInstructions(
           "I need to redate a policy, can you connect me to the correct department"
         );
+        isInstructionFlow = true;
       } else if (policyStatus === 'pending' && routingMatch) {
         content = renderCallInstructions(
           "I need to give new banking information for a policy that has not been issued yet. Can you please direct me to the correct department"
         );
+        isInstructionFlow = true;
       } else {
         // Fallback if logic doesn't match (e.g. routing number empty or something)
         content = renderTaskCreation("Unable to determine automated flow. Please create a task.");
@@ -737,6 +847,7 @@ const RetentionFlow = () => {
       content = renderCallInstructions(
         "There is a pending requirement on a pending application I need to fulfill for an applicant. Can you please direct me to the correct department"
       );
+      isInstructionFlow = true;
     }
 
     return (
@@ -749,7 +860,11 @@ const RetentionFlow = () => {
         </CardContent>
         <CardFooter className="flex justify-between">
           <Button variant="outline" onClick={() => setStep(retentionType === 'fixed_payment' ? 3 : 2)}>Back</Button>
-          <Button onClick={() => navigate('/dashboard')}>Done</Button>
+          {isInstructionFlow ? (
+            <Button onClick={() => setStep(6)}>Complete Call</Button>
+          ) : (
+            <Button onClick={() => navigate('/dashboard')}>Done</Button>
+          )}
         </CardFooter>
       </Card>
     );
@@ -860,6 +975,150 @@ const RetentionFlow = () => {
       </div>
     );
   };
+
+  const generateAutoNotes = (status: string) => {
+    const parts = [];
+    
+    if (status === 'Updated Banking/draft date') {
+      parts.push("ACTION: Fixed Failed Payment");
+      parts.push(`POLICY STATUS: ${policyStatus === 'issued' ? 'Issued' : 'Pending'}`);
+      
+      if (bankName) parts.push(`NEW BANK: ${bankName}`);
+      if (draftDate) {
+        try {
+          const [year, month, day] = draftDate.split('-');
+          parts.push(`NEW DRAFT DATE: ${month}/${day}/${year}`);
+        } catch (e) {
+          parts.push(`NEW DRAFT DATE: ${draftDate}`);
+        }
+      }
+      
+      if (mohFixType) {
+        const mohFixMap: Record<string, string> = {
+          'incorrect_banking': 'Incorrect Banking Information',
+          'insufficient_funds': 'Insufficient Funds (Redating)',
+          'pending_manual': 'Pending Manual Action Banking',
+          'pending_lapse': 'Pending Lapse Fix'
+        };
+        if (mohFixMap[mohFixType]) {
+          parts.push(`MOH FIX TYPE: ${mohFixMap[mohFixType]}`);
+        }
+      }
+      
+      parts.push("NOTES: Called carrier and successfully updated banking information/redated policy.");
+    } else if (status === 'Fulfilled carrier requirements') {
+      parts.push("ACTION: Fulfilling Carrier Requirements");
+      
+      if (rnaRequirementType) {
+        parts.push(`RNA REQUIREMENT: ${rnaRequirementType === 'banking' ? 'Banking Update' : 'Other Manual Action'}`);
+      }
+      
+      parts.push("NOTES: Called carrier and successfully fulfilled pending requirements.");
+    }
+
+    return parts.join('\n');
+  };
+
+  const handleShortFormSubmit = async () => {
+    if (!shortFormStatus) {
+      toast({
+        title: "Required",
+        description: "Please select a status",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSubmittingShortForm(true);
+    try {
+      // 1. Upsert call_results
+      const { error: resultError } = await supabase
+        .from('call_results')
+        .upsert({
+          submission_id: submissionId,
+          agent_who_took_call: retentionAgent,
+          status: shortFormStatus,
+          notes: shortFormNotes,
+          is_retention_call: true,
+          updated_at: new Date().toISOString()
+        });
+
+      if (resultError) throw resultError;
+
+      // 2. Log the action
+      await supabase.from('call_update_logs').insert({
+        submission_id: submissionId,
+        agent_name: retentionAgent,
+        status: shortFormStatus,
+        notes: shortFormNotes,
+        action: 'retention_short_form_update'
+      });
+
+      toast({
+        title: "Success",
+        description: "Call result updated successfully",
+      });
+      
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error submitting short form:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save call result",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingShortForm(false);
+    }
+  };
+
+  const renderStep6 = () => (
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle>Call Result</CardTitle>
+        <CardDescription>Log the outcome of your call</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label>Retention Agent</Label>
+          <Input value={retentionAgent} disabled />
+        </div>
+        
+        <div className="space-y-2">
+          <Label>Status / Stage</Label>
+          <Select value={shortFormStatus} onValueChange={(val) => {
+            setShortFormStatus(val);
+            setShortFormNotes(generateAutoNotes(val));
+          }}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Fulfilled carrier requirements">Fulfilled carrier requirements</SelectItem>
+              <SelectItem value="Updated Banking/draft date">Updated Banking/draft date</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Notes</Label>
+          <Textarea 
+            value={shortFormNotes} 
+            onChange={(e) => setShortFormNotes(e.target.value)} 
+            placeholder="Enter call notes..."
+            className="min-h-[100px]"
+          />
+        </div>
+      </CardContent>
+      <CardFooter className="flex justify-between">
+        <Button variant="outline" onClick={() => setStep(4)}>Back to Instructions</Button>
+        <Button onClick={handleShortFormSubmit} disabled={submittingShortForm}>
+          {submittingShortForm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Submit & Finish
+        </Button>
+      </CardFooter>
+    </Card>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -1002,6 +1261,7 @@ const RetentionFlow = () => {
               {step === 3 && renderStep3()}
               {step === 4 && renderStep4()}
               {step === 5 && renderMOHSelection()}
+              {step === 6 && renderStep6()}
             </div>
           </div>
         </div>
