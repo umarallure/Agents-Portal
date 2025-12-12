@@ -4,6 +4,7 @@ import { NavigationHeader } from '@/components/NavigationHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -156,6 +157,12 @@ const RetentionFlow = () => {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1);
   const [lead, setLead] = useState<Lead | null>(null);
+  const [validationError, setValidationError] = useState<{
+    title: string;
+    message: string;
+    type: 'error' | 'warning';
+    actions: 'back' | 'switch_workflow';
+  } | null>(null);
   
   // Step 1 State
   const [retentionAgent, setRetentionAgent] = useState<string>('');
@@ -386,6 +393,40 @@ const RetentionFlow = () => {
       writingNumber: writingNumber,
       ssnLast4: ssnLast4
     });
+
+    // Validation Logic
+    const status = policy.status || '';
+    
+    if (retentionType === 'fixed_payment') {
+      if (status === 'Charge Back') {
+        setValidationError({
+          title: 'Policy Status Alert',
+          message: 'This policy has charged back and needs a new application',
+          type: 'error',
+          actions: 'back'
+        });
+        return;
+      }
+      if (status === 'Withdrawn' || status === 'Closed as Incomplete') {
+        setValidationError({
+          title: 'Policy Status Alert',
+          message: 'The selected policy has been withdrawn. A new carrier application is required.',
+          type: 'error',
+          actions: 'back'
+        });
+        return;
+      }
+    } else if (retentionType === 'carrier_requirements') {
+      if (status !== 'Pending') {
+         setValidationError({
+          title: 'Policy Status Alert',
+          message: 'This is not a pending policy. Either select a new workflow, or different policy',
+          type: 'error',
+          actions: 'switch_workflow'
+        });
+        return;
+      }
+    }
     
     const isMOH = carrier.toUpperCase().includes('MOH') || carrier.toUpperCase().includes('MUTUAL OF OMAHA');
 
@@ -413,7 +454,7 @@ const RetentionFlow = () => {
   };
 
   const renderStep1 = () => (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full max-w-2xl mx-auto border-[#2AB7CA] shadow-sm bg-[#2AB7CA]/5">
       <CardHeader>
         <CardTitle>Retention Workflow</CardTitle>
         <CardDescription>Select agent and workflow type to proceed</CardDescription>
@@ -508,7 +549,7 @@ const RetentionFlow = () => {
   );
 
   const renderStep2 = () => (
-    <Card className="w-full max-w-4xl mx-auto">
+    <Card className="w-full max-w-4xl mx-auto border-[#2AB7CA] shadow-sm bg-[#2AB7CA]/5">
       <CardHeader>
         <CardTitle>Select Policy</CardTitle>
         <CardDescription>Select the policy you are fixing (Leads with matching SSN)</CardDescription>
@@ -524,7 +565,7 @@ const RetentionFlow = () => {
               {policies.map(policy => (
                 <div 
                   key={policy.submission_id} 
-                  className={`p-4 border rounded-lg cursor-pointer transition-colors hover:bg-accent ${selectedPolicy?.submission_id === policy.submission_id ? 'border-primary bg-accent' : ''}`}
+                  className={`p-4 border rounded-lg cursor-pointer transition-colors hover:bg-accent ${selectedPolicy?.submission_id === policy.submission_id ? 'border-primary bg-accent' : 'border-gray-200 bg-white hover:border-[#2AB7CA]/50'}`}
                   onClick={() => handlePolicySelect(policy)}
                 >
                   <div className="flex justify-between items-start mb-3">
@@ -582,7 +623,7 @@ const RetentionFlow = () => {
     const isMOH = selectedPolicy?.carrier?.toUpperCase().includes('MOH') || selectedPolicy?.carrier?.toUpperCase().includes('MUTUAL OF OMAHA');
     
     return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full max-w-2xl mx-auto border-[#2AB7CA] shadow-sm bg-[#2AB7CA]/5">
       <CardHeader>
         <CardTitle>Banking Information</CardTitle>
         <CardDescription>Enter the new banking details</CardDescription>
@@ -646,7 +687,7 @@ const RetentionFlow = () => {
   };
 
   const renderMOHSelection = () => (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full max-w-2xl mx-auto border-[#FFD289] shadow-sm bg-[#FFD289]/5">
       <CardHeader>
         <CardTitle>Mutual of Omaha Fix Type</CardTitle>
         <CardDescription>Select the type of fix required</CardDescription>
@@ -851,7 +892,7 @@ const RetentionFlow = () => {
     }
 
     return (
-      <Card className="w-full max-w-2xl mx-auto">
+      <Card className="w-full max-w-2xl mx-auto border-[#2AB7CA] shadow-sm bg-[#2AB7CA]/5">
         <CardHeader>
           <CardTitle>Instructions</CardTitle>
         </CardHeader>
@@ -1114,7 +1155,7 @@ const RetentionFlow = () => {
   };
 
   const renderStep6 = () => (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full max-w-2xl mx-auto border-[#2AB7CA] shadow-sm bg-[#2AB7CA]/5">
       <CardHeader>
         <CardTitle>Call Result</CardTitle>
         <CardDescription>Log the outcome of your call</CardDescription>
@@ -1175,7 +1216,7 @@ const RetentionFlow = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
             {/* Left Side - Lead Info */}
             <div className="lg:col-span-4 space-y-6">
-              <Card className="border-0 shadow-none bg-gray-50">
+              <Card className="border-[#FFD289] shadow-sm bg-[#FFD289]/5">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <User className="h-5 w-5 text-primary" />
@@ -1307,6 +1348,74 @@ const RetentionFlow = () => {
           </div>
         </div>
       </div>
+
+      <Dialog open={!!validationError} onOpenChange={(open) => !open && setValidationError(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              {validationError?.title}
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-base">
+              {validationError?.message}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
+            {validationError?.actions === 'back' ? (
+              <div className="flex flex-col gap-2 w-full">
+                <Button variant="secondary" onClick={() => setValidationError(null)} className="w-full">
+                  Select Different Policy
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate(`/call-result-update?submissionId=${submissionId}`)}
+                  className="w-full"
+                >
+                  Update Call Result
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 w-full">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setValidationError(null)}
+                >
+                  Select Different Policy
+                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button 
+                    variant="secondary" 
+                    onClick={() => {
+                      setRetentionType('fixed_payment');
+                      setStep(1);
+                      setValidationError(null);
+                    }}
+                  >
+                    Switch to Fixing Failed Payment
+                  </Button>
+                  <Button 
+                    variant="secondary" 
+                    onClick={() => {
+                      setRetentionType('new_sale');
+                      setStep(1);
+                      setValidationError(null);
+                    }}
+                  >
+                    Switch to New Sale
+                  </Button>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate(`/call-result-update?submissionId=${submissionId}`)}
+                  className="w-full"
+                >
+                  Update Call Result
+                </Button>
+              </div>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
