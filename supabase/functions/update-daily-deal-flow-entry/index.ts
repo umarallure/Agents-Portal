@@ -94,7 +94,9 @@ serve(async (req)=>{
     const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
     // Get parameters from request body
     requestBody = await req.json();
-    const { submission_id, call_source, buffer_agent, agent, licensed_agent_account, status, call_result, carrier, product_type, draft_date, monthly_premium, face_amount, notes, policy_number, carrier_audit, product_type_carrier, level_or_gi, from_callback, is_callback = false, create_new_entry = false, original_submission_id = null, application_submitted = null, sent_to_underwriting = null, lead_vendor, is_retention_call = false } = requestBody;
+    const { submission_id, call_source, buffer_agent, agent, licensed_agent_account, status, call_result, carrier, product_type, draft_date, monthly_premium, face_amount, notes, policy_number, carrier_audit, product_type_carrier, level_or_gi, from_callback, is_callback = false, create_new_entry = false, original_submission_id = null, application_submitted = null, sent_to_underwriting = null, lead_vendor, is_retention_call = false, retention_agent } = requestBody;
+    
+    console.log('DEBUG - Received retention_agent:', retention_agent, 'buffer_agent:', buffer_agent);
     // Validate required fields
     if (!submission_id) {
       throw new Error('Missing required field: submission_id');
@@ -142,6 +144,7 @@ serve(async (req)=>{
           client_phone_number: leadData?.phone_number,
           date: todayDate,
           buffer_agent,
+          retention_agent,
           agent,
           licensed_agent_account,
           status: finalStatus,
@@ -178,6 +181,7 @@ serve(async (req)=>{
           }
           const { data, error } = await supabase.from('daily_deal_flow').update({
             buffer_agent,
+            retention_agent,
             agent,
             licensed_agent_account,
             status: finalStatus,
@@ -212,6 +216,7 @@ serve(async (req)=>{
             client_phone_number: leadData?.phone_number,
             date: todayDate,
             buffer_agent,
+            retention_agent,
             agent,
             licensed_agent_account,
             status: finalStatus,
@@ -251,6 +256,7 @@ serve(async (req)=>{
         // Update existing entry for today
         const { data, error } = await supabase.from('daily_deal_flow').update({
           buffer_agent,
+          retention_agent,
           agent,
           licensed_agent_account,
           status: finalStatus,
@@ -285,6 +291,7 @@ serve(async (req)=>{
           client_phone_number: leadData?.phone_number,
           date: todayDate,
           buffer_agent,
+          retention_agent,
           agent,
           licensed_agent_account,
           status: finalStatus,

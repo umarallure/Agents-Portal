@@ -144,6 +144,8 @@ const { data: updateResult, error: updateError } =
       submission_id: submissionId,
       // ... other fields ...
       is_retention_call: isRetentionCall,  // ← NEW
+      // retention_agent is sent for retention flows and mirrors buffer_agent
+      retention_agent: bufferAgent,
       // ... rest of fields ...
     }
   });

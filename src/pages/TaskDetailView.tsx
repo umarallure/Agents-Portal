@@ -102,7 +102,7 @@ const TaskDetailView = () => {
     try {
       setLoading(true);
 
-      // Fetch task
+      // Fetch task details
       const { data: taskData, error: taskError } = await supabase
         .from('app_fix_tasks')
         .select('*')
@@ -437,22 +437,34 @@ const TaskDetailView = () => {
           dailyDealNotes += `\n\nCompletion Notes: ${statusNotes.trim()}`;
         }
 
+        const bufferAgentName = task.created_by_name || 'N/A';
+        console.log('DEBUG: TaskDetailView payload construction (v2)', { 
+            buffer: bufferAgentName, 
+            retention: bufferAgentName 
+        });
+
+        const payload = {
+          submission_id: task.submission_id,
+          call_source: 'First Time Transfer', // Required parameter for edge function
+          status: dailyDealStatus,
+          notes: dailyDealNotes,
+          buffer_agent: bufferAgentName,
+          // Retention agent should capture the same value as the buffer agent
+          retention_agent: bufferAgentName,
+          agent: task.assigned_to_name || 'N/A',
+          licensed_agent_account: task.assigned_to_name || 'N/A',
+          call_result: 'App Fix Completed',
+          application_submitted: false, // This is a fix, not a new submission
+          // Include relevant banking info if it's a banking fix
+          ...(task.fix_type === 'banking_info' || task.fix_type === 'updated_banking_info') && bankingDetails ? {
+            draft_date: format(new Date(bankingDetails.new_draft_date), "yyyy-MM-dd")
+          } : {}
+        };
+
+        console.log('Sending update-daily-deal-flow-entry payload:', payload);
+
         const { data: updateResult, error: updateError } = await supabase.functions.invoke('update-daily-deal-flow-entry', {
-          body: {
-            submission_id: task.submission_id,
-            call_source: 'First Time Transfer', // Required parameter for edge function
-            status: dailyDealStatus,
-            notes: dailyDealNotes,
-            buffer_agent: task.created_by_name || 'N/A',
-            agent: task.assigned_to_name || 'N/A',
-            licensed_agent_account: task.assigned_to_name || 'N/A',
-            call_result: 'App Fix Completed',
-            application_submitted: false, // This is a fix, not a new submission
-            // Include relevant banking info if it's a banking fix
-            ...(task.fix_type === 'banking_info' || task.fix_type === 'updated_banking_info') && bankingDetails ? {
-              draft_date: format(new Date(bankingDetails.new_draft_date), "yyyy-MM-dd")
-            } : {}
-          }
+          body: payload
         });
 
         if (updateError) {
