@@ -1113,15 +1113,18 @@ const RetentionFlow = () => {
       await supabase.from('call_update_logs').insert({
         submission_id: submissionId,
         agent_name: retentionAgent,
-        status: shortFormStatus,
-        notes: shortFormNotes,
-        action: 'retention_short_form_update'
+        agent_type: 'retention_agent',
+        event_type: 'retention_short_form_update',
+        event_details: {
+          status: shortFormStatus,
+          notes: shortFormNotes
+        }
       });
 
       // 3. Create daily deal flow entry
       const { error: ddfError } = await supabase
         .from('daily_deal_flow')
-        .insert({
+        .upsert({
           submission_id: submissionId,
           lead_vendor: lead?.lead_vendor,
           insured_name: lead?.customer_full_name,
@@ -1132,7 +1135,7 @@ const RetentionFlow = () => {
           from_callback: true,
           status: shortFormStatus,
           notes: shortFormNotes
-        });
+        }, { onConflict: 'submission_id, date' });
 
       if (ddfError) throw ddfError;
 
