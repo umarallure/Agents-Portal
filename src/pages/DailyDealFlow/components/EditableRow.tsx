@@ -58,11 +58,11 @@ const bufferAgentOptions = [
 ];
 
 const agentOptions = [
-  "Claudia", "Lydia", "Zack","Tatumn","Angy", "Benjamin", "Erica", "N/A", "Isaac"
+  "Claudia", "Lydia", "Zack","Tatumn","Angy", "Benjamin", "Erica","Abdul", "N/A", "Isaac"
 ];
 
 const licensedAccountOptions = [
-  "Claudia", "Lydia", "Isaac", "Noah","Trinity", "Benjamin", "Erica", "N/A","Tatumn"
+  "Claudia", "Lydia", "Isaac", "Noah","Trinity", "Benjamin", "Erica","Abdul", "N/A","Tatumn"
 ];
 
 // Retention agent options (explicit list so the Retention Agent dropdown can contain buffer/retention names)

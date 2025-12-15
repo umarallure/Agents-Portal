@@ -741,6 +741,7 @@ const RetentionFlow = () => {
     const isRoyalNeighbors = selectedPolicy?.carrier?.toLowerCase().includes('royal neighbors');
     const isAetna = selectedPolicy?.carrier?.toLowerCase().includes('aetna');
     const isMOH = selectedPolicy?.carrier?.toUpperCase().includes('MOH') || selectedPolicy?.carrier?.toUpperCase().includes('MUTUAL OF OMAHA');
+    const isAMAM = selectedPolicy?.carrier?.toUpperCase().includes('ANAM') || selectedPolicy?.carrier?.toUpperCase().includes('AMERICO');
     
     // Check time for RNA (After 6 PM EST) and Aetna (After 5 PM EST)
     const now = new Date();
@@ -889,6 +890,33 @@ const RetentionFlow = () => {
         "There is a pending requirement on a pending application I need to fulfill for an applicant. Can you please direct me to the correct department"
       );
       isInstructionFlow = true;
+    }
+
+    // Temporary override for MOH and AMAM to allow task creation
+    if ((isMOH || isAMAM) && showTaskForm) {
+      content = renderTaskCreation(`Manual Task Creation for ${isMOH ? 'Mutual of Omaha' : 'Americo'}`);
+    } else if ((isMOH || isAMAM) && isInstructionFlow) {
+      content = (
+        <div className="space-y-6">
+          {content}
+          <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+            <h3 className="font-semibold text-orange-900 mb-2 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Temporary Workflow
+            </h3>
+            <p className="text-sm text-orange-800 mb-4">
+              If you cannot reach the carrier or need to assign this to Lydia:
+            </p>
+            <Button 
+              onClick={() => setShowTaskForm(true)} 
+              variant="secondary" 
+              className="w-full border-orange-300 hover:bg-orange-100 text-orange-900"
+            >
+              Create Task for Lydia (Temporary)
+            </Button>
+          </div>
+        </div>
+      );
     }
 
     return (
