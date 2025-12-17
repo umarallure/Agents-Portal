@@ -74,6 +74,8 @@ const bufferAgentOptions = [
   "Molli Reynolds",
   "Noah Akins",
   "Molli Reynolds",
+  "Brandon Blake Flinchum",
+  "Elijah K",
   "Hussain Khan",
   "Ayan Ali",
   "N/A",

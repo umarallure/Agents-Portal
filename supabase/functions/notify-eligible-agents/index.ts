@@ -49,6 +49,7 @@ serve(async (req)=>{
       "Digicon": "#orbit-team-digicon-bpo",
       "Ambition": "#orbit-team-ambition-bpo",
       "AJ BPO": "#orbit-team-aj-bpo",
+      "TechPlanet": "#orbit-team-techplanet",
       "Pro Solutions BPO": "#orbit-team-pro-solutions-bpo",
       "Emperor BPO": "#orbit-team-emperor-bpo",
       "Benchmark": "#orbit-team-benchmark-bpo",
@@ -79,6 +80,19 @@ serve(async (req)=>{
       "CrossNotch": "#orbit-team-crossnotch",
       "TechPlanet": "#orbit-team-techplanet",
       "StratiX BPO": "#orbit-team-stratix-bpo",
+      "Lumenix BPO": "#orbit-team-lumenix-bpo",
+      "All-Star BPO": "#orbit-team-allstar-bpo",
+      "DownTown BPO": "#orbit-team-downtown-bpo",
+      "Livik BPO": "#orbit-team-livik-bpo",
+      "NexGen BPO": "#orbit-team-nexgen-bpo",
+      "Quoted-Leads BPO": "#orbit-team-quotedleads-bpo",
+      "SellerZ BPO": "#orbit-team-sellerz-bpo",
+      "Venom BPO": "#orbit-team-venom-bpo",
+      "WinBPO": "#orbit-team-win-bpo",
+      "Techvated Marketing": "#orbit-team-techvated-marketing",
+      "Core Marketing":"#orbit-team-core-marketing",
+      "Everest BPO":"#orbit-team-everest-bpo",
+      "Riztech BPO":"#orbit-team-riztech-bpo",
       "Test": "#test-bpo"
     };
     // Agent Slack ID mapping with full display names
@@ -147,6 +161,21 @@ serve(async (req)=>{
       console.error('[ERROR] Failed to fetch eligible agents:', agentsError);
       throw new Error(`Failed to fetch eligible agents: ${agentsError.message}`);
     }
+
+    // EXCEPTION: Exclude Lydia Sutton for Techvated Marketing
+    if (lead_vendor === "Techvated Marketing" && eligibleAgents) {
+       console.log('[DEBUG] Applying Techvated Marketing exception filter');
+       eligibleAgents = eligibleAgents.filter(agent => {
+          const agentInfo = agentSlackIdMapping[agent.agent_name];
+          // If we know the agent and their ID matches Lydia's, exclude them
+          if (agentInfo && agentInfo.slackId === "U08216BSGE4") {
+             console.log(`[DEBUG] Excluding agent ${agent.agent_name} (Lydia) from Techvated Marketing notification`);
+             return false;
+          }
+          return true;
+       });
+    }
+
     console.log(`[DEBUG] Found ${eligibleAgents?.length || 0} eligible agents (after upline check):`, eligibleAgents);
     // Check if this is an override state
     const hasOverrideState = eligibleAgents && eligibleAgents.length > 0 && eligibleAgents[0]?.upline_required;
@@ -229,7 +258,6 @@ serve(async (req)=>{
       }
       return a.agent_name.localeCompare(b.agent_name);
     });
-    
     // Deduplicate agents by Slack ID to avoid duplicate mentions
     const seenSlackIds = new Set();
     const uniqueAgents = sortedAgents.filter((agent)=>{
@@ -243,7 +271,6 @@ serve(async (req)=>{
       }
       return true; // Keep agents without Slack ID mapping
     });
-    
     const agentMentions = uniqueAgents.map((agent)=>{
       const agentInfo = agentSlackIdMapping[agent.agent_name];
       if (agentInfo) {
