@@ -42,9 +42,9 @@ const AGENT_SSN_MAPPING: Record<string, string> = {
 
 // Retention Agent Options
 const retentionAgentOptions = [
-  "Aqib Afridi",
   "Qasim Raja",
   "Hussain Khan",
+  "Justine",
   "Ayan Ali",
   "Ayan Khan",
   "N/A"
