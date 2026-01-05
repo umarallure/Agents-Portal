@@ -99,11 +99,9 @@ export const GridToolbar = ({
 
   const retentionAgentOptions = [
     "All Retention Agents",
-    "Aqib Afridi",
     "Qasim Raja",
     "Hussain Khan",
-    "Ayan Ali",
-    "Ayan Khan",
+    "Justin",
     "N/A"
   ];
 

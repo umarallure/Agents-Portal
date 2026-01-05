@@ -68,11 +68,9 @@ const licensedAccountOptions = [
 // Retention agent options (explicit list so the Retention Agent dropdown can contain buffer/retention names)
 const retentionAgentOptions = [
   "All Retention Agents",
-  "Aqib Afridi",
   "Qasim Raja",
   "Hussain Khan",
-  "Ayan Ali",
-  "Ayan Khan",
+  "Justin",
   "N/A"
 ];
 
@@ -93,6 +91,7 @@ const statusOptions = [
   "Returned To Center - DQ",
   "Application Withdrawn",
   "Call Back Fix",
+  "Fulfilled carrier requirements",
   "Incomplete Transfer",
   "DQ'd Can't be sold"
 ];
