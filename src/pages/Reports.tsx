@@ -230,6 +230,7 @@ export const ReportsPage = () => {
       "Kyla",
       "Bryan",
       "Justine",
+      "Catarina",
       "Isaac",
       "Juan",
       "Kaye",

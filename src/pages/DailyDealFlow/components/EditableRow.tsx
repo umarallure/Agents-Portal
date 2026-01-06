@@ -47,6 +47,7 @@ interface EditableRowProps {
 const bufferAgentOptions = [
     "All Buffer Agents",
     "Justine",
+    "Catarina",
     "Kyla",
     "Laiza Batain",
     "Angelica",

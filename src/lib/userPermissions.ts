@@ -71,7 +71,7 @@ export const isBufferAgent = async (userId: string | undefined): Promise<boolean
 
     // Buffer agent names list
     const bufferAgentNames = [
-      'Ira', 'Kyla', 'Syed Kazmi', 'Justine', 'Kaye', 'Viez', 
+      'Ira', 'Kyla', 'Syed Kazmi', 'Justine',"Catarina", 'Kaye', 'Viez', 
       'Lourd', 'Mary', 'Nicole Mejia', 'Angelica', 'Laiza Batain'
     ];
 

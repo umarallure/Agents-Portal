@@ -67,6 +67,7 @@ const productTypeOptions = [
 
 const bufferAgentOptions = [
   "Justine",
+  "Catarina",
   "Nicole Mejia",
   "Laiza Batain",
   "Aqib Afridi",

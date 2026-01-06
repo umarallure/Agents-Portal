@@ -50,6 +50,7 @@ interface EditableRowProps {
 const BUFFER_AGENT_OPTIONS = [
   "Kyla",
   "Justine",
+  "Catarina",
   "Nicole Mejia",
   "Angelica",
   "Laiza Batain",
