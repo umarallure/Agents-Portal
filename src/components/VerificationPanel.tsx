@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { logCallUpdate, getLeadInfo } from "@/lib/callLogging";
@@ -58,7 +57,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Clock, User, CheckCircle, XCircle, ArrowRight } from "lucide-react";
+import { Clock, User, CheckCircle, XCircle, ArrowRight, Loader2, Copy } from "lucide-react";
 import { useRealtimeVerification, VerificationItem } from "@/hooks/useRealtimeVerification";
 
 interface VerificationPanelProps {
@@ -139,6 +138,93 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
   const [elapsedTime, setElapsedTime] = useState("00:00");
   const [notes, setNotes] = useState("");
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
+  const [isValidating, setIsValidating] = useState(false);
+  const [validatedAddress, setValidatedAddress] = useState<any>(null);
+
+  const getValueByFieldName = (name: string) => {
+    const item = verificationItems?.find(i => i.field_name === name);
+    if (!item) return '';
+    return inputValues[item.id] !== undefined ? inputValues[item.id] : (item.verified_value || item.original_value || '');
+  };
+
+  const handleValidateAddress = async () => {
+    setIsValidating(true);
+    setValidatedAddress(null);
+    try {
+      const streetAddress = getValueByFieldName('street_address');
+      const city = getValueByFieldName('city');
+      const state = getValueByFieldName('state');
+      const zipCode = getValueByFieldName('zip_code');
+
+      const { data, error } = await supabase.functions.invoke('validate-usps-address', {
+        body: {
+          street_address: streetAddress,
+          city,
+          state,
+          zip_code: zipCode
+        }
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      setValidatedAddress(data);
+      toast({
+        title: "Address Validated",
+        description: "USPS address verification successful",
+      });
+    } catch (error: any) {
+      console.error('Address validation error:', error);
+      toast({
+        title: "Validation Failed",
+        description: error.message || "Could not validate address",
+        variant: "destructive"
+      });
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const copyValidatedAddress = () => {
+    if (!validatedAddress) return;
+    
+    // Format the complete address for copying
+    const streetParts = [validatedAddress.address2, validatedAddress.address1].filter(Boolean);
+    const fullStreet = streetParts.join(' ');
+    const zipCode = validatedAddress.zip4 
+      ? `${validatedAddress.zip5}-${validatedAddress.zip4}`
+      : validatedAddress.zip5;
+    
+    const formattedAddress = `${fullStreet}, ${validatedAddress.city}, ${validatedAddress.state} ${zipCode}`;
+    
+    navigator.clipboard.writeText(formattedAddress).then(() => {
+      toast({
+        title: "Address Copied!",
+        description: "Validated address copied to clipboard",
+      });
+    }).catch(() => {
+      toast({
+        title: "Copy Failed",
+        description: "Could not copy to clipboard",
+        variant: "destructive"
+      });
+    });
+  };
+
+  const copyAddressField = (fieldName: string, value: string) => {
+    navigator.clipboard.writeText(value).then(() => {
+      toast({
+        title: "Copied!",
+        description: `${fieldName} copied to clipboard`,
+      });
+    }).catch(() => {
+      toast({
+        title: "Copy Failed",
+        description: "Could not copy to clipboard",
+        variant: "destructive"
+      });
+    });
+  };
   
   const {
     session,
@@ -400,12 +486,23 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
               <Label className="text-xs font-medium">
                 {formatFieldName(item.field_name)}
               </Label>
+              {item.field_name === 'street_address' && (
+                 <Button 
+                   size="sm" 
+                   className="h-6 text-xs px-3 bg-green-600 hover:bg-green-700 text-white ml-auto"
+                   onClick={handleValidateAddress}
+                   disabled={isValidating}
+                 >
+                   {isValidating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                   Validate
+                 </Button>
+              )}
               <Checkbox
                 checked={item.is_verified}
                 onCheckedChange={(checked) => 
                   handleCheckboxChange(item.id, checked as boolean)
                 }
-                className="ml-auto"
+                className={item.field_name === 'street_address' ? '' : 'ml-auto'}
               />
             </div>
             <Input
@@ -414,6 +511,90 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
               placeholder={`Enter ${formatFieldName(item.field_name).toLowerCase()}`}
               className="text-xs"
             />
+            {item.field_name === 'street_address' && validatedAddress && (
+              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md text-xs">
+                 <p className="font-semibold text-green-800 mb-2">✅ Validated Address (USPS):</p>
+                 <div className="text-green-900 bg-white p-3 rounded border border-green-100 mb-3 space-y-2">
+                    {/* Street Address Row */}
+                    <div className="flex items-center justify-between group">
+                      <div className="flex-1">
+                        <span className="text-gray-600 text-[10px] uppercase">Street: </span>
+                        <span className="font-medium">
+                          {[validatedAddress.address2, validatedAddress.address1].filter(Boolean).join(' ')}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => copyAddressField('Street', [validatedAddress.address2, validatedAddress.address1].filter(Boolean).join(' '))}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    
+                    {/* City, State, ZIP in one row with labels */}
+                    <div className="flex items-center justify-between group">
+                      <div className="flex-1 flex items-center gap-3">
+                        <div>
+                          <span className="text-gray-600 text-[10px] uppercase">City: </span>
+                          <span className="font-medium">{validatedAddress.city}</span>
+                        </div>
+                        <span className="text-gray-400">•</span>
+                        <div>
+                          <span className="text-gray-600 text-[10px] uppercase">State: </span>
+                          <span className="font-medium">{validatedAddress.state}</span>
+                        </div>
+                        <span className="text-gray-400">•</span>
+                        <div>
+                          <span className="text-gray-600 text-[10px] uppercase">ZIP: </span>
+                          <span className="font-medium">
+                            {validatedAddress.zip5}{validatedAddress.zip4 ? `-${validatedAddress.zip4}` : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => copyAddressField('City, State, ZIP', `${validatedAddress.city}, ${validatedAddress.state} ${validatedAddress.zip5}${validatedAddress.zip4 ? `-${validatedAddress.zip4}` : ''}`)}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    
+                    {/* Separator */}
+                    <div className="border-t border-gray-200 my-2"></div>
+                    
+                    {/* Full Address Display */}
+                    <div className="flex items-start justify-between group">
+                      <div className="flex-1">
+                        <span className="text-gray-600 text-[10px] uppercase">Full Address: </span>
+                        <div className="font-medium text-green-800 mt-1">
+                          {[validatedAddress.address2, validatedAddress.address1].filter(Boolean).join(' ')}, {validatedAddress.city}, {validatedAddress.state} {validatedAddress.zip5}{validatedAddress.zip4 ? `-${validatedAddress.zip4}` : ''}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={copyValidatedAddress}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                 </div>
+                 <Button 
+                    variant="default" 
+                    size="sm"
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    onClick={copyValidatedAddress}
+                 >
+                    <Copy className="h-3 w-3 mr-2" />
+                    Copy Full Address
+                 </Button>
+              </div>
+            )}
             <Separator className="mt-4" />
           </div>
         ))}
