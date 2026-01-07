@@ -165,8 +165,22 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
         }
       });
 
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      // Check for errors in response
+      if (error) {
+        // If error object exists, try to extract message from it
+        console.error('Supabase function error:', error);
+        throw new Error(error.message || "Could not connect to validation service");
+      }
+
+      // Check if data contains an error (our Edge Function returns {error: "message"} on errors)
+      if (data && data.error) {
+        throw new Error(data.error);
+      }
+
+      // If no data at all, something went wrong
+      if (!data) {
+        throw new Error("No response from validation service");
+      }
 
       setValidatedAddress(data);
       toast({
@@ -175,10 +189,27 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
       });
     } catch (error: any) {
       console.error('Address validation error:', error);
+      
+      // Extract user-friendly error message from various possible error formats
+      let errorMessage = "Could not validate address";
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error.error) {
+        errorMessage = error.error;
+      } else if (error.context?.body?.error) {
+        errorMessage = error.context.body.error;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      
       toast({
-        title: "Validation Failed",
-        description: error.message || "Could not validate address",
-        variant: "destructive"
+        title: "❌ Validation Failed",
+        description: errorMessage,
+        variant: "destructive",
+        duration: 5000,
       });
     } finally {
       setIsValidating(false);
@@ -584,15 +615,17 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
                       </Button>
                     </div>
                  </div>
-                 <Button 
-                    variant="default" 
-                    size="sm"
-                    className="w-full bg-green-600 hover:bg-green-700"
-                    onClick={copyValidatedAddress}
-                 >
-                    <Copy className="h-3 w-3 mr-2" />
-                    Copy Full Address
-                 </Button>
+                 <div className="flex justify-end">
+                   <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="h-7 text-xs px-3 text-green-700 hover:text-green-800 hover:bg-green-50 border border-green-300"
+                      onClick={copyValidatedAddress}
+                   >
+                      <Copy className="h-3 w-3 mr-1.5" />
+                      Copy Full
+                   </Button>
+                 </div>
               </div>
             )}
             <Separator className="mt-4" />

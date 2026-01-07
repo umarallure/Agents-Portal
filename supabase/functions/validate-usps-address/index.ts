@@ -127,7 +127,7 @@ serve(async (req) => {
     });
 
     if (!tokenResponse.ok) {
-        const errorText = await tokenResponse.text();
+      const errorText = await tokenResponse.text();
         throw new Error(`Failed to get access token: ${tokenResponse.status} ${errorText}`);
     }
 
@@ -164,14 +164,41 @@ serve(async (req) => {
 
     if (!validateResponse.ok) {
          const errorText = await validateResponse.text();
-         throw new Error(`USPS Validation API error: ${validateResponse.status} ${errorText}`);
+         
+         // Try to parse error for better message
+         try {
+           const errorData = JSON.parse(errorText);
+           if (errorData.error) {
+             const errorMsg = errorData.error.message || "Address validation failed";
+             const errorCode = errorData.error.code;
+             
+             // Provide user-friendly messages for common errors
+             if (errorMsg.includes("Address Not Found") || errorCode === "010005") {
+               throw new Error("Address not found. Please verify the address and try again.");
+             } else if (errorMsg.includes("Invalid")) {
+               throw new Error("Invalid address format. Please check the address details.");
+             } else {
+               throw new Error(`Address validation failed: ${errorMsg}`);
+             }
+           }
+         } catch (parseError) {
+           // If we can't parse, show generic message
+           if (validateResponse.status === 400) {
+             throw new Error("Unable to validate this address. Please verify the address is correct.");
+           }
+           throw new Error(`USPS Validation API error: ${validateResponse.status}`);
+         }
     }
 
     const validateData = await validateResponse.json();
 
     // Check for "error" property in response just in case
     if (validateData.error) {
-        throw new Error(validateData.error.message || "USPS returned an error");
+        const errorMsg = validateData.error.message || "USPS returned an error";
+        if (errorMsg.includes("Address Not Found")) {
+          throw new Error("Address not found. Please verify the address and try again.");
+        }
+        throw new Error(errorMsg);
     }
 
     // Extract standardized address
@@ -193,13 +220,15 @@ serve(async (req) => {
     };
     
     return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (error: any) {
     console.error("Function error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
+    // Return 200 status with error in body so Supabase client can parse it
+    // This ensures our custom error messages are properly displayed
+    return new Response(JSON.stringify({ error: error.message || "Address validation failed" }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
