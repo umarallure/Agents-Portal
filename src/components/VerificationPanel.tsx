@@ -140,6 +140,7 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const [isValidating, setIsValidating] = useState(false);
   const [validatedAddress, setValidatedAddress] = useState<any>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const getValueByFieldName = (name: string) => {
     const item = verificationItems?.find(i => i.field_name === name);
@@ -150,6 +151,7 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
   const handleValidateAddress = async () => {
     setIsValidating(true);
     setValidatedAddress(null);
+    setValidationError(null); // Clear any previous errors
     try {
       const streetAddress = getValueByFieldName('street_address');
       const city = getValueByFieldName('city');
@@ -182,7 +184,18 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
         throw new Error("No response from validation service");
       }
 
+      // Success - clear error and set validated address
+      setValidationError(null);
       setValidatedAddress(data);
+      
+      // Auto-check the street_address checkbox on successful validation
+      if (verificationItems) {
+        const streetAddressItem = verificationItems.find(i => i.field_name === 'street_address');
+        if (streetAddressItem && !streetAddressItem.is_verified) {
+          toggleVerification(streetAddressItem.id, true);
+        }
+      }
+      
       toast({
         title: "Address Validated",
         description: "USPS address verification successful",
@@ -191,26 +204,26 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
       console.error('Address validation error:', error);
       
       // Extract user-friendly error message from various possible error formats
-      let errorMessage = "Could not validate address";
+      let errorMessage = "The address is not verified from USPS. Please ask the correct address from lead.";
       
       if (error.message) {
-        errorMessage = error.message;
+        // Customize error message based on the type
+        if (error.message.includes("Address not found") || error.message.includes("not verified")) {
+          errorMessage = "The address is not verified from USPS. Please ask the correct address from lead.";
+        } else if (error.message.includes("Invalid")) {
+          errorMessage = "The address format is invalid. Please ask the correct address from lead.";
+        } else {
+          errorMessage = "The address is not verified from USPS. Please ask the correct address from lead.";
+        }
       } else if (typeof error === 'string') {
         errorMessage = error;
       } else if (error.error) {
         errorMessage = error.error;
-      } else if (error.context?.body?.error) {
-        errorMessage = error.context.body.error;
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
       }
       
-      toast({
-        title: "❌ Validation Failed",
-        description: errorMessage,
-        variant: "destructive",
-        duration: 5000,
-      });
+      // Set error state instead of showing toast
+      setValidatedAddress(null);
+      setValidationError(errorMessage);
     } finally {
       setIsValidating(false);
     }
@@ -335,12 +348,18 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
     );
   }
 
-  const handleFieldValueChange = (itemId: string, newValue: string) => {
+  const handleFieldValueChange = (itemId: string, newValue: string, fieldName?: string) => {
     // Update local state immediately for smooth UI
     setInputValues(prev => ({
       ...prev,
       [itemId]: newValue
     }));
+    
+    // If street_address field is changed, reset validation state
+    if (fieldName === 'street_address') {
+      setValidatedAddress(null);
+      setValidationError(null);
+    }
     
     // Debounce the database update
     setTimeout(() => {
@@ -538,94 +557,119 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
             </div>
             <Input
               value={inputValues[item.id] || ''}
-              onChange={(e) => handleFieldValueChange(item.id, e.target.value)}
+              onChange={(e) => handleFieldValueChange(item.id, e.target.value, item.field_name)}
               placeholder={`Enter ${formatFieldName(item.field_name).toLowerCase()}`}
               className="text-xs"
             />
-            {item.field_name === 'street_address' && validatedAddress && (
-              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md text-xs">
-                 <p className="font-semibold text-green-800 mb-2">✅ Validated Address (USPS):</p>
-                 <div className="text-green-900 bg-white p-3 rounded border border-green-100 mb-3 space-y-2">
-                    {/* Street Address Row */}
-                    <div className="flex items-center justify-between group">
-                      <div className="flex-1">
-                        <span className="text-gray-600 text-[10px] uppercase">Street: </span>
-                        <span className="font-medium">
-                          {[validatedAddress.address2, validatedAddress.address1].filter(Boolean).join(' ')}
-                        </span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyAddressField('Street', [validatedAddress.address2, validatedAddress.address1].filter(Boolean).join(' '))}
-                      >
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    
-                    {/* City, State, ZIP in one row with labels */}
-                    <div className="flex items-center justify-between group">
-                      <div className="flex-1 flex items-center gap-3">
-                        <div>
-                          <span className="text-gray-600 text-[10px] uppercase">City: </span>
-                          <span className="font-medium">{validatedAddress.city}</span>
-                        </div>
-                        <span className="text-gray-400">•</span>
-                        <div>
-                          <span className="text-gray-600 text-[10px] uppercase">State: </span>
-                          <span className="font-medium">{validatedAddress.state}</span>
-                        </div>
-                        <span className="text-gray-400">•</span>
-                        <div>
-                          <span className="text-gray-600 text-[10px] uppercase">ZIP: </span>
+            {item.field_name === 'street_address' && (
+              <div className={`mt-2 p-3 border rounded-md text-xs ${
+                validationError 
+                  ? 'bg-red-50 border-red-200' 
+                  : validatedAddress 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-gray-50 border-gray-200'
+              }`}>
+                {validationError ? (
+                  /* Error State - Red Box */
+                  <>
+                    <p className="font-semibold text-red-800 mb-2">❌ Address Validation Failed</p>
+                    <p className="text-red-900">{validationError}</p>
+                  </>
+                ) : validatedAddress ? (
+                  /* Success State - Green Box */
+                  <>
+                    <p className="font-semibold text-green-800 mb-2">✅ Validated Address (USPS):</p>
+                    <div className="text-green-900 bg-white p-3 rounded border border-green-100 mb-3 space-y-2">
+                      {/* Street Address Row */}
+                      <div className="flex items-center justify-between group">
+                        <div className="flex-1">
+                          <span className="text-gray-600 text-[10px] uppercase">Street: </span>
                           <span className="font-medium">
-                            {validatedAddress.zip5}{validatedAddress.zip4 ? `-${validatedAddress.zip4}` : ''}
+                            {[validatedAddress.address2, validatedAddress.address1].filter(Boolean).join(' ')}
                           </span>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => copyAddressField('Street', [validatedAddress.address2, validatedAddress.address1].filter(Boolean).join(' '))}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyAddressField('City, State, ZIP', `${validatedAddress.city}, ${validatedAddress.state} ${validatedAddress.zip5}${validatedAddress.zip4 ? `-${validatedAddress.zip4}` : ''}`)}
-                      >
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    
-                    {/* Separator */}
-                    <div className="border-t border-gray-200 my-2"></div>
-                    
-                    {/* Full Address Display */}
-                    <div className="flex items-start justify-between group">
-                      <div className="flex-1">
-                        <span className="text-gray-600 text-[10px] uppercase">Full Address: </span>
-                        <div className="font-medium text-green-800 mt-1">
-                          {[validatedAddress.address2, validatedAddress.address1].filter(Boolean).join(' ')}, {validatedAddress.city}, {validatedAddress.state} {validatedAddress.zip5}{validatedAddress.zip4 ? `-${validatedAddress.zip4}` : ''}
+                      
+                      {/* City, State, ZIP in one row with labels */}
+                      <div className="flex items-center justify-between group">
+                        <div className="flex-1 flex items-center gap-3">
+                          <div>
+                            <span className="text-gray-600 text-[10px] uppercase">City: </span>
+                            <span className="font-medium">{validatedAddress.city}</span>
+                          </div>
+                          <span className="text-gray-400">•</span>
+                          <div>
+                            <span className="text-gray-600 text-[10px] uppercase">State: </span>
+                            <span className="font-medium">{validatedAddress.state}</span>
+                          </div>
+                          <span className="text-gray-400">•</span>
+                          <div>
+                            <span className="text-gray-600 text-[10px] uppercase">ZIP: </span>
+                            <span className="font-medium">
+                              {validatedAddress.zip5}{validatedAddress.zip4 ? `-${validatedAddress.zip4}` : ''}
+                            </span>
+                          </div>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => copyAddressField('City, State, ZIP', `${validatedAddress.city}, ${validatedAddress.state} ${validatedAddress.zip5}${validatedAddress.zip4 ? `-${validatedAddress.zip4}` : ''}`)}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
+                      
+                      {/* Separator */}
+                      <div className="border-t border-gray-200 my-2"></div>
+                      
+                      {/* Full Address Display */}
+                      <div className="flex items-start justify-between group">
+                        <div className="flex-1">
+                          <span className="text-gray-600 text-[10px] uppercase">Full Address: </span>
+                          <div className="font-medium text-green-800 mt-1">
+                            {[validatedAddress.address2, validatedAddress.address1].filter(Boolean).join(' ')}, {validatedAddress.city}, {validatedAddress.state} {validatedAddress.zip5}{validatedAddress.zip4 ? `-${validatedAddress.zip4}` : ''}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={copyValidatedAddress}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button 
+                        variant="ghost" 
                         size="sm"
-                        className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="h-7 text-xs px-3 text-green-700 hover:text-green-800 hover:bg-green-50 border border-green-300"
                         onClick={copyValidatedAddress}
                       >
-                        <Copy className="h-3 w-3" />
+                        <Copy className="h-3 w-3 mr-1.5" />
+                        Copy Full
                       </Button>
                     </div>
-                 </div>
-                 <div className="flex justify-end">
-                   <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="h-7 text-xs px-3 text-green-700 hover:text-green-800 hover:bg-green-50 border border-green-300"
-                      onClick={copyValidatedAddress}
-                   >
-                      <Copy className="h-3 w-3 mr-1.5" />
-                      Copy Full
-                   </Button>
-                 </div>
+                  </>
+                ) : (
+                  /* Default State - Gray Box with Instructions */
+                  <>
+                    <p className="font-semibold text-gray-700 mb-2">📍 Address Validation</p>
+                    <p className="text-gray-600">
+                      Press the <span className="font-medium text-gray-800">Validate</span> button to verify the address from USPS.
+                    </p>
+                  </>
+                )}
               </div>
             )}
             <Separator className="mt-4" />
