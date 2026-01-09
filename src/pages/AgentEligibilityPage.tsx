@@ -105,33 +105,38 @@ export function AgentEligibilityPage() {
   const fetchAgents = async () => {
     setAgentsLoading(true);
     try {
-      // Fetch agents who have license records (either carrier or state licenses)
-      const { data: carrierLicenses, error: carrierError } = await supabase
+      // Fetch all agents who have agent_status records (buffer or licensed types)
+      // This is more reliable than checking license tables which may be empty for new agents
+      const { data: agentStatus, error: statusError } = await supabase
+        .from('agent_status')
+        .select('user_id, agent_type')
+        .in('agent_type', ['buffer', 'licensed']);
+
+      if (statusError) throw statusError;
+
+      // Get unique user IDs from agent_status
+      const allUserIds = new Set<string>();
+      agentStatus?.forEach(a => a.user_id && allUserIds.add(a.user_id));
+
+      // Also fetch agents who have license records
+      const { data: carrierLicenses } = await supabase
         .from('agent_carrier_licenses')
         .select('agent_user_id');
+      
+      carrierLicenses?.forEach(l => l.agent_user_id && allUserIds.add(l.agent_user_id));
 
-      if (carrierError) throw carrierError;
-
-      const { data: stateLicenses, error: stateError } = await supabase
+      const { data: stateLicenses } = await supabase
         .from('agent_state_licenses')
         .select('agent_user_id');
-
-      if (stateError) throw stateError;
-
-      // Get unique user IDs from both license tables
-      const allUserIds = new Set<string>();
-      carrierLicenses?.forEach(l => l.agent_user_id && allUserIds.add(l.agent_user_id));
+      
       stateLicenses?.forEach(l => l.agent_user_id && allUserIds.add(l.agent_user_id));
-
-      // Also include the specific user ID you mentioned
-      allUserIds.add('d68d18e4-9deb-4282-b4d0-1e6e6a0789e9');
 
       const userIds = Array.from(allUserIds);
 
-      console.log('User IDs with licenses:', userIds);
+      console.log('User IDs for agent eligibility:', userIds);
 
       if (userIds.length === 0) {
-        console.warn('No licensed agents found');
+        console.warn('No agents found');
         setAgents([]);
         setAgentsLoading(false);
         return;
