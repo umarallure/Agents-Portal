@@ -2,6 +2,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { Search, X, Filter } from "lucide-react";
@@ -18,8 +19,8 @@ interface GridToolbarProps {
   onDateToFilterChange: (date: Date | undefined) => void;
   bufferAgentFilter: string;
   onBufferAgentFilterChange: (value: string) => void;
-  retentionAgentFilter: string;
-  onRetentionAgentFilterChange: (value: string) => void;
+  retentionAgentFilter: string[];
+  onRetentionAgentFilterChange: (value: string[]) => void;
   licensedAgentFilter: string;
   onLicensedAgentFilterChange: (value: string) => void;
   leadVendorFilter: string;
@@ -99,11 +100,9 @@ export const GridToolbar = ({
   ];
 
   const retentionAgentOptions = [
-    "All Retention Agents",
     "Qasim Raja",
     "Hussain Khan",
-    "Justin",
-    "N/A"
+    "Justin"
   ];
 
   const leadVendorOptions = [
@@ -242,6 +241,7 @@ export const GridToolbar = ({
     onDateFromFilterChange(undefined);
     onDateToFilterChange(undefined);
     onBufferAgentFilterChange(ALL_OPTION);
+    onRetentionAgentFilterChange([]);
     onLicensedAgentFilterChange(ALL_OPTION);
     onLeadVendorFilterChange(ALL_OPTION);
     onStatusFilterChange(ALL_OPTION);
@@ -253,6 +253,7 @@ export const GridToolbar = ({
 
   const hasActiveFilters = searchTerm || dateFilter || dateFromFilter || dateToFilter ||
     (bufferAgentFilter && bufferAgentFilter !== ALL_OPTION) || 
+    (retentionAgentFilter && retentionAgentFilter.length > 0) ||
     (licensedAgentFilter && licensedAgentFilter !== ALL_OPTION) || 
     (leadVendorFilter && leadVendorFilter !== ALL_OPTION) || 
     (statusFilter && statusFilter !== ALL_OPTION) || 
@@ -437,20 +438,15 @@ export const GridToolbar = ({
         <div>
           <Label className="text-sm font-medium">
             Retention Agent
-            {retentionAgentFilter && retentionAgentFilter !== ALL_OPTION && <span className="text-blue-600 ml-1">●</span>}
+            {retentionAgentFilter && retentionAgentFilter.length > 0 && <span className="text-blue-600 ml-1">●</span>}
           </Label>
-          <Select value={retentionAgentFilter || ALL_OPTION} onValueChange={onRetentionAgentFilterChange}>
-            <SelectTrigger className={cn("mt-1", retentionAgentFilter && retentionAgentFilter !== ALL_OPTION && "ring-2 ring-blue-200")}>
-              <SelectValue placeholder="All Retention Agents" />
-            </SelectTrigger>
-            <SelectContent>
-              {retentionAgentOptions.map((agent) => (
-                <SelectItem key={agent} value={agent === "All Retention Agents" ? ALL_OPTION : agent}>
-                  {agent}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelect
+            options={retentionAgentOptions}
+            selected={retentionAgentFilter}
+            onChange={onRetentionAgentFilterChange}
+            placeholder="All Retention Agents"
+            className={cn("mt-1", retentionAgentFilter && retentionAgentFilter.length > 0 && "ring-2 ring-blue-200")}
+          />
         </div>
 
         {/* Licensed Agent Filter */}

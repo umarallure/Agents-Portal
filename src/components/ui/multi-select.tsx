@@ -75,44 +75,11 @@ export function MultiSelect({
             {safeSelected.length === 0 && (
               <span className="text-muted-foreground">{placeholder}</span>
             )}
-            {safeSelected.length > 0 && safeSelected.length <= 3 ? (
-              safeSelected.map((item) => (
-                <Badge
-                  variant="secondary"
-                  key={item}
-                  className="mr-1 mb-1 text-xs"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleUnselect(item);
-                  }}
-                >
-                  {item}
-                  <button
-                    className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleUnselect(item);
-                      }
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleUnselect(item);
-                    }}
-                  >
-                    <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                  </button>
-                </Badge>
-              ))
-            ) : safeSelected.length > 3 ? (
+            {safeSelected.length > 0 && (
               <Badge variant="secondary" className="mr-1 mb-1 text-xs">
                 {safeSelected.length} selected
               </Badge>
-            ) : null}
+            )}
           </div>
         </Button>
       </PopoverTrigger>

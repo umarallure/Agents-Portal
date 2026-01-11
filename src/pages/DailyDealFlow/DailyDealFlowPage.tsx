@@ -62,7 +62,7 @@ const DailyDealFlowPage = () => {
   const [dateFromFilter, setDateFromFilter] = useState<Date | undefined>(undefined);
   const [dateToFilter, setDateToFilter] = useState<Date | undefined>(undefined);
   const [bufferAgentFilter, setBufferAgentFilter] = useState(ALL_OPTION);
-  const [retentionAgentFilter, setRetentionAgentFilter] = useState(ALL_OPTION);
+  const [retentionAgentFilter, setRetentionAgentFilter] = useState<string[]>([]);
   const [licensedAgentFilter, setLicensedAgentFilter] = useState(ALL_OPTION);
   const [leadVendorFilter, setLeadVendorFilter] = useState(ALL_OPTION);
   const [statusFilter, setStatusFilter] = useState(ALL_OPTION);
@@ -142,8 +142,8 @@ const DailyDealFlowPage = () => {
         query = query.eq('buffer_agent', bufferAgentFilter);
       }
 
-      if (retentionAgentFilter && retentionAgentFilter !== ALL_OPTION) {
-        query = query.eq('retention_agent', retentionAgentFilter);
+      if (retentionAgentFilter && retentionAgentFilter.length > 0) {
+        query = (query as any).in('retention_agent', retentionAgentFilter);
       }
 
       if (licensedAgentFilter && licensedAgentFilter !== ALL_OPTION) {
@@ -279,6 +279,10 @@ const DailyDealFlowPage = () => {
         query = query.eq('buffer_agent', bufferAgentFilter);
       }
 
+      if (retentionAgentFilter && retentionAgentFilter.length > 0) {
+        query = (query as any).in('retention_agent', retentionAgentFilter);
+      }
+
       if (licensedAgentFilter && licensedAgentFilter !== ALL_OPTION) {
         query = query.eq('licensed_agent_account', licensedAgentFilter);
       }
@@ -316,7 +320,7 @@ const DailyDealFlowPage = () => {
         query = query.or(`insured_name.ilike.%${searchTerm}%,client_phone_number.ilike.%${searchTerm}%,submission_id.ilike.%${searchTerm}%,lead_vendor.ilike.%${searchTerm}%,agent.ilike.%${searchTerm}%,status.ilike.%${searchTerm}%,carrier.ilike.%${searchTerm}%,licensed_agent_account.ilike.%${searchTerm}%,buffer_agent.ilike.%${searchTerm}%`);
       }
 
-      const { data: exportData, error } = await query;
+      const { data: exportData, error } = await query as { data: DailyDealFlowRow[] | null; error: any };
 
       if (error) {
         console.error("Error fetching data for export:", error);
@@ -345,6 +349,7 @@ const DailyDealFlowPage = () => {
         'Lead Vendor',
         'Phone Number',
         'Buffer Agent',
+        'Retention Agent',
         'Agent',
         'Licensed Agent',
         'Status',
@@ -375,6 +380,7 @@ const DailyDealFlowPage = () => {
           row.lead_vendor || '',
           row.client_phone_number || '',
           row.buffer_agent || '',
+          row.retention_agent || '',
           row.agent || '',
           row.licensed_agent_account || '',
           row.status || '',
