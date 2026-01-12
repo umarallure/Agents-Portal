@@ -320,10 +320,48 @@ const DailyDealFlowPage = () => {
         query = query.or(`insured_name.ilike.%${searchTerm}%,client_phone_number.ilike.%${searchTerm}%,submission_id.ilike.%${searchTerm}%,lead_vendor.ilike.%${searchTerm}%,agent.ilike.%${searchTerm}%,status.ilike.%${searchTerm}%,carrier.ilike.%${searchTerm}%,licensed_agent_account.ilike.%${searchTerm}%,buffer_agent.ilike.%${searchTerm}%`);
       }
 
-      const { data: exportData, error } = await query as { data: DailyDealFlowRow[] | null; error: any };
+      toast({
+        title: "Export Started",
+        description: "Fetching all records... This may take a moment.",
+      });
 
-      if (error) {
-        console.error("Error fetching data for export:", error);
+      let exportData: DailyDealFlowRow[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+      let fetchError = null;
+
+      try {
+        while (hasMore) {
+          const from = page * pageSize;
+          const to = from + pageSize - 1;
+          
+          const { data: pageData, error } = await query.range(from, to);
+          
+          if (error) {
+            fetchError = error;
+            break;
+          }
+          
+          if (pageData && pageData.length > 0) {
+            exportData = [...exportData, ...(pageData as DailyDealFlowRow[])];
+            
+            if (pageData.length < pageSize) {
+              hasMore = false;
+            } else {
+              page++;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+      } catch (err) {
+        console.error("Exception during export fetch:", err);
+        fetchError = err;
+      }
+
+      if (fetchError) {
+        console.error("Error fetching data for export:", fetchError);
         toast({
           title: "Export Failed",
           description: "Failed to fetch data for export",
