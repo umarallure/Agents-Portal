@@ -79,32 +79,52 @@ serve(async (req) => {
     const nameVariations = normalizeNameVariations(name);
     console.log(`[Monday.com] Generated ${nameVariations.length} name variations:`, nameVariations);
 
-    // We'll search the "name" field of items in the board
-    // Monday.com's item "name" is the main identifier
-    // We need to search through all items and filter by name
+    // We'll search the "text_mkw44vx" (GHL Name) column using items_page_by_column_values
+    // This is more efficient and reliable than fetching all items and filtering
     
-    // First, try direct name match in the query
-    const primaryVariation = nameVariations[0];
+    // items_page_by_column_values only supports one value at a time for text columns generally
+    
+    // We will search for all variations just to be safe
+    // But mostly the exact name should match what's in GHL Name column
+    
+    const searchValues = [name, ...nameVariations].filter((v, i, a) => a.indexOf(v) === i);
+    console.log(`[Monday.com] Searching for values in GHL Name column:`, searchValues);
+
+    let allFoundItems: any[] = [];
+    
+    // We can search for the first variation which is likely the most accurate
+    // Or we can try to search for the raw name first
+    
+    // Let's create a query that searches for the primary name in the specific column
+    // Note: items_page_by_column_values treats the list of values as OR usually
+    
+    // Use the raw name first as primary search key
+    const primarySearchValue = name;
     
     const query = `query {
-      boards(ids: 18027763264) {
-        items_page {
-          cursor
-          items {
+      items_page_by_column_values(
+        limit: 50,
+        board_id: 18027763264,
+        columns: [{
+          column_id: "text_mkw44vx",
+          column_values: ["${primarySearchValue}"]
+        }]
+      ) {
+        cursor
+        items {
+          id
+          name
+          column_values(ids: [
+            "subitems", "text_mkw44vx", "text_mkwjexhw", "status", "date1",
+            "text_mkpx3j6w", "color_mknkq2qd", "numbers", "numeric_mkw47t5d",
+            "text_mknk5m2r", "color_mkp5sj20", "pulse_updated_mknkqf59",
+            "color_mkq0rkaw", "text_mkwwrq3b", "text_mkq196kp", "date_mkq1d86z",
+            "dropdown_mkq2x0kx", "text_mkq268v3", "date_mkw9tyc9", "date_mkw94jj0",
+            "text_mkw9mq04", "text_mkxdrsg2"
+          ]) {
             id
-            name
-            column_values(ids: [
-              "subitems", "text_mkw44vx", "text_mkwjexhw", "status", "date1",
-              "text_mkpx3j6w", "color_mknkq2qd", "numbers", "numeric_mkw47t5d",
-              "text_mknk5m2r", "color_mkp5sj20", "pulse_updated_mknkqf59",
-              "color_mkq0rkaw", "text_mkwwrq3b", "text_mkq196kp", "date_mkq1d86z",
-              "dropdown_mkq2x0kx", "text_mkq268v3", "date_mkw9tyc9", "date_mkw94jj0",
-              "text_mkw9mq04", "text_mkxdrsg2"
-            ]) {
-              id
-              text
-              value
-            }
+            text
+            value
           }
         }
       }
@@ -117,6 +137,7 @@ serve(async (req) => {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': MONDAY_API_KEY,
+        'API-Version': '2023-10'
       },
       body: JSON.stringify({ query })
     });
@@ -130,45 +151,89 @@ serve(async (req) => {
     }
 
     const mondayData = await response.json();
-    console.log('[Monday.com] API response received');
+    
+    if (mondayData.errors) {
+       console.error(`[Monday.com] GraphQL Errors:`, mondayData.errors);
+       // If the error is regarding column not supported, we might need to fallback?
+       // But text column search is supported in 2023-10
+    }
 
-    const allItems = mondayData.data?.boards?.[0]?.items_page?.items || [];
-    console.log(`[Monday.com] Retrieved ${allItems.length} total items from board`);
-
-    // Filter items by name variations
-    const matchedItems = allItems.filter((item: any) => {
-      const itemName = item.name?.trim() || '';
+    const foundItems = mondayData.data?.items_page_by_column_values?.items || [];
+    console.log(`[Monday.com] Retrieved ${foundItems.length} items from search`);
+    
+    // If no items found with exact name match on column, try fetching recent items from board (fallback)
+    // or try searching by Name column? Monday API doesn't support searching Name column via items_page_by_column_values directly in same way easily
+    
+    if (foundItems.length === 0) {
+      console.log('[Monday.com] No items found by exact column match. Attempting broad board fetch (first 500 items)...');
+       
+      // Fallback query: Fetch recent 500 items and filter in memory
+      // This is what we had before but with higher limit
+      const fallbackQuery = `query {
+        boards(ids: 18027763264) {
+          items_page(limit: 500) {
+            cursor
+            items {
+              id
+              name
+              column_values(ids: [
+                "subitems", "text_mkw44vx", "text_mkwjexhw", "status", "date1",
+                "text_mkpx3j6w", "color_mknkq2qd", "numbers", "numeric_mkw47t5d",
+                "text_mknk5m2r", "color_mkp5sj20", "pulse_updated_mknkqf59",
+                "color_mkq0rkaw", "text_mkwwrq3b", "text_mkq196kp", "date_mkq1d86z",
+                "dropdown_mkq2x0kx", "text_mkq268v3", "date_mkw9tyc9", "date_mkw94jj0",
+                "text_mkw9mq04", "text_mkxdrsg2"
+              ]) {
+                id
+                text
+                value
+              }
+            }
+          }
+        }
+      }`;
       
-      // Check if item name matches any of our variations
-      return nameVariations.some(variation => {
-        const varLower = variation.toLowerCase();
-        const itemLower = itemName.toLowerCase();
-        
-        // Exact match
-        if (itemLower === varLower) return true;
-        
-        // Contains match
-        if (itemLower.includes(varLower) || varLower.includes(itemLower)) return true;
-        
-        // Fuzzy match - compare parts
-        const itemParts = itemName.split(/[\s,]+/).filter(p => p.length > 0);
-        const varParts = variation.split(/[\s,]+/).filter(p => p.length > 0);
-        
-        // Check if all parts from variation exist in item name (or vice versa)
-        const allVarPartsInItem = varParts.every(vp => 
-          itemParts.some(ip => ip.toLowerCase() === vp.toLowerCase())
-        );
-        const allItemPartsInVar = itemParts.every(ip => 
-          varParts.some(vp => vp.toLowerCase() === ip.toLowerCase())
-        );
-        
-        return allVarPartsInItem || allItemPartsInVar;
+      const fallbackResponse = await fetch("https://api.monday.com/v2", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': MONDAY_API_KEY,
+          'API-Version': '2023-10'
+        },
+        body: JSON.stringify({ query: fallbackQuery })
       });
-    });
+      
+      const fallbackData = await fallbackResponse.json();
+      const allBoardItems = fallbackData.data?.boards?.[0]?.items_page?.items || [];
+      console.log(`[Monday.com] Retrieved ${allBoardItems.length} items from fallback board fetch`);
+      
+      // Filter these items
+      const matchedFallbackItems = allBoardItems.filter((item: any) => {
+        const itemName = item.name?.trim() || '';
+        const ghlNameCol = item.column_values.find((c: any) => c.id === 'text_mkw44vx');
+        const ghlName = ghlNameCol ? ghlNameCol.text : '';
 
-    console.log(`[Monday.com] Found ${matchedItems.length} matching items after filtering`);
+        // Check against name or ghl_name
+         return nameVariations.some(variation => {
+          const varLower = variation.toLowerCase();
+          
+          // Check Item Name
+          if (itemName.toLowerCase().includes(varLower) || varLower.includes(itemName.toLowerCase())) return true;
+          
+          // Check GHL Name Column
+          if (ghlName && (ghlName.toLowerCase().includes(varLower) || varLower.includes(ghlName.toLowerCase()))) return true;
+          
+          return false;
+        });
+      });
+      
+      console.log(`[Monday.com] Found ${matchedFallbackItems.length} items via fallback in-memory filtering`);
+      allFoundItems = matchedFallbackItems;
+    } else {
+      allFoundItems = foundItems;
+    }
 
-    return new Response(JSON.stringify({ items: matchedItems }), {
+    return new Response(JSON.stringify({ items: allFoundItems }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });

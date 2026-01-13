@@ -13,8 +13,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, ArrowLeft, CheckCircle, AlertCircle, Phone, FileText, User, CreditCard } from 'lucide-react';
-import { format } from 'date-fns';
-import { fetchPoliciesByGhlName } from '@/lib/mondayRetentionApi';
 import { AppFixTaskTypeSelector } from '@/components/AppFixTaskTypeSelector';
 import { CallResultForm } from '@/components/CallResultForm';
 
@@ -257,32 +255,48 @@ const RetentionFlow = () => {
       }
 
       if (names.length === 0) {
+        console.log('No names found to fetch policies for');
         setPolicies([]);
         return;
       }
 
-      // 2. Fetch from Monday.com using these names
-      const mondayItems = await fetchPoliciesByGhlName(names);
+      console.log('Fetching policies for names:', names);
+
+      // 2. Fetch from Monday.com using internal table
+      console.log('Fetching policies from monday_com_deals table for names:', names);
+      
+      const { data: mondayDeals, error } = await supabase
+        .from('monday_com_deals')
+        .select('*')
+        .in('ghl_name', names);
+        // Removed .eq('is_active', true) to allow viewing all deals including CICA/GHL
+
+      if (error) {
+        console.error('Error fetching Monday deals:', error);
+        throw error;
+      }
+
+      console.log('All collected Monday items from DB:', mondayDeals);
 
       // 3. Map Monday items to Lead interface for display
-      const mappedPolicies = mondayItems.map(item => ({
-        submission_id: item.id, // Use Monday ID as unique key
-        customer_full_name: item.ghl_name || item.name,
+      const mappedPolicies = (mondayDeals || []).map((item: any) => ({
+        submission_id: item.id.toString(), // Use Monday ID as unique key
+        customer_full_name: item.ghl_name || item.deal_name,
         carrier: item.carrier || 'N/A',
-        product_type: item.product_type || 'N/A',
-        monthly_premium: item.premium ? parseFloat(item.premium.replace(/[^0-9.]/g, '')) : null,
-        agent: item.agent || 'N/A',
-        lead_vendor: item.vendor || 'N/A',
+        product_type: item.policy_type || 'N/A',
+        monthly_premium: item.deal_value || null,
+        agent: item.sales_agent || 'N/A',
+        lead_vendor: item.call_center || 'N/A',
         policy_number: item.policy_number || 'N/A',
-        status: item.status || 'N/A',
-        writing_number: item.writing_number || 'N/A',
+        status: item.policy_status || 'N/A',
+        writing_number: item.writing_no || 'N/A',
         date_of_birth: 'N/A', // Not available in Monday mapping
         email: null,
         state: null,
         social_security: null,
         beneficiary_routing: null,
         beneficiary_account: null,
-        phone_number: item.phone || null
+        phone_number: item.phone_number || null
       }));
 
       setPolicies(mappedPolicies as Lead[]);
