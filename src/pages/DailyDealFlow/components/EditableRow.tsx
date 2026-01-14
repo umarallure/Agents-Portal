@@ -48,6 +48,8 @@ const bufferAgentOptions = [
     "All Buffer Agents",
     "Justine",
     "Catarina",
+    "Elijah K",
+    "Brandon Blake Flinchum",
     "Kyla",
     "Laiza Batain",
     "Angelica",
