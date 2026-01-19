@@ -167,8 +167,13 @@ const DailyDealFlowPage = () => {
       }
 
       if (retentionFilter && retentionFilter !== ALL_OPTION) {
-        const isRetention = retentionFilter === 'Retention';
-        query = query.eq('is_retention_call', isRetention);
+        if (retentionFilter === 'Retention') {
+          // Retention = only show rows where retention_agent is filled (not null and not empty)
+          query = (query as any).not('retention_agent', 'is', null).neq('retention_agent', '');
+        } else if (retentionFilter === 'Regular') {
+          // Regular = don't show any rows with retention_agent filled (exclude rows where retention_agent has a value)
+          query = query.or('retention_agent.is.null,retention_agent.eq.');
+        }
       }
 
       // Apply incomplete updates filter if set
@@ -304,8 +309,13 @@ const DailyDealFlowPage = () => {
       }
 
       if (retentionFilter && retentionFilter !== ALL_OPTION) {
-        const isRetention = retentionFilter === 'Retention';
-        query = query.eq('is_retention_call', isRetention);
+        if (retentionFilter === 'Retention') {
+          // Retention = only show rows where retention_agent is filled (not null and not empty)
+          query = (query as any).not('retention_agent', 'is', null).neq('retention_agent', '');
+        } else if (retentionFilter === 'Regular') {
+          // Regular = don't show any rows with retention_agent filled (exclude rows where retention_agent has a value)
+          query = query.or('retention_agent.is.null,retention_agent.eq.');
+        }
       }
 
       if (incompleteUpdatesFilter && incompleteUpdatesFilter !== ALL_OPTION) {
