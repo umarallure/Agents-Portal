@@ -9,6 +9,48 @@ const SLACK_BOT_TOKEN = Deno.env.get('SLACK_BOT_TOKEN');
 const RETENTION_CHANNEL = '#retention-team-portal';
 const CALLBACK_PORTAL_CHANNEL = '#retention-team-portal';
 
+// Helper function to format dates in New York timezone format (MM/DD/YYYY)
+const formatDateNewYork = (dateString: string | null | undefined): string => {
+  if (!dateString || dateString === 'N/A' || dateString.trim() === '') {
+    return 'N/A';
+  }
+  
+  const trimmed = dateString.trim();
+  
+  try {
+    let date: Date;
+    
+    // If in YYYY-MM-DD format (ISO), parse it
+    const yyyymmddPattern = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
+    if (yyyymmddPattern.test(trimmed)) {
+      // Parse as UTC and convert to New York timezone
+      const match = trimmed.match(yyyymmddPattern)!;
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1; // Month is 0-indexed
+      const day = parseInt(match[3], 10);
+      date = new Date(year, month, day);
+    } else {
+      // Try to parse as a date string
+      date = new Date(trimmed);
+      if (isNaN(date.getTime())) {
+        // If parsing fails, return the original string
+        return trimmed;
+      }
+    }
+    
+    // Format in New York timezone as MM/DD/YYYY
+    return date.toLocaleDateString('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  } catch (error) {
+    // If any error occurs, return the original string
+    return trimmed;
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -140,7 +182,7 @@ serve(async (req) => {
         // Format: ✅ Application Submitted! - [Customer Name] - N/A - Isaac - WinBPO - Charles Birosel - MOH - Level - 2026-01-03 - $23.66 - $3000 - Submitted
         message = {
           channel: RETENTION_CHANNEL,
-          text: `✅ Application Submitted! - ${customerName || 'N/A'} - N/A - ${retentionAgent || agentName || 'N/A'} - ${leadVendor || 'N/A'} - ${customerName || 'N/A'} - ${carrier || 'N/A'} - ${productType || 'N/A'} - ${draftDate || 'N/A'} - $${monthlyPremium || '0.00'} - $${coverageAmount || '0'} - Submitted`
+          text: `✅ Application Submitted! - ${customerName || 'N/A'} - N/A - ${retentionAgent || agentName || 'N/A'} - ${leadVendor || 'N/A'} - ${customerName || 'N/A'} - ${carrier || 'N/A'} - ${productType || 'N/A'} - ${formatDateNewYork(draftDate)} - $${monthlyPremium || '0.00'} - $${coverageAmount || '0'} - Submitted`
         };
         break;
 
@@ -158,7 +200,7 @@ serve(async (req) => {
         // Format: 🏦 Failed Payment Fix! - [Customer Name] - [Retention Agent] - Updated banking info/draft date w/ [Carrier Name] - New Draft Date: [Draft date]
         message = {
           channel: RETENTION_CHANNEL,
-          text: `🏦 Failed Payment Fix! - ${customerName || 'N/A'} - ${retentionAgent || agentName || 'N/A'} - Updated banking info/draft date w/ ${carrier || 'N/A'} - New Draft Date: ${newDraftDate || 'N/A'}`
+          text: `🏦 Failed Payment Fix! - ${customerName || 'N/A'} - ${retentionAgent || agentName || 'N/A'} - Updated banking info/draft date w/ ${carrier || 'N/A'} - New Draft Date: ${formatDateNewYork(newDraftDate)}`
         };
         break;
 

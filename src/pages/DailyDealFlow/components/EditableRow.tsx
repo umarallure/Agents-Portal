@@ -339,8 +339,9 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
     if (draftDate) {
       const date = new Date(draftDate);
       parts.push(`6. Draft date: ${date.toLocaleDateString('en-US', {
-        month: 'numeric',
-        day: 'numeric',
+        timeZone: 'America/New_York',
+        month: '2-digit',
+        day: '2-digit',
         year: 'numeric'
       })}`);
     }
