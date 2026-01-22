@@ -254,7 +254,12 @@ export default function AetnaStateAvailabilityManager() {
         state_code: state.code,
         is_available: stateAvailability.get(state.name) || false,
         requires_upline_license: true,
-        notes: `Updated via UI on ${new Date().toLocaleDateString()}`,
+        notes: `Updated via UI on ${new Date().toLocaleDateString('en-US', {
+          timeZone: 'America/New_York',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        })}`,
         effective_date: new Date().toISOString().split('T')[0]
       }));
 
