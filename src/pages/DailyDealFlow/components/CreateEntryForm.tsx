@@ -38,7 +38,7 @@ const agentOptions = [
 ];
 
 const licensedAccountOptions = [
-  "Claudia", "Lydia", "Isaac", "Noah","Trinity", "Benjamin", "N/A","Tatumn","Abdul"
+  "Claudia", "Lydia", "Isaac","Brandon Blake Flinchum", "Noah","Trinity", "Benjamin", "N/A","Tatumn","Abdul"
 ];
 
 const carrierOptions = [

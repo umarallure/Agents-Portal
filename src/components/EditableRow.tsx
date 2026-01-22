@@ -69,7 +69,7 @@ const AGENT_OPTIONS = [
 ];
 
 const LICENSED_ACCOUNT_OPTIONS = [
-  "Claudia", "Lydia","Trinity", "Isaac", "Noah", "Benjamin", "N/A","Tatumn"
+  "Claudia", "Lydia","Trinity", "Isaac","Brandon Blake Flinchum", "Noah", "Benjamin", "N/A","Tatumn"
 ];
 
 const CARRIER_OPTIONS = [

@@ -43,6 +43,7 @@ const carrierOptions = [
   "SBLI",
   "Corebridge",
   "MOH",
+  "Aflac",
   "Transamerica",
   "RNA",
   "AMAM",
@@ -101,6 +102,7 @@ const licensedAccountOptions = [
   "Claudia",
   "Lydia",
   "Isaac",
+  "Brandon Blake Flinchum",
   "Abdul",
   "Trinity",
   "Benjamin",
@@ -239,6 +241,16 @@ const mapStatusToSheetValue = (userSelectedStatus: string) => {
   return statusMap[userSelectedStatus] || userSelectedStatus;
 };
 
+// Helper function to format dates in New York timezone format (MM/DD/YYYY)
+const formatDateNewYork = (date: Date): string => {
+  return date.toLocaleDateString('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+};
+
 const getNoteText = (status: string, reason: string, clientName: string = "[Client Name]", newDraftDate?: Date) => {
   const statusReasonMapping: { [status: string]: { [reason: string]: string } } = {
     "⁠DQ": {
@@ -275,8 +287,8 @@ const getNoteText = (status: string, reason: string, clientName: string = "[Clie
       "Other": "Custom message if none of the above fit"
     },
     "Updated Banking/draft date": {
-      "Updated Banking and draft date": newDraftDate ? `New Draft date ${newDraftDate.toLocaleDateString()}` : "New Draft date [Please select a date]",
-      "Updated draft w/ same banking information": newDraftDate ? `New Draft date ${newDraftDate.toLocaleDateString()}` : "New Draft date [Please select a date]"
+      "Updated Banking and draft date": newDraftDate ? `New Draft date ${formatDateNewYork(newDraftDate)}` : "New Draft date [Please select a date]",
+      "Updated draft w/ same banking information": newDraftDate ? `New Draft date ${formatDateNewYork(newDraftDate)}` : "New Draft date [Please select a date]"
     }
   };
   
@@ -381,8 +393,9 @@ const generateSubmittedApplicationNotes = (
   // Draft date (point 6)
   if (draftDate) {
     parts.push(`6. Draft date: ${draftDate.toLocaleDateString('en-US', {
-      month: 'numeric',
-      day: 'numeric',
+      timeZone: 'America/New_York',
+      month: '2-digit',
+      day: '2-digit',
       year: 'numeric'
     })}`);
   }

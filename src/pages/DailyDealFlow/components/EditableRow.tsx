@@ -65,7 +65,7 @@ const agentOptions = [
 ];
 
 const licensedAccountOptions = [
-  "Claudia", "Lydia", "Isaac", "Noah","Trinity", "Benjamin", "Erica","Abdul", "N/A","Tatumn"
+  "Claudia", "Lydia", "Isaac", "Brandon Blake Flinchum","Noah","Trinity", "Benjamin", "Erica","Abdul", "N/A","Tatumn"
 ];
 
 // Retention agent options (explicit list so the Retention Agent dropdown can contain buffer/retention names)
@@ -339,8 +339,9 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
     if (draftDate) {
       const date = new Date(draftDate);
       parts.push(`6. Draft date: ${date.toLocaleDateString('en-US', {
-        month: 'numeric',
-        day: 'numeric',
+        timeZone: 'America/New_York',
+        month: '2-digit',
+        day: '2-digit',
         year: 'numeric'
       })}`);
     }
