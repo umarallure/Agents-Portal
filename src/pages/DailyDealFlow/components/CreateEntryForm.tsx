@@ -34,7 +34,7 @@ const bufferAgentOptions = [
 ];
 
 const agentOptions = [
-  "Claudia", "Lydia", "Zack", "Tatumn","Angy", "Benjamin", "N/A", "Isaac", "Abdul"
+  "Claudia", "Lydia", "Zack", "Tatumn","Angy","Brandon Blake Flinchum", "Benjamin", "N/A", "Isaac", "Abdul"
 ];
 
 const licensedAccountOptions = [
@@ -42,7 +42,7 @@ const licensedAccountOptions = [
 ];
 
 const carrierOptions = [
-  "Liberty", "SBLI", "Corebridge", "MOH", "Transamerica", "RNA", "AMAM",
+  "Liberty", "SBLI", "Corebridge", "MOH", "Transamerica", "RNA", "AMAM","Aflac",
   "GTL", "Aetna", "Americo", "CICA", "N/A"
 ];
 
