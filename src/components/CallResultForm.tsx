@@ -43,6 +43,7 @@ const carrierOptions = [
   "SBLI",
   "Corebridge",
   "MOH",
+  "Aflac",
   "Transamerica",
   "RNA",
   "AMAM",
