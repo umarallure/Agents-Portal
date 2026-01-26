@@ -163,7 +163,11 @@ const leadVendorOptions = [
 "Core Marketing",
 "WinBPO",
 "Everest BPO",
-"Riztech BPO"
+"Riztech BPO",
+"Broker Leads BPO",
+"Alternative BPO",
+"Unified Systems BPO",
+"Hexa Affiliates"
 ];
 
 const dqReasonOptions = [
