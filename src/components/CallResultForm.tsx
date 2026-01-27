@@ -43,6 +43,7 @@ const carrierOptions = [
   "SBLI",
   "Corebridge",
   "MOH",
+  "Aflac",
   "Transamerica",
   "RNA",
   "AMAM",
@@ -88,6 +89,7 @@ const agentOptions = [
   "Zack",
   "Tatumn",
   "Benjamin",
+  "Brandon Blake Flinchum",
   "N/A",
   "Kaye",
   "Isaac",
@@ -101,6 +103,7 @@ const licensedAccountOptions = [
   "Claudia",
   "Lydia",
   "Isaac",
+  "Brandon Blake Flinchum",
   "Abdul",
   "Trinity",
   "Benjamin",
@@ -160,7 +163,11 @@ const leadVendorOptions = [
 "Core Marketing",
 "WinBPO",
 "Everest BPO",
-"Riztech BPO"
+"Riztech BPO",
+"Broker Leads BPO",
+"Alternative BPO",
+"Unified Systems BPO",
+"Hexa Affiliates"
 ];
 
 const dqReasonOptions = [

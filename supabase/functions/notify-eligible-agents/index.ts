@@ -93,6 +93,7 @@ serve(async (req)=>{
       "Core Marketing":"#orbit-team-core-marketing",
       "Everest BPO":"#orbit-team-everest-bpo",
       "Riztech BPO":"#orbit-team-riztech-bpo",
+      "Unified Systems BPO":"#orbit-team-unified-systems-bpo",
       "Test": "#test-bpo"
     };
     // Agent Slack ID mapping with full display names
@@ -120,6 +121,14 @@ serve(async (req)=>{
       "Isaac": {
         slackId: "U099W0RKYDB",
         displayName: "Isaac Reed - Insurance Agent"
+      },
+      "Brandon Blake Flinchum": {
+        slackId: "U0A4HAT5GN6",
+        displayName: "Brandon Flinchum - Insurance Agent"
+      },
+      "Brandon": {
+        slackId: "U0A4HAT5GN6",
+        displayName: "Brandon Flinchum - Insurance Agent"
       }
     };
     const centerChannel = leadVendorCenterMapping[lead_vendor];
@@ -258,9 +267,26 @@ serve(async (req)=>{
       }
       return a.agent_name.localeCompare(b.agent_name);
     });
+    // Filter out Ben and Coleman agents (by agent_name only, not displayName)
+    const excludedAgents = ['Ben', 'Coleman', 'Aidan Coleman'];
+    const filteredAgents = sortedAgents.filter((agent)=>{
+      const agentName = agent.agent_name?.toLowerCase() || '';
+      
+      // Check if agent name contains excluded names (only check agent_name, not displayName)
+      const isExcluded = excludedAgents.some(excluded => {
+        const excludedLower = excluded.toLowerCase();
+        return agentName.includes(excludedLower);
+      });
+      
+      if (isExcluded) {
+        return false; // Skip excluded agents
+      }
+      return true;
+    });
+    
     // Deduplicate agents by Slack ID to avoid duplicate mentions
     const seenSlackIds = new Set();
-    const uniqueAgents = sortedAgents.filter((agent)=>{
+    const uniqueAgents = filteredAgents.filter((agent)=>{
       const agentInfo = agentSlackIdMapping[agent.agent_name];
       if (agentInfo) {
         if (seenSlackIds.has(agentInfo.slackId)) {
@@ -274,6 +300,11 @@ serve(async (req)=>{
     const agentMentions = uniqueAgents.map((agent)=>{
       const agentInfo = agentSlackIdMapping[agent.agent_name];
       if (agentInfo) {
+        // Special handling for Brandon on Aetna - add Aflac note
+        // Check by Slack ID to handle variations in agent name (Brandon vs Brandon Blake Flinchum)
+        if (carrier.toLowerCase() === 'aetna' && agentInfo.slackId === "U0A4HAT5GN6") {
+          return `• <@${agentInfo.slackId}> (Will submit with Aflac)`;
+        }
         return `• <@${agentInfo.slackId}>`;
       }
       return `• ${agent.agent_name}`;
@@ -321,7 +352,7 @@ serve(async (req)=>{
       elements: [
         {
           type: 'mrkdwn',
-          text: `${eligibleAgents.length} eligible agent(s)`
+          text: `${uniqueAgents.length} eligible agent(s)`
         }
       ]
     });

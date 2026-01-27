@@ -63,17 +63,17 @@ const BUFFER_AGENT_OPTIONS = [
 ];
 
 const AGENT_OPTIONS = [
-  "Claudia", "Lydia", "Juan", "Angy","Benjamin", "N/A", "Isaac",
+  "Claudia", "Lydia", "Juan", "Angy","Benjamin", "N/A", "Isaac","Brandon Blake Flinchum",
    "Tatumn",
    "Zack"
 ];
 
 const LICENSED_ACCOUNT_OPTIONS = [
-  "Claudia", "Lydia","Trinity", "Isaac", "Noah", "Benjamin", "N/A","Tatumn"
+  "Claudia", "Lydia","Trinity", "Isaac","Brandon Blake Flinchum", "Noah", "Benjamin", "N/A","Tatumn"
 ];
 
 const CARRIER_OPTIONS = [
-  "Liberty", "SBLI", "Corebridge", "MOH", "Transamerica", "RNA", "AMAM",
+  "Liberty", "SBLI", "Corebridge", "MOH", "Transamerica", "RNA", "AMAM","Aflac",
   "GTL", "Aetna", "Americo", "CICA", "N/A"
 ];
 
