@@ -164,9 +164,9 @@ const leadVendorOptions = [
 "WinBPO",
 "Everest BPO",
 "Riztech BPO",
+"Broker Leads BPO",
 "Alternative BPO",
 "Unified Systems BPO",
-"Broker Leads BPO",
 "Hexa Affiliates"
 ];
 
@@ -1261,6 +1261,79 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
           console.error("Disconnected call notification failed:", disconnectedError);
           // Don't fail the entire process if disconnected notification fails
         }
+      }
+
+      // Send underwriting notification when submission goes to underwriting
+      console.log("DEBUG: Checking underwriting notification conditions:", {
+        applicationSubmitted,
+        sentToUnderwriting,
+        shouldNotify: applicationSubmitted === true && sentToUnderwriting === true
+      });
+      
+      if (applicationSubmitted === true && sentToUnderwriting === true) {
+        console.log("DEBUG: Underwriting notification condition met, proceeding...");
+        try {
+          // First, fetch the lead data for the underwriting notification
+          const { data: leadData, error: leadError } = await supabase
+            .from("leads")
+            .select("*")
+            .eq("submission_id", submissionId)
+            .single();
+
+          console.log("DEBUG: Lead fetch result:", { leadError, hasLeadData: !!leadData });
+
+          if (!leadError && leadData) {
+            const callResultForUnderwriting = {
+              application_submitted: applicationSubmitted,
+              sent_to_underwriting: sentToUnderwriting,
+              status: finalStatus,
+              carrier: carrier || null,
+              product_type: productType || null,
+              draft_date: draftDate ? format(draftDate, "yyyy-MM-dd") : null,
+              monthly_premium: monthlyPremium ? parseFloat(monthlyPremium) : null,
+              face_amount: coverageAmount ? parseFloat(coverageAmount) : null,
+              notes: notes,
+              buffer_agent: bufferAgent,
+              agent_who_took_call: agentWhoTookCall,
+              lead_vendor: leadData.lead_vendor || leadVendor || 'N/A',
+              call_source: callSource
+            };
+
+            console.log("DEBUG: Sending underwriting notification with payload:", {
+              submissionId,
+              callResult: callResultForUnderwriting
+            });
+
+            const { data: notificationData, error: underwritingError } = await supabase.functions.invoke('disconnected-call-notification', {
+              body: {
+                submissionId: submissionId,
+                leadData: {
+                  customer_full_name: leadData.customer_full_name,
+                  phone_number: leadData.phone_number,
+                  email: leadData.email,
+                  lead_vendor: leadData.lead_vendor
+                },
+                callResult: callResultForUnderwriting
+              }
+            });
+
+            if (underwritingError) {
+              console.error("ERROR: Failed to send underwriting notification:", underwritingError);
+              console.error("ERROR Details:", JSON.stringify(underwritingError, null, 2));
+              // Don't fail the entire process if underwriting notification fails
+            } else {
+              console.log("SUCCESS: Underwriting notification sent successfully:", notificationData);
+            }
+          } else {
+            console.error("ERROR: Could not fetch lead data for underwriting notification:", leadError);
+          }
+        } catch (underwritingError) {
+          console.error("ERROR: Underwriting notification exception:", underwritingError);
+          console.error("ERROR Stack:", underwritingError?.stack);
+          // Don't fail the entire process if underwriting notification fails
+        }
+      } else {
+        console.log("DEBUG: Underwriting notification skipped - conditions not met");
       }
 
       // Send personal sales portal notification if there's a licensed agent
