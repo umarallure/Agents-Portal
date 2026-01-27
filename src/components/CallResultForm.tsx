@@ -164,9 +164,9 @@ const leadVendorOptions = [
 "WinBPO",
 "Everest BPO",
 "Riztech BPO",
-"Broker Leads BPO",
 "Alternative BPO",
 "Unified Systems BPO",
+"Broker Leads BPO",
 "Hexa Affiliates"
 ];
 
