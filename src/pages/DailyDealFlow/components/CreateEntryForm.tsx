@@ -74,6 +74,7 @@ const leadVendorOptions = [
   "Cutting Edge", "Next Era", "Rock BPO", "Avenue Consultancy",
   "AJ BPO", "Pro Solutions BPO", "Emperor BPO",
   "Networkize",
+  "Lavish BPO",
   "LightVerse BPO",
   "TechPlanet",
   "Leads BPO",

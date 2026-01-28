@@ -123,6 +123,7 @@ export const GridToolbar = ({
     "Benchmark",
     "Poshenee",
     "Plexi",
+    "Lavish BPO",
     "Gigabite",
     "Everline solution",
     "Progressive BPO",

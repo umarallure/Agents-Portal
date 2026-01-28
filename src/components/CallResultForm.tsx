@@ -142,6 +142,7 @@ const leadVendorOptions = [
 "Rock BPO",
 "Avenue Consultancy",
 "AJ BPO",
+"Lavish BPO",
 "Pro Solutions BPO",
 "Emperor BPO",
 "Networkize",

@@ -25,6 +25,7 @@ const leadVendorOptions = [
 "TechPlanet",
 "StratiX BPO",
 "AJ BPO",
+"Lavish BPO",
 "Pro Solutions BPO",
 "Emperor BPO",
 "Benchmark",

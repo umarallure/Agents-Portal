@@ -115,6 +115,7 @@ const leadVendorOptions = [
   "Networkize",
   "LightVerse BPO",
   "StratiX BPO",
+  "Lavish BPO",
   "Leads BPO",
   "Helix BPO",
   "Exito BPO"

@@ -55,6 +55,7 @@ export const WeeklyReports = ({ className }: WeeklyReportsProps) => {
     "Cutting Edge", "Next Era",
     "Rock BPO", "Avenue Consultancy",
     "AJ BPO",
+    "Lavish BPO",
     "TechPlanet",
     "Pro Solutions BPO",
     "Emperor BPO",

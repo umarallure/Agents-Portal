@@ -54,6 +54,7 @@ export const EODReports = ({ className }: EODReportsProps) => {
     "Cutting Edge", "Next Era",
     "Rock BPO", "Avenue Consultancy",
     "AJ BPO",
+    "Lavish BPO",
     "Pro Solutions BPO",
     "Emperor BPO",
     "TechPlanet",

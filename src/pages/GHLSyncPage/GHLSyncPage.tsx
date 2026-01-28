@@ -69,6 +69,7 @@ const GHLSyncPage = () => {
     "Benchmark",
     "Poshenee",
     "Plexi",
+    "Lavish BPO",
     "Gigabite",
     "Everline solution",
     "Progressive BPO",
