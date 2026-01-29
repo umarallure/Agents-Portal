@@ -47,10 +47,12 @@ interface EditableRowProps {
 const bufferAgentOptions = [
     "All Buffer Agents",
     "Justine",
+    "Muhammad Ahmed",
     "Catarina",
     "Elijah K",
     "Brandon Blake Flinchum",
     "Kyla",
+    "Muhammad Ahmed",
     "Laiza Batain",
     "Angelica",
     "Aqib Afridi",
@@ -61,7 +63,7 @@ const bufferAgentOptions = [
 ];
 
 const agentOptions = [
-  "Claudia", "Lydia", "Zack","Tatumn","Angy", "Benjamin","Brandon Blake Flinchum", "Erica","Abdul", "N/A", "Isaac"
+  "Claudia", "Lydia","Muhammad Ahmed", "Zack","Muhammad Ahmed","Tatumn","Angy", "Benjamin","Brandon Blake Flinchum", "Erica","Abdul", "N/A", "Isaac"
 ];
 
 const licensedAccountOptions = [
@@ -74,6 +76,7 @@ const retentionAgentOptions = [
   "Qasim Raja",
   "Hussain Khan",
   "Muhammad Ahmed",
+  "Hammad Rafique",
   "Justin",
   "N/A"
 ];

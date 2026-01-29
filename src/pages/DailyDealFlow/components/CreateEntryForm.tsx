@@ -21,6 +21,7 @@ interface CreateEntryFormProps {
 const bufferAgentOptions = [
     "All Buffer Agents",
     "Justine",
+    "Muhammad Ahmed",
     "Catarina",
     "Kyla",
     "Laiza Batain",
@@ -34,7 +35,7 @@ const bufferAgentOptions = [
 ];
 
 const agentOptions = [
-  "Claudia", "Lydia", "Zack", "Tatumn","Angy","Brandon Blake Flinchum", "Benjamin", "N/A", "Isaac", "Abdul"
+  "Claudia", "Muhammad Ahmed","Lydia", "Zack", "Tatumn","Angy","Brandon Blake Flinchum", "Benjamin", "N/A", "Isaac", "Abdul"
 ];
 
 const licensedAccountOptions = [

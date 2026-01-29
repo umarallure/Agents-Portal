@@ -68,6 +68,7 @@ const productTypeOptions = [
 
 const bufferAgentOptions = [
   "Justine",
+  "Muhammad Ahmed",
   "Catarina",
   "Nicole Mejia",
   "Laiza Batain",
@@ -86,6 +87,7 @@ const bufferAgentOptions = [
 const agentOptions = [
   "Claudia",
   "Lydia",
+  "Muhammad Ahmed",
   "Zack",
   "Tatumn",
   "Benjamin",
