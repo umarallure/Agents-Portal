@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getTodayDateEST, getCurrentDateEST } from "@/lib/dateUtils";
+import { useLeadVendors } from "@/hooks/useLeadVendors";
 
 interface CreateEntryFormProps {
   onSuccess: () => void;
@@ -66,33 +67,6 @@ const callResultOptions = [
   "Submitted", "Underwriting", "Not Submitted"
 ];
 
-const leadVendorOptions = [
-  "Ark Tech", "GrowthOnics BPO", "Maverick", "Omnitalk BPO", "Vize BPO",
-  "Corebiz", "Digicon", "Ambition", "Benchmark", "Poshenee", "Plexi",
-  "Gigabite", "Everline solution", "Progressive BPO", "Cerberus BPO",
-  "NanoTech", "Optimum BPO", "Ethos BPO", "Trust Link", "Crown Connect BPO",
-  "Quotes BPO", "Zupax Marketing", "Argon Comm", "Care Solutions",
-  "Cutting Edge", "Next Era", "Rock BPO", "Avenue Consultancy",
-  "AJ BPO", "Pro Solutions BPO", "Emperor BPO",
-  "Networkize",
-  "Lavish BPO",
-  "LightVerse BPO",
-  "TechPlanet",
-  "Leads BPO",
-  "StratiX BPO",
-  "Helix BPO",
-  "Exito BPO",
-  "Lumenix BPO",
-  "All-Star BPO",
-  "DownTown BPO",
-  "Livik BPO",
-  "NexGen BPO",
-  "Quoted-Leads BPO",
-  "SellerZ BPO",
-  "Venom BPO",
-  "WinBPO"
-];
-
 // Function to generate unique CB submission ID
 const generateCBSubmissionId = (): string => {
   const timestamp = Date.now().toString().slice(-8); // Last 8 digits of timestamp
@@ -104,6 +78,7 @@ export const CreateEntryForm = ({ onSuccess }: CreateEntryFormProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { vendorNames: leadVendorOptions, loading: vendorsLoading, error: vendorsError } = useLeadVendors();
 
   // Form state - Initialize with today's date and generated submission ID
   const [formData, setFormData] = useState(() => {
@@ -335,9 +310,10 @@ export const CreateEntryForm = ({ onSuccess }: CreateEntryFormProps) => {
                 <Select
                   value={formData.lead_vendor}
                   onValueChange={(value) => updateField('lead_vendor', value)}
+                  disabled={vendorsLoading}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select lead vendor" />
+                    <SelectValue placeholder={vendorsLoading ? "Loading vendors..." : "Select lead vendor"} />
                   </SelectTrigger>
                   <SelectContent>
                     {leadVendorOptions.map((vendor) => (
@@ -347,6 +323,9 @@ export const CreateEntryForm = ({ onSuccess }: CreateEntryFormProps) => {
                     ))}
                   </SelectContent>
                 </Select>
+                {vendorsError && (
+                  <p className="text-sm text-red-500 mt-1">Failed to load vendors</p>
+                )}
               </div>
 
               {/* Customer Name */}

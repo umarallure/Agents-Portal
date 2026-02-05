@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Check, X, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useLeadVendors } from '@/hooks/useLeadVendors';
 
 export interface DailyDealFlowRecord {
   id: string;
@@ -98,10 +99,6 @@ const CALL_RESULT_OPTIONS = [
   "Submitted", "Underwriting", "Not Submitted"
 ];
 
-const LEAD_VENDOR_OPTIONS = [
-  "LeadsMarket", "Media Alpha", "QuoteWizard", "SelectQuote", "SeniorQuote", "N/A"
-];
-
 const LEVEL_OR_GI_OPTIONS = [
   "Level", "GI", "ROP", "N/A"
 ];
@@ -116,6 +113,7 @@ export const EditableRow: React.FC<EditableRowProps> = ({
   isSaving = false
 }) => {
   const [editData, setEditData] = useState<Partial<DailyDealFlowRecord>>({});
+  const { vendorNames: leadVendorOptions, loading: vendorsLoading } = useLeadVendors();
 
   useEffect(() => {
     if (isEditing) {

@@ -12,61 +12,12 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentTimestampEST, formatDateToEST } from "@/lib/dateUtils";
-
-const leadVendorOptions = [
-"Ark Tech",
-"GrowthOnics BPO",
-"Maverick",
-"Omnitalk BPO",
-"Vize BPO",
-"Corebiz",
-"Digicon",
-"Ambition",
-"TechPlanet",
-"StratiX BPO",
-"AJ BPO",
-"Lavish BPO",
-"Pro Solutions BPO",
-"Emperor BPO",
-"Benchmark",
-"Poshenee",
-"Plexi",
-"Gigabite",
-"Everline solution",
-"Progressive BPO",
-"Cerberus BPO",
-"NanoTech",
-"Optimum BPO",
-"Ethos BPO",
-"Trust Link",
-"Quotes BPO",
-"Zupax Marketing",
-"Argon Comm",
-"Care Solutions",
-"Crown Connect BPO",
-"Cutting Edge",
-"Next Era",
-"Rock BPO",
-"Avenue Consultancy",
-"Networkize",
-"LightVerse BPO",
-"Leads BPO",
-"Helix BPO",
-"Exito BPO",
-"Lumenix BPO",
-"All-Star BPO",
-"DownTown BPO",
-"Livik BPO",
-"NexGen BPO",
-"Quoted-Leads BPO",
-"SellerZ BPO",
-"Venom BPO",
-"WinBPO"
-];
+import { useLeadVendors } from "@/hooks/useLeadVendors";
 
 const NewCallback = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { vendorNames: leadVendorOptions, loading: vendorsLoading } = useLeadVendors();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state
@@ -218,9 +169,9 @@ const NewCallback = () => {
 
                   <div className="md:col-span-2">
                     <Label htmlFor="leadVendor">Lead Vendor *</Label>
-                    <Select value={leadVendor} onValueChange={setLeadVendor} required>
+                    <Select value={leadVendor} onValueChange={setLeadVendor} required disabled={vendorsLoading}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select lead vendor" />
+                        <SelectValue placeholder={vendorsLoading ? "Loading vendors..." : "Select lead vendor"} />
                       </SelectTrigger>
                       <SelectContent>
                         {leadVendorOptions.map((vendor) => (

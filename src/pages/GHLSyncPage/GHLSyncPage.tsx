@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useLeadVendors } from "@/hooks/useLeadVendors";
 
 export interface GHLSyncRow {
   id: string;
@@ -49,59 +50,9 @@ const GHLSyncPage = () => {
   // Special constant to represent "All" selections (cannot use empty string with Radix UI)
   const ALL_OPTION = "__ALL__";
 
-  // Filter options (these should match your database values)
-  const leadVendorOptions = [
-    "All Lead Vendors",
-    "Ark Tech",
-    "GrowthOnics BPO",
-    "Maverick",
-    "Omnitalk BPO",
-    "Vize BPO",
-    "Corebiz",
-    "Digicon",
-    "Ambition",
-    "TechPlanet",
-    "StratiX BPO",
-    "Argon Comm",
-    "AJ BPO",
-    "Pro Solutions BPO",
-    "Emperor BPO",
-    "Benchmark",
-    "Poshenee",
-    "Plexi",
-    "Lavish BPO",
-    "Gigabite",
-    "Everline solution",
-    "Progressive BPO",
-    "Cerberus BPO",
-    "NanoTech",
-    "Optimum BPO",
-    "Ethos BPO",
-    "Trust Link",
-    "Crown Connect BPO",
-    "Quotes BPO",
-    "Zupax Marketing",
-    "Argon Communications",
-    "Care Solutions",
-    "Cutting Edge",
-    "Next Era",
-    "Rock BPO",
-    "Avenue Consultancy",
-    "Networkize",
-    "LightVerse BPO",
-    "Leads BPO",
-    "Helix BPO",
-    "Exito BPO",
-    "Lumenix BPO",
-    "All-Star BPO",
-    "DownTown BPO",
-    "Livik BPO",
-    "NexGen BPO",
-    "Quoted-Leads BPO",
-    "SellerZ BPO",
-    "Venom BPO",
-    "WinBPO"
-  ];
+  // Use dynamic lead vendors from database
+  const { vendorNames, loading: vendorsLoading } = useLeadVendors();
+  const leadVendorOptions = ["All Lead Vendors", ...vendorNames];
 
   const statusOptions = [
     "All Statuses",
@@ -361,9 +312,9 @@ const GHLSyncPage = () => {
                     Lead Vendor
                     {leadVendorFilter && leadVendorFilter !== ALL_OPTION && <span className="text-blue-600 ml-1">●</span>}
                   </Label>
-                  <Select value={leadVendorFilter || ALL_OPTION} onValueChange={setLeadVendorFilter}>
+                  <Select value={leadVendorFilter || ALL_OPTION} onValueChange={setLeadVendorFilter} disabled={vendorsLoading}>
                     <SelectTrigger className={cn("mt-1", leadVendorFilter && leadVendorFilter !== ALL_OPTION && "ring-2 ring-blue-200")}>
-                      <SelectValue placeholder="All Lead Vendors" />
+                      <SelectValue placeholder={vendorsLoading ? "Loading vendors..." : "All Lead Vendors"} />
                     </SelectTrigger>
                     <SelectContent>
                       {leadVendorOptions.map((vendor) => (

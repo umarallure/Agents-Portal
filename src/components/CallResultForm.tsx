@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import { CalendarIcon, CheckCircle, XCircle, Loader2, Shield, Wrench, Copy, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useLeadVendors } from "@/hooks/useLeadVendors";
 import { getTodayDateEST, getCurrentTimestampEST, formatDateESTLocale } from "@/lib/dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { logCallUpdate, getLeadInfo } from "@/lib/callLogging";
@@ -112,65 +113,6 @@ const licensedAccountOptions = [
   "Tatumn",
   "Noah",
   "N/A"
-];
-
-const leadVendorOptions = [
-"Ark Tech",
-"GrowthOnics BPO",
-"Maverick",
-"Omnitalk BPO",
-"Vize BPO",
-"Corebiz",
-"Digicon",
-"Ambition",
-"Benchmark",
-"Poshenee",
-"Plexi",
-"Gigabite",
-"Everline solution",
-"Progressive BPO",
-"Cerberus BPO",
-"NanoTech",
-"Optimum BPO",
-"Ethos BPO",
-"Trust Link",
-"Crown Connect BPO",
-"Quotes BPO",
-"Zupax Marketing",
-"Argon Comm",
-"Care Solutions",
-"Cutting Edge",
-"Next Era",
-"Rock BPO",
-"Avenue Consultancy",
-"AJ BPO",
-"Lavish BPO",
-"Pro Solutions BPO",
-"Emperor BPO",
-"Networkize",
-"LightVerse BPO",
-"Leads BPO",
-"Helix BPO",
-"CrossNotch",
-"StratiX BPO",
-"Exito BPO",
-"Lumenix BPO",
-"All-Star BPO",
-"DownTown BPO",
-"TechPlanet",
-"Livik BPO",
-"NexGen BPO",
-"Quoted-Leads BPO",
-"SellerZ BPO",
-"Venom BPO",
-"Core Marketing",
-"WinBPO",
-"Everest BPO",
-"Riztech BPO",
-"Broker Leads BPO",
-"Alternative BPO",
-"Unified Systems BPO",
-"Hexa Affiliates"
 ];
 
 const dqReasonOptions = [
@@ -309,31 +251,9 @@ const generateCallbackSubmissionId = (originalSubmissionId: string): string => {
   return `CBB${randomDigits}${originalSubmissionId}`;
 };
 
-// Lead vendor to DID mapping for GI - Currently DQ transfers
-const leadVendorDIDMapping: { [key: string]: string } = {
-  "AJ BPO": "Contact AJ BPO",
-  "Ambition": "8036808613",
-  "Argon Comm": "Contact Argon Comm",
-  "Avenue Consultancy": "3465896057",
-  "Corebiz": "Contact Corebiz",
-  "CrossNotch": "9298101908",
-  "Crown Connect BPO": "Contact Crown Connect BPO",
-  "DownTown BPO": "Contact DownTown BPO",
-  "Exito BPO": "Contact Exito BPO",
-  "Leads BPO": "Contact Leads BPO",
-  "NanoTech": "4696296367",
-  "Rock BPO": "9182486011",
-  "SellerZ BPO": "9086641503",
-  "StratiX BPO": "7273545717",
-  "TechPlanet": "+1 (833) 817-1810",
-  "Quoted-Leads BPO": "12179961427",
-  "WinBPO": "+12163009420",
-  "Zupax Marketing": "Contact Zupax Marketing"
-};
-
-// Function to get DID for lead vendor
-const getLeadVendorDID = (leadVendor: string): string | null => {
-  return leadVendorDIDMapping[leadVendor] || null;
+// Function to get DID for lead vendor - now uses dynamic mapping from hook
+const getLeadVendorDID = (leadVendor: string, didMapping: Record<string, string>): string | null => {
+  return didMapping[leadVendor] || null;
 };
 
 // Function to check if entry exists and get its date
@@ -466,6 +386,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
   const [showAppFixForm, setShowAppFixForm] = useState(false);
   
   const { toast } = useToast();
+  const { vendorNames, didMapping, loading: vendorsLoading, error: vendorsError } = useLeadVendors();
 
   // Load existing call result data
   useEffect(() => {
@@ -668,7 +589,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
   
   // Show DID warning for GI - Currently DQ status
   const showDIDWarning = applicationSubmitted === false && status === "GI - Currently DQ" && leadVendor;
-  const vendorDID = leadVendor ? getLeadVendorDID(leadVendor) : null;
+  const vendorDID = leadVendor ? getLeadVendorDID(leadVendor, didMapping) : null;
 
   const handleCopyDID = () => {
     if (vendorDID) {
@@ -1713,18 +1634,21 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
 
                 <div>
                   <Label htmlFor="leadVendor">Lead Vendor</Label>
-                  <Select value={leadVendor} onValueChange={setLeadVendor}>
+                  <Select value={leadVendor} onValueChange={setLeadVendor} disabled={vendorsLoading}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select lead vendor" />
+                      <SelectValue placeholder={vendorsLoading ? "Loading vendors..." : "Select lead vendor"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {leadVendorOptions.map((vendor) => (
+                      {vendorNames.map((vendor) => (
                         <SelectItem key={vendor} value={vendor}>
                           {vendor}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {vendorsError && (
+                    <p className="text-sm text-red-500 mt-1">Failed to load vendors</p>
+                  )}
                 </div>
 
                 <div>

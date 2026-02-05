@@ -15,6 +15,7 @@ import { DailyDealFlowRow } from "../DailyDealFlowPage";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentTimestampEST } from "@/lib/dateUtils";
+import { useLeadVendors } from "@/hooks/useLeadVendors";
 
 // Helper function to create Date object from YYYY-MM-DD string without timezone conversion
 const createDateFromString = (dateString: string): Date => {
@@ -107,23 +108,6 @@ const callResultOptions = [
   "Submitted", "Underwriting", "Not Submitted"
 ];
 
-const leadVendorOptions = [
-  "Ark Tech", "GrowthOnics BPO", "Maverick", "Omnitalk BPO", "Vize BPO",
-  "Corebiz", "Digicon", "Ambition", "Benchmark", "Poshenee", "Plexi",
-  "Gigabite", "Everline solution", "Progressive BPO", "Cerberus BPO",
-  "NanoTech", "Optimum BPO", "Ethos BPO", "Trust Link", "Crown Connect BPO",
-  "Quotes BPO", "Zupax Marketing", "Argon Communications", "Care Solutions",
-  "Cutting Edge", "Next Era", "Rock BPO", "Avenue Consultancy",
-  "AJ BPO", "Pro Solutions BPO", "Emperor BPO",
-  "Networkize",
-  "LightVerse BPO",
-  "StratiX BPO",
-  "Lavish BPO",
-  "Leads BPO",
-  "Helix BPO",
-  "Exito BPO"
-];
-
 export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePermissions = true, isDuplicate = false }: EditableRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<DailyDealFlowRow>(row);
@@ -132,6 +116,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
   const [isDeleting, setIsDeleting] = useState(false);
   const prevRowId = useRef(row.id);
   const { toast } = useToast();
+  const { vendorNames: leadVendorOptions, loading: vendorsLoading } = useLeadVendors();
 
   // Reset edit state when dialog closes
   useEffect(() => {
@@ -540,9 +525,10 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
                 <Select
                   value={editData.lead_vendor || ''}
                   onValueChange={(value) => updateField('lead_vendor', value)}
+                  disabled={vendorsLoading}
                 >
                   <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select vendor" />
+                    <SelectValue placeholder={vendorsLoading ? "Loading..." : "Select vendor"} />
                   </SelectTrigger>
                   <SelectContent>
                     {leadVendorOptions.map(option => (
@@ -1044,9 +1030,10 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
             <Select
               value={editData.lead_vendor || ''}
               onValueChange={(value) => updateField('lead_vendor', value)}
+              disabled={vendorsLoading}
             >
               <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Vendor" />
+                <SelectValue placeholder={vendorsLoading ? "..." : "Vendor"} />
               </SelectTrigger>
               <SelectContent>
                 {leadVendorOptions.map(option => (
