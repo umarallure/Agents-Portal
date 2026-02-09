@@ -47,6 +47,7 @@ const carrierOptions = [
   "Aflac",
   "Transamerica",
   "RNA",
+  "Sentinel Security Life",
   "AMAM",
   "GTL",
   "Aetna",
@@ -60,6 +61,9 @@ const productTypeOptions = [
   "Standard",
   "Graded",
   "Modified",
+  "New Vantage I (Preferred)",
+  "New Vantage II (Graded)",
+  "New Vantage III (Modified)",
   "GI",
   "Immediate",
   "Level",
@@ -154,7 +158,7 @@ const fulfilledCarrierReasonOptions = [
 
 const getReasonOptions = (status: string) => {
   switch (status) {
-    case "⁠DQ":
+    case "DQ":
     case "Chargeback DQ":
       return dqReasonOptions;
     case "Needs callback":
@@ -192,18 +196,33 @@ const mapStatusToSheetValue = (userSelectedStatus: string) => {
 };
 
 // Helper function to format dates in New York timezone format (MM/DD/YYYY)
+// This function handles dates from the calendar picker which returns dates at midnight UTC
 const formatDateNewYork = (date: Date): string => {
-  return date.toLocaleDateString('en-US', {
-    timeZone: 'America/New_York',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  });
+  // Calendar picker returns dates at midnight UTC
+  // We need to add the NY timezone offset to get the correct local date
+  // NY is UTC-5 (EST) or UTC-4 (EDT during DST)
+  const isDST = (d: Date) => {
+    const year = d.getFullYear();
+    const marchSecondSunday = new Date(year, 2, 1);
+    marchSecondSunday.setDate(1 + (7 - marchSecondSunday.getDay()) + 7);
+    const novemberFirstSunday = new Date(year, 10, 1);
+    novemberFirstSunday.setDate(1 + (7 - novemberFirstSunday.getDay()) % 7);
+    return d >= marchSecondSunday && d < novemberFirstSunday;
+  };
+  
+  const nyOffsetHours = isDST(date) ? 4 : 5; // Offset to add (NY is behind UTC)
+  const adjustedDate = new Date(date.getTime() + (nyOffsetHours * 60 * 60 * 1000));
+  
+  const year = adjustedDate.getUTCFullYear();
+  const month = String(adjustedDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(adjustedDate.getUTCDate()).padStart(2, '0');
+  
+  return `${month}/${day}/${year}`;
 };
 
 const getNoteText = (status: string, reason: string, clientName: string = "[Client Name]", newDraftDate?: Date) => {
   const statusReasonMapping: { [status: string]: { [reason: string]: string } } = {
-    "⁠DQ": {
+    "DQ": {
       "Multiple Chargebacks": `${clientName} has been DQ'd. They have caused multiple chargebacks in our agency, so we cannot submit another application for them`,
       "Not Cognatively Functional": `${clientName} has been DQ'd. They are not mentally able to make financial decisions. We cannot submit an application for them`,
       "Transferred Many Times Without Success": `We have spoken with ${clientName} more than 5 times and have not been able to successfully submit an application. We should move on from this caller`,
@@ -334,7 +353,7 @@ const generateSubmittedApplicationNotes = (
 
   // --- Carrier-specific commission rules as the final point ---
   let commissionNote = "";
-  if (/aetna/i.test(carrier) || /corebridge/i.test(carrier)) {
+  if (/aetna/i.test(carrier) || /corebridge/i.test(carrier) || /sentinel/i.test(carrier) || /aflac/i.test(carrier)) {
     commissionNote = "8. Commissions from this carrier are paid after the first successful draft";
   } else if (/cica/i.test(carrier)) {
     commissionNote = "8. Commissions from this carrier are paid 10-14 days after first successful draft";
