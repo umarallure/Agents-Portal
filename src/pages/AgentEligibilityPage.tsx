@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { NavigationHeader } from '@/components/NavigationHeader';
 import AetnaStateAvailabilityManager from '@/components/AetnaStateAvailabilityManager';
+import AflacStateAvailabilityManager from '@/components/AflacStateAvailabilityManager';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -105,12 +106,11 @@ export function AgentEligibilityPage() {
   const fetchAgents = async () => {
     setAgentsLoading(true);
     try {
-      // Fetch all agents who have agent_status records (buffer or licensed types)
-      // This is more reliable than checking license tables which may be empty for new agents
+      // Fetch only licensed agents from agent_status
       const { data: agentStatus, error: statusError } = await supabase
         .from('agent_status')
         .select('user_id, agent_type')
-        .in('agent_type', ['buffer', 'licensed']);
+        .eq('agent_type', 'licensed');
 
       if (statusError) throw statusError;
 
@@ -534,14 +534,22 @@ export function AgentEligibilityPage() {
         throw new Error('Invalid carrier or state selection');
       }
 
-      // Check if the carrier is Aetna - use special function for Aetna
+      // Check if the carrier is Aetna or Aflac - use special function for these carriers
       const isAetna = carrierObj.carrier_name.toLowerCase() === 'aetna';
+      const isAflac = carrierObj.carrier_name.toLowerCase() === 'aflac';
       
       let data, error;
       
       if (isAetna) {
         // Use Aetna-specific function
         const result = await supabase.rpc('get_eligible_agents_for_aetna' as any, {
+          p_state_name: stateObj.state_name
+        });
+        data = result.data;
+        error = result.error;
+      } else if (isAflac) {
+        // Use Aflac-specific function
+        const result = await supabase.rpc('get_eligible_agents_for_aflac' as any, {
           p_state_name: stateObj.state_name
         });
         data = result.data;
@@ -567,12 +575,14 @@ export function AgentEligibilityPage() {
           title: "No Eligible Agents",
           description: isAetna 
             ? `No agents are available for Aetna in ${stateObj.state_name} (requires upline approval and custom state availability)`
+            : isAflac
+            ? `No agents are available for Aflac in ${stateObj.state_name} (requires upline approval and custom state availability)`
             : `No agents found who are licensed for ${carrierObj.carrier_name} in ${stateObj.state_name}`,
         });
       } else {
         toast({
           title: "Search Complete",
-          description: `Found ${agentsList.length} eligible agent(s)${isAetna ? ' (Aetna requires upline licensing)' : ''}`,
+          description: `Found ${agentsList.length} eligible agent(s)${isAetna ? ' (Aetna requires upline licensing)' : isAflac ? ' (Aflac requires upline licensing)' : ''}`,
         });
       }
     } catch (error: any) {
@@ -666,6 +676,17 @@ export function AgentEligibilityPage() {
                     <AlertTitle className="text-blue-800">Aetna Special Requirements</AlertTitle>
                     <AlertDescription className="text-blue-700">
                       Aetna uses a separate state availability system with custom per-agent approvals. All 52 US states/territories require upline license verification. Results will show agents based on their individual Aetna state availability settings.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Aflac Special Notice */}
+                {selectedCarrier && carriers.find(c => c.id === selectedCarrier)?.carrier_name.toLowerCase() === 'aflac' && (
+                  <Alert className="bg-green-50 border-green-200">
+                    <Info className="h-4 w-4 text-green-600" />
+                    <AlertTitle className="text-green-800">Aflac Special Requirements</AlertTitle>
+                    <AlertDescription className="text-green-700">
+                      Aflac uses a separate state availability system with custom per-agent approvals. All 52 US states/territories require upline license verification. Results will show agents based on their individual Aflac state availability settings.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -841,7 +862,7 @@ export function AgentEligibilityPage() {
           {/* Eligibility Management */}
           {selectedAgentId && !loading && (
             <Tabs defaultValue="carriers" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="carriers" className="flex items-center gap-2">
                   <Building2 className="h-4 w-4" />
                   Carriers ({getCarrierStats().licensed}/{getCarrierStats().total})
@@ -854,9 +875,13 @@ export function AgentEligibilityPage() {
                   <MapPin className="h-4 w-4 text-blue-600" />
                   Aetna States
                 </TabsTrigger>
+                <TabsTrigger value="aflac" className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-green-600" />
+                  Aflac States
+                </TabsTrigger>
                 <TabsTrigger value="overrides" className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4" />
-                  Upline Requirements ({overrideStates.length})
+                  Upline ({overrideStates.length})
                 </TabsTrigger>
               </TabsList>
 
@@ -1122,20 +1147,12 @@ export function AgentEligibilityPage() {
 
               {/* Aetna States Tab */}
               <TabsContent value="aetna" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MapPin className="h-5 w-5 text-blue-600" />
-                      Aetna State Availability Management
-                    </CardTitle>
-                    <CardDescription>
-                      Manage agent-specific Aetna state availability. This is separate from general state licensing.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <AetnaStateAvailabilityManager />
-                  </CardContent>
-                </Card>
+                <AetnaStateAvailabilityManager />
+              </TabsContent>
+
+              {/* Aflac States Tab */}
+              <TabsContent value="aflac" className="space-y-4">
+                <AflacStateAvailabilityManager />
               </TabsContent>
             </Tabs>
           )}

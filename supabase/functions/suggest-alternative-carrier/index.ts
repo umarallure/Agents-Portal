@@ -71,21 +71,22 @@ serve(async (req) => {
 
     console.log(`[INFO] Found state: ${stateData.state_name} (ID: ${stateData.id})`);
 
-    // Step 2: Check if state is "Aetna" to use special Aetna logic
+    // Step 2: Check if original carrier is "Aetna" or "Aflac" to use special logic
     const isAetnaQuery = original_carrier?.toLowerCase() === 'aetna';
+    const isAflacQuery = original_carrier?.toLowerCase() === 'aflac';
 
     let carrierSuggestions: CarrierSuggestion[] = [];
 
-    if (isAetnaQuery) {
-      console.log('[INFO] Using Aetna-specific query for alternative carriers');
+    if (isAetnaQuery || isAflacQuery) {
+      console.log(`[INFO] Using ${isAetnaQuery ? 'Aetna' : 'Aflac'}-specific query for alternative carriers`);
       
-      // For Aetna, we need to check aetna_agent_state_availability table
+      // For Aetna/Aflac, we need to check their special state availability tables
       // But since user wants alternatives, we'll look at regular carriers
-      // Get all carriers except Aetna
+      // Get all carriers except the original one
       const { data: carriers, error: carriersError } = await supabase
         .from('carriers')
         .select('id, name')
-        .neq('name', 'Aetna');
+        .neq('name', isAetnaQuery ? 'Aetna' : 'Aflac');
 
       if (carriersError || !carriers) {
         console.error('[ERROR] Failed to fetch carriers:', carriersError);
@@ -139,6 +140,15 @@ serve(async (req) => {
           // Use Aetna-specific function
           const result = await supabase
             .rpc('get_eligible_agents_for_aetna', {
+              p_state_name: stateData.state_name
+            });
+          
+          eligibleAgents = result.data || [];
+          agentsError = result.error;
+        } else if (carrier.name.toLowerCase() === 'aflac') {
+          // Use Aflac-specific function
+          const result = await supabase
+            .rpc('get_eligible_agents_for_aflac', {
               p_state_name: stateData.state_name
             });
           

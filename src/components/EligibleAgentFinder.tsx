@@ -97,8 +97,9 @@ export default function EligibleAgentFinder() {
     setLoading(true);
     setHasSearched(true);
     try {
-      // Check if the carrier is Aetna - use special function for Aetna
+      // Check if the carrier is Aetna or Aflac - use special function for these carriers
       const isAetna = carrierName.toLowerCase() === 'aetna';
+      const isAflac = carrierName.toLowerCase() === 'aflac';
       
       let data, error;
       
@@ -106,6 +107,14 @@ export default function EligibleAgentFinder() {
         // Use Aetna-specific function
         const result = await supabase
           .rpc('get_eligible_agents_for_aetna' as any, {
+            p_state_name: stateName
+          });
+        data = result.data;
+        error = result.error;
+      } else if (isAflac) {
+        // Use Aflac-specific function
+        const result = await supabase
+          .rpc('get_eligible_agents_for_aflac' as any, {
             p_state_name: stateName
           });
         data = result.data;
@@ -131,13 +140,15 @@ export default function EligibleAgentFinder() {
           title: 'No Eligible Agents Found',
           description: isAetna 
             ? `No agents are available for Aetna in ${stateName} (requires upline approval).`
+            : isAflac
+            ? `No agents are available for Aflac in ${stateName} (requires upline approval).`
             : `No agents are licensed for ${carrierName} in ${stateName}.`,
           variant: 'default'
         });
       } else {
         toast({
           title: 'Search Complete',
-          description: `Found ${agentsList.length} eligible agent(s).${isAetna ? ' (Aetna requires upline licensing)' : ''}`,
+          description: `Found ${agentsList.length} eligible agent(s).${isAetna ? ' (Aetna requires upline licensing)' : isAflac ? ' (Aflac requires upline licensing)' : ''}`,
         });
       }
     } catch (error) {
@@ -205,6 +216,16 @@ export default function EligibleAgentFinder() {
               <CheckCircle2 className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-blue-800">
                 <strong>Aetna Special Requirements:</strong> This carrier uses a separate state availability system. All 52 US states/territories require upline license verification with custom per-agent state approvals.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Aflac Special Notice */}
+          {carrierName.toLowerCase() === 'aflac' && (
+            <Alert className="bg-green-50 border-green-200">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
+                <strong>Aflac Special Requirements:</strong> This carrier uses a separate state availability system. All 52 US states/territories require upline license verification with custom per-agent state approvals.
               </AlertDescription>
             </Alert>
           )}

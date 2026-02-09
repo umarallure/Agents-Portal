@@ -17,7 +17,7 @@ interface Agent {
   email: string;
 }
 
-interface AetnaStateAvailability {
+interface AflacStateAvailability {
   state_name: string;
   state_code: string;
   is_available: boolean;
@@ -80,7 +80,7 @@ const ALL_STATES = [
   { name: 'Wyoming', code: 'WY' }
 ];
 
-export default function AetnaStateAvailabilityManager() {
+export default function AflacStateAvailabilityManager() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -88,7 +88,7 @@ export default function AetnaStateAvailabilityManager() {
   
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
-  const [hasAetnaLicense, setHasAetnaLicense] = useState(false);
+  const [hasAflacLicense, setHasAflacLicense] = useState(false);
   const [stateAvailability, setStateAvailability] = useState<Map<string, boolean>>(new Map());
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -98,8 +98,8 @@ export default function AetnaStateAvailabilityManager() {
 
   useEffect(() => {
     if (selectedAgentId) {
-      checkAetnaLicense(selectedAgentId);
-      fetchAetnaStateAvailability(selectedAgentId);
+      checkAflacLicense(selectedAgentId);
+      fetchAflacStateAvailability(selectedAgentId);
     }
   }, [selectedAgentId]);
 
@@ -150,43 +150,43 @@ export default function AetnaStateAvailabilityManager() {
     }
   };
 
-  const checkAetnaLicense = async (agentUserId: string) => {
+  const checkAflacLicense = async (agentUserId: string) => {
     setCheckingLicense(true);
     try {
       const { data, error } = await supabase
         .from('agent_carrier_licenses')
         .select('is_licensed, carriers!inner(carrier_name)')
         .eq('agent_user_id', agentUserId)
-        .eq('carriers.carrier_name', 'Aetna')
+        .eq('carriers.carrier_name', 'Aflac')
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
-      setHasAetnaLicense(data?.is_licensed || false);
+      setHasAflacLicense(data?.is_licensed || false);
     } catch (error) {
-      console.error('Error checking Aetna license:', error);
-      setHasAetnaLicense(false);
+      console.error('Error checking Aflac license:', error);
+      setHasAflacLicense(false);
     } finally {
       setCheckingLicense(false);
     }
   };
 
-  const fetchAetnaStateAvailability = async (agentUserId: string) => {
+  const fetchAflacStateAvailability = async (agentUserId: string) => {
     try {
       const { data, error } = await supabase
-        .from('aetna_agent_state_availability')
+        .from('aflac_agent_state_availability' as any)
         .select('state_name, state_code, is_available')
         .eq('agent_user_id', agentUserId);
 
       if (error) throw error;
 
       const availabilityMap = new Map<string, boolean>();
-      data?.forEach(item => {
+      data?.forEach((item: any) => {
         availabilityMap.set(item.state_name, item.is_available);
       });
       setStateAvailability(availabilityMap);
       setHasChanges(false);
     } catch (error) {
-      console.error('Error fetching Aetna state availability:', error);
+      console.error('Error fetching Aflac state availability:', error);
       setStateAvailability(new Map());
     }
   };
@@ -208,21 +208,21 @@ export default function AetnaStateAvailabilityManager() {
     setHasChanges(true);
   };
 
-  const enableAetnaLicense = async () => {
+  const enableAflacLicense = async () => {
     if (!selectedAgentId) return;
     
     setSaving(true);
     try {
-      // Get Aetna carrier ID
+      // Get Aflac carrier ID
       const { data: carrierData, error: carrierError } = await supabase
         .from('carriers')
         .select('id')
-        .eq('carrier_name', 'Aetna')
+        .eq('carrier_name', 'Aflac')
         .single();
 
       if (carrierError) throw carrierError;
 
-      // Insert or update Aetna carrier license
+      // Insert or update Aflac carrier license
       const { error } = await supabase
         .from('agent_carrier_licenses')
         .upsert({
@@ -235,16 +235,16 @@ export default function AetnaStateAvailabilityManager() {
 
       if (error) throw error;
 
-      setHasAetnaLicense(true);
+      setHasAflacLicense(true);
       toast({
         title: 'Success',
-        description: 'Aetna carrier license enabled.',
+        description: 'Aflac carrier license enabled.',
       });
     } catch (error) {
-      console.error('Error enabling Aetna license:', error);
+      console.error('Error enabling Aflac license:', error);
       toast({
         title: 'Error',
-        description: 'Failed to enable Aetna license.',
+        description: 'Failed to enable Aflac license.',
         variant: 'destructive'
       });
     } finally {
@@ -253,10 +253,10 @@ export default function AetnaStateAvailabilityManager() {
   };
 
   const saveChanges = async () => {
-    if (!selectedAgentId || !hasAetnaLicense) {
+    if (!selectedAgentId || !hasAflacLicense) {
       toast({
         title: 'Error',
-        description: 'Agent must have Aetna carrier license first.',
+        description: 'Agent must have Aflac carrier license first.',
         variant: 'destructive'
       });
       return;
@@ -282,7 +282,7 @@ export default function AetnaStateAvailabilityManager() {
 
       // Batch upsert all records
       const { error } = await supabase
-        .from('aetna_agent_state_availability')
+        .from('aflac_agent_state_availability' as any)
         .upsert(records, {
           onConflict: 'agent_user_id,state_name'
         });
@@ -292,11 +292,11 @@ export default function AetnaStateAvailabilityManager() {
       setHasChanges(false);
       toast({
         title: 'Success',
-        description: `Aetna state availability updated for all ${ALL_STATES.length} states.`,
+        description: `Aflac state availability updated for all ${ALL_STATES.length} states.`,
       });
 
       // Refresh data
-      await fetchAetnaStateAvailability(selectedAgentId);
+      await fetchAflacStateAvailability(selectedAgentId);
     } catch (error) {
       console.error('Error saving state availability:', error);
       toast({
@@ -334,11 +334,11 @@ export default function AetnaStateAvailabilityManager() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-blue-600" />
-            Aetna State Availability Manager
+            <MapPin className="h-5 w-5 text-green-600" />
+            Aflac State Availability Manager
           </CardTitle>
           <CardDescription>
-            Manage agent-specific state availability for Aetna carrier (requires upline licensing for all 52 states)
+            Manage agent-specific state availability for Aflac carrier (requires upline licensing for all 52 states)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -376,15 +376,15 @@ export default function AetnaStateAvailabilityManager() {
                       <Loader2 className="h-3 w-3 animate-spin" />
                       Checking...
                     </Badge>
-                  ) : hasAetnaLicense ? (
+                  ) : hasAflacLicense ? (
                     <Badge variant="default" className="flex items-center gap-1 bg-green-600">
                       <CheckCircle2 className="h-3 w-3" />
-                      Aetna Licensed
+                      Aflac Licensed
                     </Badge>
                   ) : (
                     <Badge variant="destructive" className="flex items-center gap-1">
                       <AlertCircle className="h-3 w-3" />
-                      No Aetna License
+                      No Aflac License
                     </Badge>
                   )}
                   <Badge variant="secondary" className="flex items-center gap-1">
@@ -395,15 +395,15 @@ export default function AetnaStateAvailabilityManager() {
               </div>
 
               {/* License Warning */}
-              {!hasAetnaLicense && (
+              {!hasAflacLicense && (
                 <Alert className="bg-orange-50 border-orange-200">
                   <AlertCircle className="h-4 w-4 text-orange-600" />
                   <AlertDescription className="text-orange-800">
                     <div className="flex items-center justify-between">
-                      <span>This agent needs an Aetna carrier license before state availability can be configured.</span>
+                      <span>This agent needs an Aflac carrier license before state availability can be configured.</span>
                       <Button 
                         size="sm" 
-                        onClick={enableAetnaLicense}
+                        onClick={enableAflacLicense}
                         disabled={saving}
                       >
                         {saving ? (
@@ -412,7 +412,7 @@ export default function AetnaStateAvailabilityManager() {
                             Enabling...
                           </>
                         ) : (
-                          'Enable Aetna License'
+                          'Enable Aflac License'
                         )}
                       </Button>
                     </div>
@@ -420,11 +420,11 @@ export default function AetnaStateAvailabilityManager() {
                 </Alert>
               )}
 
-              {/* Aetna Info Alert */}
-              <Alert className="bg-blue-50 border-blue-200">
-                <AlertCircle className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-800 text-sm">
-                  <strong>Important:</strong> Aetna uses a separate state availability system. All states require upline license verification. Each agent can have custom YES/NO settings per state.
+              {/* Aflac Info Alert */}
+              <Alert className="bg-green-50 border-green-200">
+                <AlertCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800 text-sm">
+                  <strong>Important:</strong> Aflac uses a separate state availability system. All states require upline license verification. Each agent can have custom YES/NO settings per state.
                 </AlertDescription>
               </Alert>
             </div>
@@ -433,14 +433,14 @@ export default function AetnaStateAvailabilityManager() {
       </Card>
 
       {/* State Management */}
-      {selectedAgentId && hasAetnaLicense && (
+      {selectedAgentId && hasAflacLicense && (
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
                 <CardTitle>State Availability</CardTitle>
                 <CardDescription>
-                  Select states where {selectedAgent?.display_name} can receive Aetna leads
+                  Select states where {selectedAgent?.display_name} can receive Aflac leads
                 </CardDescription>
               </div>
               <div className="flex gap-2">
@@ -491,7 +491,7 @@ export default function AetnaStateAvailabilityManager() {
                 ) : (
                   <>
                     <Save className="mr-2 h-4 w-4" />
-                    Save Aetna State Availability
+                    Save Aflac State Availability
                   </>
                 )}
               </Button>
