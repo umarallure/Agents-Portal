@@ -402,8 +402,8 @@ export const DataGrid = ({
                   column === 'Draft Date' ? 'w-20' :
                   column === 'MP' ? 'w-16' :
                   column === 'Face Amount' ? 'w-20' :
-                  column === 'Notes' ? 'w-32' :
-                  column === 'Actions' ? 'w-20' : ''
+column === 'Notes' ? 'w-32' :
+                  column === 'Actions' ? 'w-24' : ''
                 }>
                   {isSortable ? (
                     <Button

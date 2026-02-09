@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Save, X, Edit, CalendarIcon, Eye, Trash2 } from "lucide-react";
+import { Save, X, Edit, CalendarIcon, Eye, Trash2, Zap } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DailyDealFlowRow } from "../DailyDealFlowPage";
@@ -468,6 +468,48 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
       });
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Handle marking entry as incomplete transfer (no status)
+  const handleMarkIncomplete = async () => {
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('daily_deal_flow')
+        .update({
+          status: 'Incomplete Transfer',
+          call_result: 'Not Submitted',
+          notes: 'Call never sent',
+          updated_at: getCurrentTimestampEST()
+        })
+        .eq('id', row.id);
+
+      if (error) {
+        console.error("Error updating row:", error);
+        toast({
+          title: "Error",
+          description: "Failed to mark as incomplete transfer",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: "Entry marked as Incomplete Transfer",
+      });
+
+      onUpdate();
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1425,15 +1467,33 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
         {hasWritePermissions && (
           <td className="border border-border px-3 py-2 w-28">
             <div className="flex gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setIsEditing(true)}
-                className="h-7 w-7 p-0"
-                title="Edit row"
-              >
-                <Edit className="h-3 w-3" />
-              </Button>
+              {/* Edit button - hide when no status (use lightning instead) */}
+              {row.status && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsEditing(true)}
+                  className="h-7 w-7 p-0"
+                  title="Edit row"
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
+              )}
+              
+              {/* Lightning icon - only show when no status */}
+              {!row.status && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleMarkIncomplete}
+                  disabled={isSaving}
+                  className="h-7 w-7 p-0 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
+                  title="Mark as Incomplete Transfer"
+                >
+                  <Zap className="h-4 w-4" />
+                </Button>
+              )}
+              
               <Button
                 size="sm"
                 variant="ghost"
@@ -1443,6 +1503,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
               >
                 <Eye className="h-3 w-3" />
               </Button>
+              
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
