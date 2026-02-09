@@ -46,7 +46,6 @@ const carrierOptions = [
   "MOH",
   "Aflac",
   "Transamerica",
-  "RNA",
   "Sentinel Security Life",
   "AMAM",
   "GTL",
