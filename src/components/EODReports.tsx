@@ -66,14 +66,36 @@ export const EODReports = ({ className }: EODReportsProps) => {
   const [vendors, setVendors] = useState<LeadVendor[]>([]);
   const [selectedVendors, setSelectedVendors] = useState<Set<string>>(new Set());
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
-  const [googleAccessToken, setGoogleAccessToken] = useState<string>("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [tokenInfo, setTokenInfo] = useState<{ expiresAt?: number; needsRefresh: boolean } | null>(null);
   const { toast } = useToast();
 
-  // Fetch lead vendors from database on mount
+  // Fetch lead vendors from database on mount and check stored auth
   useEffect(() => {
     fetchLeadVendors();
+    checkStoredAuth();
   }, []);
+
+  // Check for stored authentication
+  const checkStoredAuth = () => {
+    const tokenData = googleDriveService.getTokenInfo();
+    if (tokenData.isValid) {
+      setIsAuthenticated(true);
+      setTokenInfo({
+        expiresAt: tokenData.expiresAt,
+        needsRefresh: tokenData.needsRefresh,
+      });
+      
+      // Show warning if token needs refresh soon
+      if (tokenData.needsRefresh) {
+        toast({
+          title: "Session Expiring Soon",
+          description: "Your Google Drive session will expire soon. You may need to re-authenticate.",
+          variant: "default",
+        });
+      }
+    }
+  };
 
   const fetchLeadVendors = async () => {
     try {
@@ -128,19 +150,76 @@ export const EODReports = ({ className }: EODReportsProps) => {
 
   // Google OAuth authentication
   const authenticateWithGoogle = () => {
-    // In production, implement proper OAuth flow
-    // For now, prompt user to paste access token
-    const token = prompt("Please enter your Google Drive access token:\n\n(To get a token, visit: https://developers.google.com/oauthplayground/\nSelect 'Drive API v3' > 'https://www.googleapis.com/auth/drive.file' > Authorize APIs)");
+    const instructions = `Please paste your Google Drive credentials from OAuth Playground:
+
+1. Visit: https://developers.google.com/oauthplayground/
+2. Select "Drive API v3" → "https://www.googleapis.com/auth/drive.file"
+3. Click "Authorize APIs" and sign in
+4. Click "Exchange authorization code for tokens"
+5. Copy the ENTIRE JSON response and paste it here
+
+Your session will be automatically refreshed for up to 7 days!`;
+
+    const response = prompt(instructions);
     
-    if (token) {
-      setGoogleAccessToken(token);
-      googleDriveService.initialize(token);
-      setIsAuthenticated(true);
-      toast({
-        title: "Authenticated",
-        description: "Successfully connected to Google Drive",
-      });
+    if (response) {
+      try {
+        // Try to parse as JSON (full OAuth response)
+        const tokenData = JSON.parse(response);
+        
+        if (tokenData.access_token) {
+          const accessToken = tokenData.access_token;
+          const refreshToken = tokenData.refresh_token;
+          const expiresIn = tokenData.expires_in || 3600;
+          
+          // Initialize with both tokens
+          googleDriveService.initialize(accessToken, refreshToken, expiresIn);
+          setIsAuthenticated(true);
+          
+          // Calculate expiration time
+          const expiresAt = new Date(Date.now() + (expiresIn * 1000));
+          setTokenInfo({
+            expiresAt: expiresAt.getTime(),
+            needsRefresh: false,
+          });
+          
+          toast({
+            title: "Authenticated Successfully",
+            description: refreshToken 
+              ? `Connected to Google Drive. Your session will auto-refresh until ${expiresAt.toLocaleDateString()}.`
+              : "Connected to Google Drive (no refresh token - you'll need to re-authenticate in 1 hour).",
+          });
+        } else {
+          // Fallback: treat as just access token
+          googleDriveService.initialize(response.trim());
+          setIsAuthenticated(true);
+          toast({
+            title: "Authenticated",
+            description: "Connected to Google Drive (session expires in 1 hour).",
+          });
+        }
+      } catch (e) {
+        // Not JSON, treat as plain access token
+        const token = response.trim();
+        googleDriveService.initialize(token);
+        setIsAuthenticated(true);
+        toast({
+          title: "Authenticated",
+          description: "Connected to Google Drive (session expires in 1 hour).",
+        });
+      }
     }
+  };
+
+  // Logout from Google Drive
+  const logoutFromGoogle = () => {
+    googleDriveService.clearTokens();
+    setIsAuthenticated(false);
+    setTokenInfo(null);
+    toast({
+      title: "Logged Out",
+      description: "Disconnected from Google Drive",
+    });
   };
 
   const fetchDataForDate = async (date: Date): Promise<DailyDealFlowData[]> => {
@@ -678,9 +757,27 @@ export const EODReports = ({ className }: EODReportsProps) => {
                 </div>
               ) : (
                 <div className="p-3 border rounded-lg bg-green-50">
-                  <div className="flex items-center gap-2 text-green-700">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-sm font-medium">Connected to Google Drive</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-green-700">
+                      <CheckCircle2 className="h-4 w-4" />
+                      <div>
+                        <span className="text-sm font-medium">Connected to Google Drive</span>
+                        {tokenInfo?.expiresAt && (
+                          <p className="text-xs text-green-600 mt-0.5">
+                            Session expires: {new Date(tokenInfo.expiresAt).toLocaleString()}
+                            {tokenInfo.needsRefresh && " (will auto-refresh)"}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={logoutFromGoogle}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      Logout
+                    </Button>
                   </div>
                 </div>
               )}

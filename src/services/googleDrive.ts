@@ -1,29 +1,158 @@
 // Google Drive API Integration Service
-// This service handles uploading files to Google Drive
+// This service handles uploading files to Google Drive with automatic token refresh
+
+interface TokenData {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number; // Timestamp when token expires
+  tokenType: string;
+}
 
 interface GoogleDriveConfig {
   apiKey?: string;
   clientId?: string;
   accessToken?: string;
+  refreshToken?: string;
 }
+
+const STORAGE_KEY = 'google_drive_tokens';
 
 class GoogleDriveService {
   private config: GoogleDriveConfig;
   private isInitialized: boolean = false;
+  private tokenData: TokenData | null = null;
 
   constructor(config: GoogleDriveConfig = {}) {
     this.config = config;
+    this.loadTokensFromStorage();
   }
 
-  // Initialize with access token (obtained from OAuth flow)
-  initialize(accessToken: string) {
+  // Load tokens from localStorage on initialization
+  private loadTokensFromStorage() {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        this.tokenData = JSON.parse(stored);
+        if (this.tokenData && this.tokenData.accessToken) {
+          this.config.accessToken = this.tokenData.accessToken;
+          this.config.refreshToken = this.tokenData.refreshToken;
+          this.isInitialized = true;
+        }
+      }
+    } catch (error) {
+      console.error('Error loading tokens from storage:', error);
+    }
+  }
+
+  // Save tokens to localStorage
+  private saveTokensToStorage() {
+    try {
+      if (this.tokenData) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.tokenData));
+      }
+    } catch (error) {
+      console.error('Error saving tokens to storage:', error);
+    }
+  }
+
+  // Initialize with tokens from OAuth flow
+  initialize(accessToken: string, refreshToken?: string, expiresIn: number = 3600) {
     this.config.accessToken = accessToken;
+    this.config.refreshToken = refreshToken;
     this.isInitialized = true;
+
+    // Calculate expiration time (subtract 5 minutes buffer)
+    const expiresAt = Date.now() + (expiresIn * 1000) - (5 * 60 * 1000);
+
+    this.tokenData = {
+      accessToken,
+      refreshToken: refreshToken || this.tokenData?.refreshToken || '',
+      expiresAt,
+      tokenType: 'Bearer',
+    };
+
+    this.saveTokensToStorage();
   }
 
   // Check if service is ready
   isReady(): boolean {
     return this.isInitialized && !!this.config.accessToken;
+  }
+
+  // Check if token needs refresh (expires in less than 5 minutes)
+  private needsRefresh(): boolean {
+    if (!this.tokenData) return false;
+    return Date.now() >= this.tokenData.expiresAt;
+  }
+
+  // Refresh the access token using refresh token
+  private async refreshAccessToken(): Promise<boolean> {
+    if (!this.tokenData?.refreshToken) {
+      console.error('No refresh token available');
+      return false;
+    }
+
+    try {
+      // Note: In production, you should proxy this through your backend
+      // to keep client_secret secure. This is for demonstration.
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          refresh_token: this.tokenData.refreshToken,
+          client_id: '407408718192.apps.googleusercontent.com', // OAuth Playground client ID
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Token refresh failed:', error);
+        return false;
+      }
+
+      const data = await response.json();
+      
+      // Update tokens
+      this.config.accessToken = data.access_token;
+      this.tokenData.accessToken = data.access_token;
+      this.tokenData.expiresAt = Date.now() + (data.expires_in * 1000) - (5 * 60 * 1000);
+      
+      // Save updated tokens
+      this.saveTokensToStorage();
+      
+      return true;
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      return false;
+    }
+  }
+
+  // Ensure valid access token (refresh if needed)
+  private async ensureValidToken(): Promise<boolean> {
+    if (!this.isReady()) return false;
+    
+    if (this.needsRefresh()) {
+      const refreshed = await this.refreshAccessToken();
+      if (!refreshed) {
+        // Clear tokens if refresh failed
+        this.clearTokens();
+        return false;
+      }
+    }
+    
+    return true;
+  }
+
+  // Clear stored tokens (logout)
+  clearTokens() {
+    this.tokenData = null;
+    this.config.accessToken = undefined;
+    this.config.refreshToken = undefined;
+    this.isInitialized = false;
+    localStorage.removeItem(STORAGE_KEY);
   }
 
   // Upload file to specific folder
@@ -37,22 +166,25 @@ class GoogleDriveService {
       return { success: false, error: 'Google Drive not initialized. Please authenticate first.' };
     }
 
+    // Ensure token is valid before upload
+    const tokenValid = await this.ensureValidToken();
+    if (!tokenValid) {
+      return { success: false, error: 'Session expired. Please authenticate again.' };
+    }
+
     try {
-      // Step 1: Create file metadata with parent folder
       const metadata = {
         name: fileName,
         parents: [folderId],
         mimeType: mimeType,
       };
 
-      // Step 2: Create multipart request body
       const boundary = '-------314159265358979323846';
       const delimiter = "\r\n--" + boundary + "\r\n";
       const close_delim = "\r\n--" + boundary + "--";
 
       const metadataContent = JSON.stringify(metadata);
 
-      // Convert blob to base64 if needed
       let fileContent: string;
       if (file instanceof Blob) {
         fileContent = await this.blobToBase64(file);
@@ -70,7 +202,6 @@ class GoogleDriveService {
         fileContent +
         close_delim;
 
-      // Step 3: Upload to Google Drive
       const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
         headers: {
@@ -123,10 +254,11 @@ class GoogleDriveService {
     return btoa(binary);
   }
 
-  // List files in a folder (for debugging/verification)
+  // List files in a folder
   async listFilesInFolder(folderId: string): Promise<any[]> {
-    if (!this.isReady()) {
-      throw new Error('Google Drive not initialized');
+    const tokenValid = await this.ensureValidToken();
+    if (!tokenValid) {
+      throw new Error('Session expired. Please authenticate again.');
     }
 
     try {
@@ -150,6 +282,20 @@ class GoogleDriveService {
       return [];
     }
   }
+
+  // Get token expiration info
+  getTokenInfo(): { isValid: boolean; expiresAt?: number; needsRefresh: boolean } {
+    if (!this.tokenData) {
+      return { isValid: false, needsRefresh: false };
+    }
+    
+    const needsRefresh = this.needsRefresh();
+    return {
+      isValid: true,
+      expiresAt: this.tokenData.expiresAt,
+      needsRefresh,
+    };
+  }
 }
 
 // Create singleton instance
@@ -157,8 +303,8 @@ export const googleDriveService = new GoogleDriveService();
 
 // Hook for using Google Drive in components
 export const useGoogleDrive = () => {
-  const initialize = (accessToken: string) => {
-    googleDriveService.initialize(accessToken);
+  const initialize = (accessToken: string, refreshToken?: string, expiresIn?: number) => {
+    googleDriveService.initialize(accessToken, refreshToken, expiresIn);
   };
 
   const uploadFile = async (
@@ -170,10 +316,16 @@ export const useGoogleDrive = () => {
   };
 
   const isReady = () => googleDriveService.isReady();
+  
+  const logout = () => googleDriveService.clearTokens();
+  
+  const getTokenInfo = () => googleDriveService.getTokenInfo();
 
   return {
     initialize,
     uploadFile,
     isReady,
+    logout,
+    getTokenInfo,
   };
 };
