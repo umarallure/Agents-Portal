@@ -809,3 +809,5 @@ export const EODReports = ({ className }: EODReportsProps) => {
     </Dialog>
   );
 };
+
+// Export for module system
