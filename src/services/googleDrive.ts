@@ -172,10 +172,15 @@ class GoogleDriveService {
       return { success: false, error: 'Session expired. Please authenticate again.' };
     }
 
+    // Clean the folder ID
+    const cleanId = this.cleanFolderId(folderId);
+    
+    console.log('Uploading to folder ID:', cleanId, '(original:', folderId + ')');
+
     try {
       const metadata = {
         name: fileName,
-        parents: [folderId],
+        parents: [cleanId],
         mimeType: mimeType,
       };
 
@@ -217,7 +222,7 @@ class GoogleDriveService {
         
         // Provide more helpful error messages for common issues
         if (errorMessage.includes('File not found')) {
-          throw new Error(`Folder not found or no access. Please verify: 1) The folder exists in Google Drive, 2) You have edit access to the folder, 3) The folder ID is correct.`);
+          throw new Error(`Folder not found (ID: ${cleanId.substring(0, 20)}...). Please verify: 1) The folder exists in Google Drive, 2) You have edit access to the folder, 3) The folder ID in database is correct (not a URL).`);
         } else if (errorMessage.includes('insufficient permissions') || errorMessage.includes('Forbidden')) {
           throw new Error('Insufficient permissions. Please ensure you have edit access to the target folder.');
         } else if (errorMessage.includes('Invalid folder')) {
@@ -265,6 +270,25 @@ class GoogleDriveService {
     return btoa(binary);
   }
 
+  // Helper to extract clean folder ID from various formats
+  private cleanFolderId(folderId: string): string {
+    // If it's a URL, extract the ID
+    if (folderId.includes('drive.google.com')) {
+      const match = folderId.match(/folders\/([a-zA-Z0-9_-]+)/);
+      if (match) {
+        return match[1];
+      }
+    }
+    
+    // Remove any query parameters
+    if (folderId.includes('?')) {
+      return folderId.split('?')[0];
+    }
+    
+    // Return as-is if already clean
+    return folderId.trim();
+  }
+
   // Validate that a folder exists and is accessible
   async validateFolder(folderId: string): Promise<{ valid: boolean; error?: string; folderName?: string }> {
     const tokenValid = await this.ensureValidToken();
@@ -272,9 +296,14 @@ class GoogleDriveService {
       return { valid: false, error: 'Session expired. Please authenticate again.' };
     }
 
+    // Clean the folder ID
+    const cleanId = this.cleanFolderId(folderId);
+    
+    console.log('Validating folder ID:', cleanId, '(original:', folderId + ')');
+
     try {
       const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${folderId}?fields=id,name,mimeType,permissions`,
+        `https://www.googleapis.com/drive/v3/files/${cleanId}?fields=id,name,mimeType,permissions`,
         {
           headers: {
             'Authorization': `Bearer ${this.config.accessToken}`,
