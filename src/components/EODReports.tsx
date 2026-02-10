@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import { parseESTDate } from "@/lib/dateUtils";
-import { googleDriveService } from "@/services/googleDrive";
+import { googleDriveService } from "@/services/googleDrive-db";
 
 interface EODReportsProps {
   className?: string;
@@ -77,8 +77,8 @@ export const EODReports = ({ className }: EODReportsProps) => {
   }, []);
 
   // Check for stored authentication
-  const checkStoredAuth = () => {
-    const tokenData = googleDriveService.getTokenInfo();
+  const checkStoredAuth = async () => {
+    const tokenData = await googleDriveService.getTokenInfo();
     if (tokenData.isValid) {
       setIsAuthenticated(true);
       setTokenInfo({

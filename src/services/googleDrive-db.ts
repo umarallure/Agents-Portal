@@ -483,6 +483,7 @@ class GoogleDriveService {
     if (!accessToken) return [];
 
     try {
+      console.log('=== DEBUG: Listing recent files ===');
       const response = await fetch(
         `https://www.googleapis.com/drive/v3/files?pageSize=10&orderBy=modifiedTime desc&fields=files(id,name,mimeType,modifiedTime)`,
         {
@@ -490,12 +491,54 @@ class GoogleDriveService {
         }
       );
 
-      if (!response.ok) return [];
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Debug list files error:', errorData);
+        return [];
+      }
 
       const data = await response.json();
+      console.log('Recent files:', data.files);
+      console.log('=====================================');
       return data.files || [];
     } catch (error) {
+      console.error('Error listing recent files:', error);
       return [];
+    }
+  }
+
+  // Debug: Get Drive info (storage, user, etc.)
+  async debugGetDriveInfo(): Promise<any> {
+    const accessToken = await this.ensureValidToken();
+    if (!accessToken) {
+      console.error('Cannot get drive info: Token not valid');
+      return null;
+    }
+
+    try {
+      console.log('=== DEBUG: Getting Drive Info ===');
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/about?fields=user,storageQuota`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Debug drive info error:', errorData);
+        return null;
+      }
+
+      const data = await response.json();
+      console.log('Drive Info:', data);
+      console.log('=====================================');
+      return data;
+    } catch (error) {
+      console.error('Error getting drive info:', error);
+      return null;
     }
   }
 
