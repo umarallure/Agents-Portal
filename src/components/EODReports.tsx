@@ -883,6 +883,34 @@ Your session will be automatically refreshed for up to 7 days!`;
                     >
                       Debug: List Files
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        console.log('Running debug: getting Drive info...');
+                        googleDriveService.debugGetDriveInfo();
+                      }}
+                      className="text-purple-600 hover:text-purple-700"
+                    >
+                      Debug: Drive Info
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        console.log('Creating test folder...');
+                        const result = await googleDriveService.createFolder('AJ BPO Reports - Test');
+                        if (result.success) {
+                          alert(`Folder created! ID: ${result.folderId}`);
+                          console.log('Update your database with this ID:', result.folderId);
+                        } else {
+                          alert(`Failed: ${result.error}`);
+                        }
+                      }}
+                      className="text-green-600 hover:text-green-700"
+                    >
+                      Create Test Folder
+                    </Button>
                   </div>
                 </div>
               )}

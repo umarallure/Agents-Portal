@@ -430,6 +430,90 @@ class GoogleDriveService {
     }
   }
 
+  // Debug: Get Drive info (storage, user, etc.)
+  async debugGetDriveInfo(): Promise<any> {
+    const tokenValid = await this.ensureValidToken();
+    if (!tokenValid) {
+      console.error('Cannot get drive info: Token not valid');
+      return null;
+    }
+
+    try {
+      console.log('=== DEBUG: Getting Drive Info ===');
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/about?fields=user,storageQuota`,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.config.accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Debug drive info error:', errorData);
+        return null;
+      }
+
+      const data = await response.json();
+      console.log('Drive Info:', data);
+      console.log('=====================================');
+      return data;
+    } catch (error) {
+      console.error('Error getting drive info:', error);
+      return null;
+    }
+  }
+
+  // Create a new folder in the root of Drive
+  async createFolder(folderName: string): Promise<{ success: boolean; folderId?: string; error?: string }> {
+    const tokenValid = await this.ensureValidToken();
+    if (!tokenValid) {
+      return { success: false, error: 'Session expired. Please authenticate again.' };
+    }
+
+    try {
+      console.log('Creating folder:', folderName);
+      
+      const metadata = {
+        name: folderName,
+        mimeType: 'application/vnd.google-apps.folder',
+      };
+
+      const response = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.config.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(metadata),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Create folder error:', errorData);
+        return { 
+          success: false, 
+          error: errorData.error?.message || 'Failed to create folder' 
+        };
+      }
+
+      const result = await response.json();
+      console.log('Folder created:', result);
+      
+      return {
+        success: true,
+        folderId: result.id,
+      };
+    } catch (error) {
+      console.error('Error creating folder:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create folder',
+      };
+    }
+  }
+
   // Get token expiration info
   getTokenInfo(): { isValid: boolean; expiresAt?: number; needsRefresh: boolean } {
     if (!this.tokenData) {
