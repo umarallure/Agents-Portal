@@ -16,6 +16,7 @@ import Dashboard from "./pages/Dashboard";
 import CenterLeadPortal from "./pages/CenterLeadPortal";
 import CenterCalendarView from "./pages/CenterCalendarView";
 import CallbackRequestPage from "./pages/CallbackRequestPage";
+import MedalertQuoteForm from "./pages/MedalertQuoteForm";
 import CommissionPortal from "./pages/CommissionPortal";
 import CallResultUpdate from "./pages/CallResultUpdate";
 import CallResultJourney from "./pages/CallResultJourney";
@@ -88,7 +89,15 @@ const App = () => (
               } 
             />
             <Route 
-              path="/commission-portal" 
+              path="/medalert-quote" 
+              element={
+                <CenterProtectedRoute>
+                  <MedalertQuoteForm />
+                </CenterProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/commission-portal"
               element={
                 <LicensedAgentProtectedRoute>
                   <CommissionPortal />

@@ -184,6 +184,10 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                       <Calendar className="mr-2 h-4 w-4" />
                       Calendar View
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/medalert-quote')}>
+                      <ShieldCheck className="mr-2 h-4 w-4" />
+                      Medalert Quote
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate('/agent-licensing')}>
                       <ShieldCheck className="mr-2 h-4 w-4" />
                       Find Eligible Agents

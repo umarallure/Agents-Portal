@@ -1,0 +1,754 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ArrowLeft, AlertCircle, Shield, Package, DollarSign, Truck, CreditCard, Landmark, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useCenterUser } from '@/hooks/useCenterUser';
+
+const PRODUCT_INFO = {
+  companyName: 'Bay Alarm Alert',
+  productName: 'SOS All-In-One 2',
+  deviceCost: 149.00,
+  discountedDeviceCost: 89.40,
+  monthlySubscription: 34.95,
+  protectionPlan: 4.95,
+  shipping: 15.00
+};
+
+const MedalertQuoteForm = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { leadVendor, loading: centerLoading } = useCenterUser();
+
+  // Client Information
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [zipCode, setZipCode] = useState('');
+
+  // Primary User
+  const [primaryUserSameAsClient, setPrimaryUserSameAsClient] = useState(true);
+  const [primaryUserFirstName, setPrimaryUserFirstName] = useState('');
+  const [primaryUserLastName, setPrimaryUserLastName] = useState('');
+
+  // Payment Method
+  const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'ach'>('credit_card');
+  const [includeProtectionPlan, setIncludeProtectionPlan] = useState(false);
+
+  // Credit Card
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [cvv, setCvv] = useState('');
+  const [cardholderName, setCardholderName] = useState('');
+
+  // ACH
+  const [routingNumber, setRoutingNumber] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountType, setAccountType] = useState<'checking' | 'savings'>('checking');
+  const [accountHolderName, setAccountHolderName] = useState('');
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const calculateTotal = () => {
+    const deviceCost = PRODUCT_INFO.discountedDeviceCost;
+    const shipping = PRODUCT_INFO.shipping;
+    const protectionPlan = includeProtectionPlan ? PRODUCT_INFO.protectionPlan : 0;
+    return deviceCost + shipping + protectionPlan;
+  };
+
+  const calculateMonthlyTotal = () => {
+    let total = PRODUCT_INFO.monthlySubscription;
+    if (includeProtectionPlan) {
+      total += PRODUCT_INFO.protectionPlan;
+    }
+    return total;
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!email) newErrors.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) newErrors.email = 'Invalid email format';
+    
+    if (!password) newErrors.password = 'Password is required';
+    else if (password.length < 8) newErrors.password = 'Password must be at least 8 characters';
+    
+    if (!firstName) newErrors.firstName = 'First name is required';
+    if (!lastName) newErrors.lastName = 'Last name is required';
+    if (!phoneNumber) newErrors.phoneNumber = 'Phone number is required';
+    if (!address) newErrors.address = 'Address is required';
+    if (!city) newErrors.city = 'City is required';
+    if (!state) newErrors.state = 'State is required';
+    if (!zipCode) newErrors.zipCode = 'ZIP code is required';
+
+    if (!primaryUserSameAsClient) {
+      if (!primaryUserFirstName) newErrors.primaryUserFirstName = 'Primary user first name is required';
+      if (!primaryUserLastName) newErrors.primaryUserLastName = 'Primary user last name is required';
+    }
+
+    if (paymentMethod === 'credit_card') {
+      if (!cardNumber) newErrors.cardNumber = 'Card number is required';
+      if (!expiryDate) newErrors.expiryDate = 'Expiry date is required';
+      if (!cvv) newErrors.cvv = 'CVV is required';
+      if (!cardholderName) newErrors.cardholderName = 'Cardholder name is required';
+    } else {
+      if (!routingNumber) newErrors.routingNumber = 'Routing number is required';
+      if (!accountNumber) newErrors.accountNumber = 'Account number is required';
+      if (!accountHolderName) newErrors.accountHolderName = 'Account holder name is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please fill in all required fields',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Prepare payload for the create-lead edge function
+      const primaryUserFirst = primaryUserSameAsClient ? firstName : primaryUserFirstName;
+      const primaryUserLast = primaryUserSameAsClient ? lastName : primaryUserLastName;
+      const customerFullName = `${primaryUserFirst} ${primaryUserLast}`;
+
+      const totalUpfront = calculateTotal();
+      const totalMonthly = calculateMonthlyTotal();
+
+      const leadPayload = {
+        // Basic lead info (required by edge function)
+        first_name: firstName,
+        last_name: lastName,
+        customer_full_name: customerFullName,
+        phone_number: phoneNumber,
+        email: email,
+        address: address,
+        city: city,
+        state: state,
+        zip_code: zipCode,
+        
+        // Generate submission_id
+        submission_id: `MEDALERT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+        
+        // SOURCE & VERSION
+        source: 'medalert_quote_form',
+        form_version: '1.0',
+        
+        // PRODUCT INFO - All mapped to direct columns
+        carrier: PRODUCT_INFO.companyName,                    // Bay Alarm Alert
+        product_type: 'Medalert Device',                      // Product category
+        quoted_product: PRODUCT_INFO.productName,             // SOS All-In-One 2
+        company_name: PRODUCT_INFO.companyName,               // Company name
+        device_cost: PRODUCT_INFO.discountedDeviceCost,       // Device cost (discounted)
+        original_device_cost: PRODUCT_INFO.deviceCost,        // Original device cost
+        discounted_device_cost: PRODUCT_INFO.discountedDeviceCost, // Discounted device cost
+        shipping_cost: PRODUCT_INFO.shipping,                 // Shipping cost
+        monthly_subscription: PRODUCT_INFO.monthlySubscription, // Monthly subscription
+        protection_plan_cost: includeProtectionPlan ? PRODUCT_INFO.protectionPlan : 0, // Protection plan cost
+        protection_plan_included: includeProtectionPlan,      // Whether protection plan is included
+        total_upfront_cost: totalUpfront,                     // Total upfront cost
+        total_monthly_cost: totalMonthly,                     // Total monthly cost
+        
+        // LEAD VENDOR & CENTER INFO
+        lead_vendor: leadVendor,                              // Lead vendor name
+        center_user_name: leadVendor,                         // Center user name
+        
+        // PRIMARY USER INFO
+        primary_user_same_as_client: primaryUserSameAsClient, // Whether primary user is same as client
+        primary_user_first_name: primaryUserFirst,            // Primary user first name
+        primary_user_last_name: primaryUserLast,              // Primary user last name
+        
+        // CLIENT ACCOUNT INFO
+        client_password: password,                            // Client password
+        
+        // PAYMENT INFO
+        payment_method: paymentMethod,                        // Payment method: credit_card or ach
+        
+        // CREDIT CARD INFO (if applicable)
+        ...(paymentMethod === 'credit_card' ? {
+          card_number_last_four: cardNumber.slice(-4),        // Last 4 digits of card
+          card_expiry: expiryDate,                            // Card expiry date
+          cardholder_name: cardholderName,                    // Cardholder name
+        } : {
+          // ACH INFO (if applicable)
+          account_holder_name: accountHolderName,             // Account holder name
+          account_number_last_four: accountNumber.slice(-4),  // Last 4 digits of account
+          routing_number: routingNumber,                      // Routing number
+          account_number: accountNumber,                      // Full account number
+          account_type: accountType,                          // Account type (checking/savings)
+        }),
+        
+        // Keep minimal data in beneficiary_info for reference
+        beneficiary_info: {
+          raw_source: 'medalert_quote_form',
+          center_user: leadVendor,
+        },
+      };
+
+      // Call the create-lead edge function from different Supabase project
+      const response = await fetch('https://desmolljguqzgadwkfkq.supabase.co/functions/v1/create-lead', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlc21vbGxqZ3VxemdhZHdrZmtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MDIyNzEsImV4cCI6MjA4MDE3ODI3MX0.bdnyuoYX0cI4d_xf6Vhlwa-RX-5LpH-RQf1GkhmaXy0',
+        },
+        body: JSON.stringify(leadPayload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Edge function error:', errorText);
+        throw new Error(`Failed to create lead: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      toast({
+        title: 'Lead Created Successfully',
+        description: `The Medalert lead has been created with submission ID: ${leadPayload.submission_id}`,
+      });
+
+      // Navigate back to portal
+      navigate('/center-lead-portal');
+    } catch (error) {
+      console.error('Error submitting quote:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to submit quote. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleBack = () => {
+    navigate('/center-lead-portal');
+  };
+
+  if (centerLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-2 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="border-b bg-card">
+        <div className="container mx-auto px-4 py-4">
+          <Button variant="ghost" onClick={handleBack} className="mb-2">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Leads
+          </Button>
+          <h1 className="text-2xl font-bold text-foreground">Medalert Quote Form</h1>
+          <p className="text-muted-foreground">Complete the form below to submit a Medalert device quote</p>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Product Information Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Package className="h-5 w-5" />
+                <span>Product Information</span>
+              </CardTitle>
+              <CardDescription>Product details and pricing</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Company Name</Label>
+                  <Input value={PRODUCT_INFO.companyName} disabled className="bg-muted" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Product Name</Label>
+                  <Input value={PRODUCT_INFO.productName} disabled className="bg-muted" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Device Cost</Label>
+                  <p className="text-lg font-semibold text-green-600">
+                    ${PRODUCT_INFO.discountedDeviceCost.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-muted-foreground line-through">
+                    ${PRODUCT_INFO.deviceCost.toFixed(2)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Monthly Subscription</Label>
+                  <p className="text-lg font-semibold">${PRODUCT_INFO.monthlySubscription.toFixed(2)}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Shipping</Label>
+                  <p className="text-lg font-semibold">${PRODUCT_INFO.shipping.toFixed(2)}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Shield className="h-3 w-3" />
+                    Protection Plan (Optional)
+                  </Label>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="protection-plan"
+                      checked={includeProtectionPlan}
+                      onCheckedChange={(checked) => setIncludeProtectionPlan(checked as boolean)}
+                    />
+                    <Label htmlFor="protection-plan" className="text-sm font-normal cursor-pointer">
+                      Add ${PRODUCT_INFO.protectionPlan.toFixed(2)}/mo
+                    </Label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Upfront Cost</p>
+                    <p className="text-2xl font-bold">${calculateTotal().toFixed(2)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Monthly Cost</p>
+                    <p className="text-2xl font-bold">${calculateMonthlyTotal().toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Client Information Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <AlertCircle className="h-5 w-5" />
+                <span>Client Information</span>
+              </CardTitle>
+              <CardDescription>Account and contact details for the client</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">
+                    Email Address <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="client@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={errors.email ? 'border-red-500' : ''}
+                  />
+                  {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">
+                    Account Password <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Create a secure password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={errors.password ? 'border-red-500' : ''}
+                  />
+                  {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
+                  <p className="text-xs text-muted-foreground">Minimum 8 characters</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">
+                    First Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="firstName"
+                    placeholder="First name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className={errors.firstName ? 'border-red-500' : ''}
+                  />
+                  {errors.firstName && <p className="text-sm text-red-500">{errors.firstName}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">
+                    Last Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="lastName"
+                    placeholder="Last name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className={errors.lastName ? 'border-red-500' : ''}
+                  />
+                  {errors.lastName && <p className="text-sm text-red-500">{errors.lastName}</p>}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phoneNumber">
+                  Phone Number <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="phoneNumber"
+                  type="tel"
+                  placeholder="(555) 123-4567"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className={errors.phoneNumber ? 'border-red-500' : ''}
+                />
+                {errors.phoneNumber && <p className="text-sm text-red-500">{errors.phoneNumber}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="address">
+                  Street Address <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="address"
+                  placeholder="123 Main Street"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className={errors.address ? 'border-red-500' : ''}
+                />
+                {errors.address && <p className="text-sm text-red-500">{errors.address}</p>}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="city">
+                    City <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="city"
+                    placeholder="City"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className={errors.city ? 'border-red-500' : ''}
+                  />
+                  {errors.city && <p className="text-sm text-red-500">{errors.city}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="state">
+                    State <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="state"
+                    placeholder="State"
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
+                    className={errors.state ? 'border-red-500' : ''}
+                  />
+                  {errors.state && <p className="text-sm text-red-500">{errors.state}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="zipCode">
+                    ZIP Code <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="zipCode"
+                    placeholder="12345"
+                    value={zipCode}
+                    onChange={(e) => setZipCode(e.target.value)}
+                    className={errors.zipCode ? 'border-red-500' : ''}
+                  />
+                  {errors.zipCode && <p className="text-sm text-red-500">{errors.zipCode}</p>}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Primary User Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Primary User Information</CardTitle>
+              <CardDescription>The person who will be wearing/using the device</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="same-as-client"
+                  checked={primaryUserSameAsClient}
+                  onCheckedChange={(checked) => setPrimaryUserSameAsClient(checked as boolean)}
+                />
+                <Label htmlFor="same-as-client" className="font-normal cursor-pointer">
+                  Primary user is the same as the client
+                </Label>
+              </div>
+
+              {!primaryUserSameAsClient && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label htmlFor="primaryUserFirstName">
+                      Primary User First Name <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="primaryUserFirstName"
+                      placeholder="First name"
+                      value={primaryUserFirstName}
+                      onChange={(e) => setPrimaryUserFirstName(e.target.value)}
+                      className={errors.primaryUserFirstName ? 'border-red-500' : ''}
+                    />
+                    {errors.primaryUserFirstName && (
+                      <p className="text-sm text-red-500">{errors.primaryUserFirstName}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="primaryUserLastName">
+                      Primary User Last Name <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="primaryUserLastName"
+                      placeholder="Last name"
+                      value={primaryUserLastName}
+                      onChange={(e) => setPrimaryUserLastName(e.target.value)}
+                      className={errors.primaryUserLastName ? 'border-red-500' : ''}
+                    />
+                    {errors.primaryUserLastName && (
+                      <p className="text-sm text-red-500">{errors.primaryUserLastName}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Payment Information Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <DollarSign className="h-5 w-5" />
+                <span>Payment Information</span>
+              </CardTitle>
+              <CardDescription>Select payment method and enter details</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Payment Method Selection */}
+              <div className="space-y-2">
+                <Label>Payment Method</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div
+                    className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                      paymentMethod === 'credit_card'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                    onClick={() => setPaymentMethod('credit_card')}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <CreditCard className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium">Credit Card</p>
+                        <p className="text-xs text-muted-foreground">Pay with credit or debit card</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                      paymentMethod === 'ach'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                    onClick={() => setPaymentMethod('ach')}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Landmark className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium">ACH/Bank Transfer</p>
+                        <p className="text-xs text-muted-foreground">Pay directly from bank account</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Credit Card Form */}
+              {paymentMethod === 'credit_card' && (
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label htmlFor="cardNumber">
+                      Card Number <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="cardNumber"
+                      placeholder="1234 5678 9012 3456"
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(e.target.value)}
+                      className={errors.cardNumber ? 'border-red-500' : ''}
+                    />
+                    {errors.cardNumber && <p className="text-sm text-red-500">{errors.cardNumber}</p>}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="expiryDate">
+                        Expiry Date <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="expiryDate"
+                        placeholder="MM/YY"
+                        value={expiryDate}
+                        onChange={(e) => setExpiryDate(e.target.value)}
+                        className={errors.expiryDate ? 'border-red-500' : ''}
+                      />
+                      {errors.expiryDate && <p className="text-sm text-red-500">{errors.expiryDate}</p>}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cvv">
+                        CVV <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="cvv"
+                        placeholder="123"
+                        value={cvv}
+                        onChange={(e) => setCvv(e.target.value)}
+                        className={errors.cvv ? 'border-red-500' : ''}
+                      />
+                      {errors.cvv && <p className="text-sm text-red-500">{errors.cvv}</p>}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cardholderName">
+                      Cardholder Name <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="cardholderName"
+                      placeholder="Name as it appears on card"
+                      value={cardholderName}
+                      onChange={(e) => setCardholderName(e.target.value)}
+                      className={errors.cardholderName ? 'border-red-500' : ''}
+                    />
+                    {errors.cardholderName && <p className="text-sm text-red-500">{errors.cardholderName}</p>}
+                  </div>
+                </div>
+              )}
+
+              {/* ACH Form */}
+              {paymentMethod === 'ach' && (
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label htmlFor="accountHolderName">
+                      Account Holder Name <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="accountHolderName"
+                      placeholder="Full name on account"
+                      value={accountHolderName}
+                      onChange={(e) => setAccountHolderName(e.target.value)}
+                      className={errors.accountHolderName ? 'border-red-500' : ''}
+                    />
+                    {errors.accountHolderName && (
+                      <p className="text-sm text-red-500">{errors.accountHolderName}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="routingNumber">
+                      Routing Number <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="routingNumber"
+                      placeholder="9-digit routing number"
+                      value={routingNumber}
+                      onChange={(e) => setRoutingNumber(e.target.value)}
+                      className={errors.routingNumber ? 'border-red-500' : ''}
+                    />
+                    {errors.routingNumber && <p className="text-sm text-red-500">{errors.routingNumber}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="accountNumber">
+                      Account Number <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="accountNumber"
+                      placeholder="Account number"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      className={errors.accountNumber ? 'border-red-500' : ''}
+                    />
+                    {errors.accountNumber && <p className="text-sm text-red-500">{errors.accountNumber}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Account Type</Label>
+                    <Select value={accountType} onValueChange={(value: 'checking' | 'savings') => setAccountType(value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select account type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="checking">Checking</SelectItem>
+                        <SelectItem value="savings">Savings</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Submit Button */}
+          <div className="flex justify-end space-x-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleBack}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="min-w-[200px]"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit Quote'
+              )}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default MedalertQuoteForm;

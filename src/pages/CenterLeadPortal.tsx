@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Filter, LogOut, Phone, User, DollarSign, Send, Plus } from 'lucide-react';
+import { Calendar, Filter, LogOut, Phone, User, DollarSign, Send, Plus, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCenterUser } from '@/hooks/useCenterUser';
 import { supabase } from '@/integrations/supabase/client';
@@ -294,6 +294,13 @@ const CenterLeadPortal = () => {
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Lead
+              </Button>
+              <Button 
+                onClick={() => navigate('/medalert-quote')}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Medalert Quote
               </Button>
             </div>
           </div>
