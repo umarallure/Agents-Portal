@@ -207,7 +207,8 @@ class GoogleDriveService {
         fileContent +
         close_delim;
 
-      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      // Add supportsAllDrives=true for Shared Drive support
+      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.config.accessToken}`,
@@ -312,8 +313,9 @@ class GoogleDriveService {
     console.log('Validating folder ID:', cleanId, '(original:', folderId + ')');
 
     try {
+      // Try with supportsAllDrives for shared drives
       const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${cleanId}?fields=id,name,mimeType,permissions`,
+        `https://www.googleapis.com/drive/v3/files/${cleanId}?supportsAllDrives=true&fields=id,name,mimeType,permissions,driveId`,
         {
           headers: {
             'Authorization': `Bearer ${this.config.accessToken}`,
@@ -338,7 +340,7 @@ class GoogleDriveService {
         if (response.status === 404 || errorMessage.includes('File not found')) {
           return { 
             valid: false, 
-            error: 'Folder not found. Please verify the folder ID is correct and the folder exists in Google Drive.' 
+            error: 'Folder not found. If this is a shared drive folder, ensure you have edit access and the folder ID is correct.' 
           };
         } else if (response.status === 403) {
           return { 
@@ -354,6 +356,11 @@ class GoogleDriveService {
       
       if (data.mimeType !== 'application/vnd.google-apps.folder') {
         return { valid: false, error: 'The provided ID is not a folder.' };
+      }
+
+      // Check if it's in a shared drive
+      if (data.driveId) {
+        console.log('Folder is in Shared Drive:', data.driveId);
       }
 
       return { valid: true, folderName: data.name };
