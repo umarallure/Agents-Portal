@@ -213,7 +213,18 @@ class GoogleDriveService {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error?.message || `Upload failed: ${response.statusText}`);
+        const errorMessage = errorData.error?.message || `Upload failed: ${response.statusText}`;
+        
+        // Provide more helpful error messages for common issues
+        if (errorMessage.includes('File not found')) {
+          throw new Error(`Folder not found or no access. Please verify: 1) The folder exists in Google Drive, 2) You have edit access to the folder, 3) The folder ID is correct.`);
+        } else if (errorMessage.includes('insufficient permissions') || errorMessage.includes('Forbidden')) {
+          throw new Error('Insufficient permissions. Please ensure you have edit access to the target folder.');
+        } else if (errorMessage.includes('Invalid folder')) {
+          throw new Error('Invalid folder ID. Please check the folder ID in Lead Vendors settings.');
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -252,6 +263,58 @@ class GoogleDriveService {
       binary += String.fromCharCode(bytes[i]);
     }
     return btoa(binary);
+  }
+
+  // Validate that a folder exists and is accessible
+  async validateFolder(folderId: string): Promise<{ valid: boolean; error?: string; folderName?: string }> {
+    const tokenValid = await this.ensureValidToken();
+    if (!tokenValid) {
+      return { valid: false, error: 'Session expired. Please authenticate again.' };
+    }
+
+    try {
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${folderId}?fields=id,name,mimeType,permissions`,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.config.accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        const errorMessage = errorData.error?.message || '';
+        
+        if (response.status === 404 || errorMessage.includes('File not found')) {
+          return { 
+            valid: false, 
+            error: 'Folder not found. Please verify the folder ID is correct and the folder exists in Google Drive.' 
+          };
+        } else if (response.status === 403) {
+          return { 
+            valid: false, 
+            error: 'Access denied. Please ensure you have been granted edit access to this folder.' 
+          };
+        }
+        
+        return { valid: false, error: `Failed to access folder: ${errorMessage}` };
+      }
+
+      const data = await response.json();
+      
+      if (data.mimeType !== 'application/vnd.google-apps.folder') {
+        return { valid: false, error: 'The provided ID is not a folder.' };
+      }
+
+      return { valid: true, folderName: data.name };
+    } catch (error) {
+      console.error('Error validating folder:', error);
+      return { 
+        valid: false, 
+        error: error instanceof Error ? error.message : 'Failed to validate folder access' 
+      };
+    }
   }
 
   // List files in a folder
@@ -315,6 +378,10 @@ export const useGoogleDrive = () => {
     return googleDriveService.uploadFile(file, fileName, folderId);
   };
 
+  const validateFolder = async (folderId: string) => {
+    return googleDriveService.validateFolder(folderId);
+  };
+
   const isReady = () => googleDriveService.isReady();
   
   const logout = () => googleDriveService.clearTokens();
@@ -324,6 +391,7 @@ export const useGoogleDrive = () => {
   return {
     initialize,
     uploadFile,
+    validateFolder,
     isReady,
     logout,
     getTokenInfo,

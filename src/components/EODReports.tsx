@@ -526,6 +526,38 @@ Your session will be automatically refreshed for up to 7 days!`;
     setIsUploading(true);
     setUploadResults([]);
 
+    // First, validate all folders before starting uploads
+    const validationResults: { vendor: string; valid: boolean; error?: string }[] = [];
+    
+    for (const vendorName of selectedVendors) {
+      const vendorInfo = vendors.find(v => v.name === vendorName);
+      if (vendorInfo?.google_drive_folder_id) {
+        const validation = await googleDriveService.validateFolder(vendorInfo.google_drive_folder_id);
+        validationResults.push({ vendor: vendorName, ...validation });
+      }
+    }
+
+    // Check if any folders failed validation
+    const invalidFolders = validationResults.filter(r => !r.valid);
+    if (invalidFolders.length > 0) {
+      const errorMessages = invalidFolders.map(r => 
+        `${r.vendor}: ${r.error}`
+      ).join('\n');
+      
+      toast({
+        title: "Folder Access Issues",
+        description: `Some folders could not be accessed:\n${errorMessages}`,
+        variant: "destructive",
+      });
+      
+      // Set results for invalid folders and continue with valid ones
+      setUploadResults(invalidFolders.map(r => ({
+        vendor: r.vendor,
+        success: false,
+        error: r.error
+      })));
+    }
+
     try {
       const data = await fetchDataForDate(selectedDate);
 
@@ -541,11 +573,16 @@ Your session will be automatically refreshed for up to 7 days!`;
       const groupedData = groupDataByVendor(data);
       const fileDate = format(selectedDate, "MM_dd");
       
-      const results: UploadResult[] = [];
+      const results: UploadResult[] = [...uploadResults]; // Include validation failures
       let successCount = 0;
 
-      // Upload only selected vendors
+      // Upload only selected vendors with valid folders
       for (const vendorName of selectedVendors) {
+        // Skip vendors with invalid folders
+        const validation = validationResults.find(r => r.vendor === vendorName);
+        if (validation && !validation.valid) {
+          continue; // Already added to results above
+        }
         const vendorData = groupedData[vendorName];
         const vendorInfo = vendors.find(v => v.name === vendorName);
 
