@@ -395,6 +395,41 @@ class GoogleDriveService {
     }
   }
 
+  // Debug: List recent files to verify API access
+  async debugListRecentFiles(): Promise<any[]> {
+    const tokenValid = await this.ensureValidToken();
+    if (!tokenValid) {
+      console.error('Cannot list files: Token not valid');
+      return [];
+    }
+
+    try {
+      console.log('=== DEBUG: Listing recent files ===');
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files?pageSize=10&orderBy=modifiedTime desc&fields=files(id,name,mimeType,modifiedTime)`,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.config.accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Debug list files error:', errorData);
+        return [];
+      }
+
+      const data = await response.json();
+      console.log('Recent files:', data.files);
+      console.log('=====================================');
+      return data.files || [];
+    } catch (error) {
+      console.error('Error listing recent files:', error);
+      return [];
+    }
+  }
+
   // Get token expiration info
   getTokenInfo(): { isValid: boolean; expiresAt?: number; needsRefresh: boolean } {
     if (!this.tokenData) {

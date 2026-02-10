@@ -872,6 +872,17 @@ Your session will be automatically refreshed for up to 7 days!`;
                     >
                       Logout
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        console.log('Running debug: listing recent files...');
+                        googleDriveService.debugListRecentFiles();
+                      }}
+                      className="text-blue-600 hover:text-blue-700"
+                    >
+                      Debug: List Files
+                    </Button>
                   </div>
                 </div>
               )}
