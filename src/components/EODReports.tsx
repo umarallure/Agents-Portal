@@ -163,14 +163,28 @@ Your session will be automatically refreshed for up to 7 days!`;
     const response = prompt(instructions);
     
     if (response) {
+      console.log('=== GOOGLE AUTHENTICATION ===');
+      console.log('Raw response length:', response.length);
+      
       try {
         // Try to parse as JSON (full OAuth response)
         const tokenData = JSON.parse(response);
+        console.log('Parsed token data:', {
+          has_access_token: !!tokenData.access_token,
+          has_refresh_token: !!tokenData.refresh_token,
+          expires_in: tokenData.expires_in,
+          token_type: tokenData.token_type,
+          scope: tokenData.scope
+        });
         
         if (tokenData.access_token) {
           const accessToken = tokenData.access_token;
           const refreshToken = tokenData.refresh_token;
           const expiresIn = tokenData.expires_in || 3600;
+          
+          console.log('Initializing with tokens...');
+          console.log('Access token (first 30 chars):', accessToken.substring(0, 30) + '...');
+          console.log('Has refresh token:', !!refreshToken);
           
           // Initialize with both tokens
           googleDriveService.initialize(accessToken, refreshToken, expiresIn);
@@ -183,6 +197,8 @@ Your session will be automatically refreshed for up to 7 days!`;
             needsRefresh: false,
           });
           
+          console.log('Authentication complete. Expires at:', expiresAt.toLocaleString());
+          
           toast({
             title: "Authenticated Successfully",
             description: refreshToken 
@@ -190,6 +206,7 @@ Your session will be automatically refreshed for up to 7 days!`;
               : "Connected to Google Drive (no refresh token - you'll need to re-authenticate in 1 hour).",
           });
         } else {
+          console.warn('No access_token found in response');
           // Fallback: treat as just access token
           googleDriveService.initialize(response.trim());
           setIsAuthenticated(true);
@@ -199,6 +216,7 @@ Your session will be automatically refreshed for up to 7 days!`;
           });
         }
       } catch (e) {
+        console.log('Failed to parse as JSON, treating as plain token');
         // Not JSON, treat as plain access token
         const token = response.trim();
         googleDriveService.initialize(token);
@@ -208,6 +226,7 @@ Your session will be automatically refreshed for up to 7 days!`;
           description: "Connected to Google Drive (session expires in 1 hour).",
         });
       }
+      console.log('=== END AUTHENTICATION ===');
     }
   };
 
@@ -526,16 +545,33 @@ Your session will be automatically refreshed for up to 7 days!`;
     setIsUploading(true);
     setUploadResults([]);
 
+    console.log('=== STARTING UPLOAD PROCESS ===');
+    console.log('Selected vendors:', Array.from(selectedVendors));
+    console.log('Total vendors:', selectedVendors.size);
+
     // First, validate all folders before starting uploads
     const validationResults: { vendor: string; valid: boolean; error?: string }[] = [];
     
     for (const vendorName of selectedVendors) {
       const vendorInfo = vendors.find(v => v.name === vendorName);
+      console.log(`Validating vendor: ${vendorName}`);
+      console.log(`  Folder ID: ${vendorInfo?.google_drive_folder_id}`);
+      
       if (vendorInfo?.google_drive_folder_id) {
         const validation = await googleDriveService.validateFolder(vendorInfo.google_drive_folder_id);
+        console.log(`  Validation result:`, validation);
         validationResults.push({ vendor: vendorName, ...validation });
+      } else {
+        console.log(`  No folder ID configured`);
+        validationResults.push({ 
+          vendor: vendorName, 
+          valid: false, 
+          error: 'No Google Drive folder configured' 
+        });
       }
     }
+
+    console.log('Validation results:', validationResults);
 
     // Check if any folders failed validation
     const invalidFolders = validationResults.filter(r => !r.valid);
@@ -543,6 +579,8 @@ Your session will be automatically refreshed for up to 7 days!`;
       const errorMessages = invalidFolders.map(r => 
         `${r.vendor}: ${r.error}`
       ).join('\n');
+      
+      console.error('Invalid folders:', invalidFolders);
       
       toast({
         title: "Folder Access Issues",
@@ -604,14 +642,25 @@ Your session will be automatically refreshed for up to 7 days!`;
           continue;
         }
 
-        const { buffer, fileName } = createExcelFile(vendorData, vendorName, fileDate);
-        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        console.log(`\n--- Processing upload for: ${vendorName} ---`);
+        console.log(`  Records: ${vendorData.length}`);
+        console.log(`  Folder ID: ${vendorInfo.google_drive_folder_id}`);
 
+        const { buffer, fileName } = createExcelFile(vendorData, vendorName, fileDate);
+        console.log(`  Generated file: ${fileName}`);
+        console.log(`  Buffer size: ${buffer.byteLength} bytes`);
+
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        console.log(`  Blob size: ${blob.size} bytes`);
+
+        console.log(`  Starting upload...`);
         const result = await googleDriveService.uploadFile(
           blob,
           fileName,
           vendorInfo.google_drive_folder_id
         );
+
+        console.log(`  Upload result:`, result);
 
         results.push({
           vendor: vendorName,
@@ -622,8 +671,16 @@ Your session will be automatically refreshed for up to 7 days!`;
 
         if (result.success) {
           successCount++;
+          console.log(`  ✓ Success! File ID: ${result.fileId}`);
+        } else {
+          console.error(`  ✗ Failed: ${result.error}`);
         }
+        console.log(`--- End ${vendorName} ---\n`);
       }
+
+      console.log('=== UPLOAD PROCESS COMPLETE ===');
+      console.log('Results:', results);
+      console.log(`Success count: ${successCount}/${selectedVendors.size}`);
 
       setUploadResults(results);
 

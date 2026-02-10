@@ -220,6 +220,16 @@ class GoogleDriveService {
         const errorData = await response.json();
         const errorMessage = errorData.error?.message || `Upload failed: ${response.statusText}`;
         
+        // Log full error details for debugging
+        console.error('=== GOOGLE DRIVE UPLOAD ERROR ===');
+        console.error('Status:', response.status, response.statusText);
+        console.error('Error Data:', JSON.stringify(errorData, null, 2));
+        console.error('Folder ID (clean):', cleanId);
+        console.error('Folder ID (original):', folderId);
+        console.error('File Name:', fileName);
+        console.error('Response URL:', response.url);
+        console.error('==================================');
+        
         // Provide more helpful error messages for common issues
         if (errorMessage.includes('File not found')) {
           throw new Error(`Folder not found (ID: ${cleanId.substring(0, 20)}...). Please verify: 1) The folder exists in Google Drive, 2) You have edit access to the folder, 3) The folder ID in database is correct (not a URL).`);
@@ -314,6 +324,16 @@ class GoogleDriveService {
       if (!response.ok) {
         const errorData = await response.json();
         const errorMessage = errorData.error?.message || '';
+        
+        // Log full error details for debugging
+        console.error('=== GOOGLE DRIVE VALIDATION ERROR ===');
+        console.error('Status:', response.status, response.statusText);
+        console.error('Error Data:', JSON.stringify(errorData, null, 2));
+        console.error('Folder ID (clean):', cleanId);
+        console.error('Folder ID (original):', folderId);
+        console.error('Response URL:', response.url);
+        console.error('Access Token (first 20 chars):', this.config.accessToken?.substring(0, 20) + '...');
+        console.error('=====================================');
         
         if (response.status === 404 || errorMessage.includes('File not found')) {
           return { 
