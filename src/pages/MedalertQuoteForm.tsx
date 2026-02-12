@@ -21,14 +21,21 @@ const PRODUCT_INFO = {
   shipping: 15.00
 };
 
+const US_STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+  'DC', 'PR'
+];
+
 const MedalertQuoteForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { leadVendor, loading: centerLoading } = useCenterUser();
 
   // Client Information
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -64,7 +71,8 @@ const MedalertQuoteForm = () => {
   // DNC Check
   const [dncChecked, setDncChecked] = useState(false);
   const [dncChecking, setDncChecking] = useState(false);
-  const [dncResult, setDncResult] = useState<{isDnc: boolean; isTcpa: boolean; message: string} | null>(null);
+  const [dncResult, setDncResult] = useState<{isDnc: boolean; isTcpa: boolean; message: string; rawData?: any} | null>(null);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
 
   const calculateTotal = () => {
     const deviceCost = PRODUCT_INFO.discountedDeviceCost;
@@ -114,21 +122,36 @@ const MedalertQuoteForm = () => {
 
       const result = await response.json();
       
-      // Parse the RealValidito response
-      // The API returns an array of results for each number
-      const phoneResult = result?.results?.[0] || result;
+      // Debug: Log the full response to see the structure
+      console.log('DNC API Response:', JSON.stringify(result, null, 2));
       
-      const isDnc = phoneResult?.dnc === true || phoneResult?.isDnc === true;
-      const isTcpa = phoneResult?.tcpa === true || phoneResult?.isTcpa === true || phoneResult?.litigator === true;
+      // Parse the RealValidito response
+      // The API returns: { status: "success", data: { tcpa_litigator: ["8608907018"], cleaned_number: [], invalid: [] } }
+      const apiData = result?.data || result;
+      
+      // Check if phone number is in tcpa_litigator array
+      const tcpaLitigatorList = apiData?.tcpa_litigator || [];
+      const isTcpa = Array.isArray(tcpaLitigatorList) && tcpaLitigatorList.includes(cleanPhone);
+      
+      // Check DNC - for now RealValidito doesn't return DNC, only TCPA litigator
+      // If you have DNC data, it would likely be in a similar array structure
+      const dncList = apiData?.dnc || apiData?.do_not_call || [];
+      const isDnc = Array.isArray(dncList) && dncList.includes(cleanPhone);
+      
+      // Also check if it's in any restricted list
+      const isRestricted = false; // No restricted field in this API response
       
       setDncResult({
-        isDnc,
-        isTcpa,
+        isDnc: isDnc || isRestricted,
+        isTcpa: isTcpa,
         message: isTcpa 
           ? 'WARNING: This number is flagged as TCPA/Litigator. Cannot proceed with submission.'
           : isDnc 
             ? 'This number is on the DNC list. Proceed with caution.'
-            : 'This number is clear. Safe to proceed.',
+            : isRestricted
+              ? 'This number is restricted. Proceed with caution.'
+              : 'This number is clear. Safe to proceed.',
+        rawData: result // Store raw data for debugging
       });
 
       if (isTcpa) {
@@ -137,7 +160,7 @@ const MedalertQuoteForm = () => {
           description: 'This phone number is flagged as TCPA/Litigator. Form submission is blocked.',
           variant: 'destructive',
         });
-      } else if (isDnc) {
+      } else if (isDnc || isRestricted) {
         toast({
           title: 'DNC Warning',
           description: 'This number is on the Do Not Call list. Please verify before proceeding.',
@@ -164,15 +187,6 @@ const MedalertQuoteForm = () => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    // Email and Password are now optional
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = 'Invalid email format';
-    }
-    
-    if (password && password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
-    
     if (!firstName) newErrors.firstName = 'First name is required';
     if (!lastName) newErrors.lastName = 'Last name is required';
     if (!phoneNumber) newErrors.phoneNumber = 'Phone number is required';
@@ -260,7 +274,6 @@ const MedalertQuoteForm = () => {
         last_name: lastName,
         customer_full_name: customerFullName,
         phone_number: phoneNumber,
-        email: email,
         address: address,
         city: city,
         state: state,
@@ -296,9 +309,6 @@ const MedalertQuoteForm = () => {
         primary_user_same_as_client: primaryUserSameAsClient, // Whether primary user is same as client
         primary_user_first_name: primaryUserFirst,            // Primary user first name
         primary_user_last_name: primaryUserLast,              // Primary user last name
-        
-        // CLIENT ACCOUNT INFO
-        client_password: password,                            // Client password
         
         // PAYMENT INFO
         payment_method: paymentMethod,                        // Payment method: credit_card or ach
@@ -354,12 +364,10 @@ const MedalertQuoteForm = () => {
           first_name: firstName,
           last_name: lastName,
           phone_number: phoneNumber,
-          email: email || null,
           address: address,
           city: city,
           state: state,
           zip_code: zipCode,
-          client_password: password || null,
           primary_user_same_as_client: primaryUserSameAsClient,
           primary_user_first_name: primaryUserSameAsClient ? firstName : primaryUserFirstName,
           primary_user_last_name: primaryUserSameAsClient ? lastName : primaryUserLastName,
@@ -535,38 +543,6 @@ const MedalertQuoteForm = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">
-                    Email Address <span className="text-gray-400">(Optional)</span>
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="client@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className={errors.email ? 'border-red-500' : ''}
-                  />
-                  {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">
-                    Account Password <span className="text-gray-400">(Optional)</span>
-                  </Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Create a secure password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className={errors.password ? 'border-red-500' : ''}
-                  />
-                  {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
-                  <p className="text-xs text-muted-foreground">Minimum 8 characters if provided</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
                   <Label htmlFor="firstName">
                     First Name <span className="text-red-500">*</span>
                   </Label>
@@ -666,7 +642,7 @@ const MedalertQuoteForm = () => {
                           </svg>
                         )}
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <p className="font-medium">
                           {dncResult.isTcpa 
                             ? 'TCPA/Litigator Detected' 
@@ -675,6 +651,21 @@ const MedalertQuoteForm = () => {
                               : 'Clear - Safe to Contact'}
                         </p>
                         <p className="text-xs mt-1">{dncResult.message}</p>
+                        
+                        {/* Debug Toggle */}
+                        <button
+                          type="button"
+                          onClick={() => setShowDebugInfo(!showDebugInfo)}
+                          className="text-xs text-blue-600 hover:text-blue-800 underline mt-2"
+                        >
+                          {showDebugInfo ? 'Hide' : 'Show'} API Debug Info
+                        </button>
+                        
+                        {showDebugInfo && dncResult.rawData && (
+                          <div className="mt-2 p-2 bg-gray-800 text-green-400 text-xs rounded overflow-auto max-h-40">
+                            <pre>{JSON.stringify(dncResult.rawData, null, 2)}</pre>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -737,13 +728,18 @@ const MedalertQuoteForm = () => {
                   <Label htmlFor="state">
                     State <span className="text-red-500">*</span>
                   </Label>
-                  <Input
-                    id="state"
-                    placeholder="State"
-                    value={state}
-                    onChange={(e) => setState(e.target.value)}
-                    className={errors.state ? 'border-red-500' : ''}
-                  />
+                  <Select value={state} onValueChange={(value) => setState(value)}>
+                    <SelectTrigger className={errors.state ? 'border-red-500' : ''}>
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {US_STATES.map((stateCode) => (
+                        <SelectItem key={stateCode} value={stateCode}>
+                          {stateCode}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {errors.state && <p className="text-sm text-red-500">{errors.state}</p>}
                 </div>
                 <div className="space-y-2">
