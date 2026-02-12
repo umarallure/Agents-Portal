@@ -404,6 +404,61 @@ const MedalertQuoteForm = () => {
           console.error('Error saving to local medalert_leads:', localError);
           // Don't throw here - we still want to show success for the external lead creation
         }
+
+        // Send Slack notification to the center's channel
+        try {
+          console.log('Sending Slack notification with leadData:', localLeadData);
+          
+          // Get the current session token for authentication
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          const slackResponse = await fetch('https://gqhcjqxcvhgwsqfqgekh.supabase.co/functions/v1/medalert-slack-notification', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token || ''}`,
+            },
+            body: JSON.stringify({
+              leadData: localLeadData
+            }),
+          });
+
+          console.log('Slack response status:', slackResponse.status);
+          
+          if (!slackResponse.ok) {
+            const slackError = await slackResponse.text();
+            console.error('Slack notification error:', slackError);
+            toast({
+              title: 'Slack Notification Failed',
+              description: `Error: ${slackError}`,
+              variant: 'destructive',
+            });
+          } else {
+            const slackResult = await slackResponse.json();
+            console.log('Slack notification result:', slackResult);
+            
+            if (slackResult.success) {
+              toast({
+                title: 'Slack Notification Sent',
+                description: `Notification sent to ${slackResult.channel}`,
+              });
+            } else {
+              toast({
+                title: 'Slack Notification Warning',
+                description: slackResult.message || 'Could not send notification',
+                variant: 'default',
+              });
+            }
+          }
+        } catch (slackError) {
+          console.error('Error sending Slack notification:', slackError);
+          toast({
+            title: 'Slack Notification Error',
+            description: slackError instanceof Error ? slackError.message : 'Failed to send Slack notification',
+            variant: 'destructive',
+          });
+          // Don't throw - we don't want to block the form submission if Slack fails
+        }
       } catch (localError) {
         console.error('Error saving to local table:', localError);
         // Don't throw - the external lead was still created successfully
