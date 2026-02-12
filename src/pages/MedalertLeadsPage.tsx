@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Shield, Package, CreditCard, Landmark, Loader2, Eye } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Shield, Package, CreditCard, Landmark, Loader2, Eye, Clock, List } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -49,9 +50,9 @@ const MedalertLeadsPage = () => {
   const { toast } = useToast();
 
   const [leads, setLeads] = useState<MedalertLead[]>([]);
-  const [filteredLeads, setFilteredLeads] = useState<MedalertLead[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('all');
   const [searchFilter, setSearchFilter] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<MedalertLead | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
@@ -67,10 +68,6 @@ const MedalertLeadsPage = () => {
     }
   }, [user]);
 
-  useEffect(() => {
-    applyFilters();
-  }, [leads, searchFilter]);
-
   const fetchLeads = async () => {
     try {
       const { data, error } = await supabase
@@ -81,7 +78,7 @@ const MedalertLeadsPage = () => {
 
       if (error) throw error;
 
-      setLeads(data || []);
+      setLeads((data as unknown as MedalertLead[]) || []);
     } catch (error) {
       console.error('Error fetching medalert leads:', error);
       toast({
@@ -94,9 +91,10 @@ const MedalertLeadsPage = () => {
     }
   };
 
-  const applyFilters = () => {
-    let filtered = leads;
+  const filterLeads = (leadsList: MedalertLead[]) => {
+    let filtered = leadsList;
 
+    // Filter by search
     if (searchFilter) {
       const search = searchFilter.toLowerCase();
       filtered = filtered.filter(lead =>
@@ -107,8 +105,11 @@ const MedalertLeadsPage = () => {
       );
     }
 
-    setFilteredLeads(filtered);
+    return filtered;
   };
+
+  const allLeads = filterLeads(leads);
+  const pendingLeads = filterLeads(leads.filter(l => l.status === 'pending'));
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -131,6 +132,103 @@ const MedalertLeadsPage = () => {
     setSelectedLead(lead);
     setIsDetailOpen(true);
   };
+
+  const renderLeadCard = (lead: MedalertLead) => (
+    <Card key={lead.id} className="hover:shadow-md transition-shadow">
+      <CardContent className="pt-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Left side - Client Info */}
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-lg font-semibold">
+                {lead.first_name} {lead.last_name}
+              </h3>
+              <Badge className={getStatusBadge(lead.status)}>
+                {lead.status}
+              </Badge>
+              {lead.protection_plan_included && (
+                <Badge variant="outline" className="text-blue-600">
+                  Protection Plan
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              {lead.phone_number}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              ID: {lead.submission_id} • Submitted {format(new Date(lead.created_at), 'MMM dd, yyyy')}
+            </p>
+          </div>
+
+          {/* Middle - Product Info */}
+          <div className="flex-1 md:text-center">
+            <div className="flex items-center gap-2 justify-center mb-1">
+              <Package className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">{lead.quoted_product}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">{lead.company_name}</p>
+          </div>
+
+          {/* Right side - Payment & Cost */}
+          <div className="flex-1 md:text-right">
+            <div className="flex items-center gap-2 justify-end mb-1">
+              {lead.payment_method === 'credit_card' ? (
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Landmark className="h-4 w-4 text-muted-foreground" />
+              )}
+              <span className="text-lg font-bold text-green-600">
+                {formatCurrency(lead.total_upfront_cost)}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {formatCurrency(lead.total_monthly_cost)}/month
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => handleViewDetails(lead)}
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              View
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderEmptyState = (isActiveQueue: boolean) => (
+    <Card>
+      <CardContent className="pt-6 text-center py-12">
+        {isActiveQueue ? (
+          <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        ) : (
+          <Shield className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        )}
+        <h3 className="text-lg font-medium">
+          {isActiveQueue ? "No Active Queue leads" : "No Medalert leads found"}
+        </h3>
+        <p className="text-muted-foreground mt-2">
+          {searchFilter 
+            ? "Try adjusting your search filters"
+            : isActiveQueue 
+              ? "No pending leads in the active queue"
+              : "You haven't submitted any Medalert device quotes yet"}
+        </p>
+        <Button 
+          onClick={() => navigate('/medalert-quote')}
+          className="mt-4"
+        >
+          Submit New Quote
+        </Button>
+      </CardContent>
+    </Card>
+  );
 
   if (isLoading) {
     return (
@@ -159,12 +257,12 @@ const MedalertLeadsPage = () => {
           </Button>
           <h1 className="text-3xl font-bold text-foreground">My Medalert Leads</h1>
           <p className="text-muted-foreground mt-1">
-            View all Medalert device quotes you have submitted
+            Manage your Medalert device quotes
           </p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardContent className="pt-6">
               <div className="text-2xl font-bold">{leads.length}</div>
@@ -173,10 +271,18 @@ const MedalertLeadsPage = () => {
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold text-yellow-600">
                 {leads.filter(l => l.status === 'pending').length}
               </div>
-              <p className="text-sm text-muted-foreground">Pending</p>
+              <p className="text-sm text-muted-foreground">Active Queue (Pending)</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-green-600">
+                {leads.filter(l => l.status === 'completed').length}
+              </div>
+              <p className="text-sm text-muted-foreground">Completed</p>
             </CardContent>
           </Card>
           <Card>
@@ -189,7 +295,7 @@ const MedalertLeadsPage = () => {
           </Card>
         </div>
 
-        {/* Filters */}
+        {/* Search */}
         <Card className="mb-6">
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row gap-4">
@@ -204,97 +310,55 @@ const MedalertLeadsPage = () => {
           </CardContent>
         </Card>
 
-        {/* Leads List */}
-        {filteredLeads.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6 text-center py-12">
-              <Shield className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">No Medalert leads found</h3>
-              <p className="text-muted-foreground mt-2">
-                {searchFilter 
-                  ? "Try adjusting your search filters"
-                  : "You haven't submitted any Medalert device quotes yet"}
-              </p>
-              <Button 
-                onClick={() => navigate('/medalert-quote')}
-                className="mt-4"
-              >
-                Submit New Quote
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {filteredLeads.map((lead) => (
-              <Card key={lead.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="pt-6">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    {/* Left side - Client Info */}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-lg font-semibold">
-                          {lead.first_name} {lead.last_name}
-                        </h3>
-                        <Badge className={getStatusBadge(lead.status)}>
-                          {lead.status}
-                        </Badge>
-                        {lead.protection_plan_included && (
-                          <Badge variant="outline" className="text-blue-600">
-                            Protection Plan
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-1">
-                        {lead.phone_number}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        ID: {lead.submission_id} • Submitted {format(new Date(lead.created_at), 'MMM dd, yyyy')}
-                      </p>
-                    </div>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="all" className="flex items-center gap-2">
+              <List className="h-4 w-4" />
+              All Leads
+              <Badge variant="secondary" className="ml-1">{allLeads.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="active" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Active Queue
+              <Badge variant="secondary" className="ml-1 bg-yellow-100 text-yellow-800">
+                {pendingLeads.length}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
 
-                    {/* Middle - Product Info */}
-                    <div className="flex-1 md:text-center">
-                      <div className="flex items-center gap-2 justify-center mb-1">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{lead.quoted_product}</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{lead.company_name}</p>
-                    </div>
+          <TabsContent value="all" className="mt-0">
+            {allLeads.length === 0 ? (
+              renderEmptyState(false)
+            ) : (
+              <div className="space-y-4">
+                {allLeads.map(renderLeadCard)}
+              </div>
+            )}
+          </TabsContent>
 
-                    {/* Right side - Payment & Cost */}
-                    <div className="flex-1 md:text-right">
-                      <div className="flex items-center gap-2 justify-end mb-1">
-                        {lead.payment_method === 'credit_card' ? (
-                          <CreditCard className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <Landmark className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <span className="text-lg font-bold text-green-600">
-                          {formatCurrency(lead.total_upfront_cost)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {formatCurrency(lead.total_monthly_cost)}/month
+          <TabsContent value="active" className="mt-0">
+            {pendingLeads.length === 0 ? (
+              renderEmptyState(true)
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-start gap-3">
+                    <Clock className="h-5 w-5 text-yellow-600 mt-0.5" />
+                    <div>
+                      <h3 className="font-medium text-yellow-800">Active Queue</h3>
+                      <p className="text-sm text-yellow-700">
+                        These {pendingLeads.length} lead{pendingLeads.length !== 1 ? 's are' : ' is'} pending and waiting to be processed. 
+                        Total value: {formatCurrency(pendingLeads.reduce((sum, l) => sum + (l.total_upfront_cost || 0), 0))}
                       </p>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleViewDetails(lead)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                </div>
+                {pendingLeads.map(renderLeadCard)}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Detail Dialog */}
