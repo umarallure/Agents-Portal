@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, Search, ArrowLeft, DollarSign, ShieldCheck, Zap, Users, Calendar, Inbox } from 'lucide-react';
+import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, Search, ArrowLeft, DollarSign, ShieldCheck, Zap, Users, Calendar, Inbox, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLicensedAgent } from '@/hooks/useLicensedAgent';
 import { useCenterUser } from '@/hooks/useCenterUser';
@@ -183,6 +183,10 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                     <DropdownMenuItem onClick={() => navigate('/center-calendar-view')}>
                       <Calendar className="mr-2 h-4 w-4" />
                       Calendar View
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/medalert-leads')}>
+                      <Shield className="mr-2 h-4 w-4" />
+                      My Medalert Leads
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate('/medalert-quote')}>
                       <ShieldCheck className="mr-2 h-4 w-4" />

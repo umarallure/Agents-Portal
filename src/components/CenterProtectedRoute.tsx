@@ -29,7 +29,7 @@ const CenterProtectedRoute = ({ children }: CenterProtectedRouteProps) => {
     }
 
     // Center users can only access center-specific routes
-    const allowedPaths = ['/center-lead-portal', '/center-calendar-view', '/center-auth', '/center-callback-request', '/medalert-quote'];
+    const allowedPaths = ['/center-lead-portal', '/center-calendar-view', '/center-auth', '/center-callback-request', '/medalert-quote', '/medalert-leads'];
     if (!allowedPaths.includes(location.pathname)) {
       console.log('[CenterProtectedRoute] Blocking access to:', location.pathname, 'Allowed paths:', allowedPaths);
       navigate('/center-lead-portal', { replace: true });

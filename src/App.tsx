@@ -17,6 +17,7 @@ import CenterLeadPortal from "./pages/CenterLeadPortal";
 import CenterCalendarView from "./pages/CenterCalendarView";
 import CallbackRequestPage from "./pages/CallbackRequestPage";
 import MedalertQuoteForm from "./pages/MedalertQuoteForm";
+import MedalertLeadsPage from "./pages/MedalertLeadsPage";
 import CommissionPortal from "./pages/CommissionPortal";
 import CallResultUpdate from "./pages/CallResultUpdate";
 import CallResultJourney from "./pages/CallResultJourney";
@@ -93,6 +94,14 @@ const App = () => (
               element={
                 <CenterProtectedRoute>
                   <MedalertQuoteForm />
+                </CenterProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/medalert-leads" 
+              element={
+                <CenterProtectedRoute>
+                  <MedalertLeadsPage />
                 </CenterProtectedRoute>
               } 
             />

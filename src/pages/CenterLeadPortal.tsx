@@ -302,6 +302,14 @@ const CenterLeadPortal = () => {
                 <Shield className="h-4 w-4 mr-2" />
                 Medalert Quote
               </Button>
+              <Button 
+                onClick={() => navigate('/medalert-leads')}
+                variant="outline"
+                className="border-blue-600 text-blue-600 hover:bg-blue-50"
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                My Medalert Leads
+              </Button>
             </div>
           </div>
 

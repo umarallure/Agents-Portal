@@ -60,6 +60,11 @@ const MedalertQuoteForm = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // DNC Check
+  const [dncChecked, setDncChecked] = useState(false);
+  const [dncChecking, setDncChecking] = useState(false);
+  const [dncResult, setDncResult] = useState<{isDnc: boolean; isTcpa: boolean; message: string} | null>(null);
 
   const calculateTotal = () => {
     const deviceCost = PRODUCT_INFO.discountedDeviceCost;
@@ -76,14 +81,97 @@ const MedalertQuoteForm = () => {
     return total;
   };
 
+  // DNC Check Function
+  const checkDnc = async () => {
+    if (!phoneNumber || phoneNumber.length < 10) {
+      toast({
+        title: 'Phone Number Required',
+        description: 'Please enter a valid phone number before checking DNC.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setDncChecking(true);
+    setDncResult(null);
+
+    try {
+      // Clean the phone number - remove non-digits
+      const cleanPhone = phoneNumber.replace(/\D/g, '');
+      
+      const response = await fetch('https://akdryqadcxhzqcqhssok.supabase.co/functions/v1/dnc-lookup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrZHJ5cWFkY3hoenFjcWhzc29rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3Mjg5MDQsImV4cCI6MjA2OTMwNDkwNH0.36poCyc_PGl2EnGM3283Hj5_yxRYQU2IetYl8aUA3r4',
+        },
+        body: JSON.stringify({ mobileNumber: cleanPhone }),
+      });
+
+      if (!response.ok) {
+        throw new Error('DNC check failed');
+      }
+
+      const result = await response.json();
+      
+      // Parse the RealValidito response
+      // The API returns an array of results for each number
+      const phoneResult = result?.results?.[0] || result;
+      
+      const isDnc = phoneResult?.dnc === true || phoneResult?.isDnc === true;
+      const isTcpa = phoneResult?.tcpa === true || phoneResult?.isTcpa === true || phoneResult?.litigator === true;
+      
+      setDncResult({
+        isDnc,
+        isTcpa,
+        message: isTcpa 
+          ? 'WARNING: This number is flagged as TCPA/Litigator. Cannot proceed with submission.'
+          : isDnc 
+            ? 'This number is on the DNC list. Proceed with caution.'
+            : 'This number is clear. Safe to proceed.',
+      });
+
+      if (isTcpa) {
+        toast({
+          title: 'TCPA Alert',
+          description: 'This phone number is flagged as TCPA/Litigator. Form submission is blocked.',
+          variant: 'destructive',
+        });
+      } else if (isDnc) {
+        toast({
+          title: 'DNC Warning',
+          description: 'This number is on the Do Not Call list. Please verify before proceeding.',
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: 'DNC Check Complete',
+          description: 'This number is clear and safe to contact.',
+        });
+      }
+    } catch (error) {
+      console.error('DNC check error:', error);
+      toast({
+        title: 'DNC Check Failed',
+        description: 'Unable to check DNC status. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDncChecking(false);
+    }
+  };
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!email) newErrors.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) newErrors.email = 'Invalid email format';
+    // Email and Password are now optional
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = 'Invalid email format';
+    }
     
-    if (!password) newErrors.password = 'Password is required';
-    else if (password.length < 8) newErrors.password = 'Password must be at least 8 characters';
+    if (password && password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    }
     
     if (!firstName) newErrors.firstName = 'First name is required';
     if (!lastName) newErrors.lastName = 'Last name is required';
@@ -109,12 +197,42 @@ const MedalertQuoteForm = () => {
       if (!accountHolderName) newErrors.accountHolderName = 'Account holder name is required';
     }
 
+    // DNC Check Validation
+    if (!dncChecked) {
+      newErrors.dnc = 'You must check DNC/TCPA status before submitting';
+    }
+
+    // Block submission if TCPA is detected
+    if (dncResult?.isTcpa) {
+      newErrors.dnc = 'Cannot submit: This number is flagged as TCPA/Litigator';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check if DNC has been checked
+    if (!dncChecked) {
+      toast({
+        title: 'DNC Check Required',
+        description: 'Please check the DNC/TCPA status before submitting the form.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Block submission if TCPA is detected
+    if (dncResult?.isTcpa) {
+      toast({
+        title: 'Submission Blocked',
+        description: 'Cannot submit: This phone number is flagged as TCPA/Litigator.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     if (!validateForm()) {
       toast({
@@ -223,6 +341,65 @@ const MedalertQuoteForm = () => {
       }
 
       const data = await response.json();
+
+      // Also save to local medalert_leads table for user's reference
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        const localLeadData = {
+          submission_id: leadPayload.submission_id,
+          submitted_by: user?.id,
+          lead_vendor: leadVendor,
+          center_user_name: leadVendor,
+          first_name: firstName,
+          last_name: lastName,
+          phone_number: phoneNumber,
+          email: email || null,
+          address: address,
+          city: city,
+          state: state,
+          zip_code: zipCode,
+          client_password: password || null,
+          primary_user_same_as_client: primaryUserSameAsClient,
+          primary_user_first_name: primaryUserSameAsClient ? firstName : primaryUserFirstName,
+          primary_user_last_name: primaryUserSameAsClient ? lastName : primaryUserLastName,
+          company_name: PRODUCT_INFO.companyName,
+          quoted_product: PRODUCT_INFO.productName,
+          device_cost: PRODUCT_INFO.discountedDeviceCost,
+          original_device_cost: PRODUCT_INFO.deviceCost,
+          discounted_device_cost: PRODUCT_INFO.discountedDeviceCost,
+          shipping_cost: PRODUCT_INFO.shipping,
+          monthly_subscription: PRODUCT_INFO.monthlySubscription,
+          protection_plan_included: includeProtectionPlan,
+          protection_plan_cost: includeProtectionPlan ? PRODUCT_INFO.protectionPlan : 0,
+          total_upfront_cost: totalUpfront,
+          total_monthly_cost: totalMonthly,
+          payment_method: paymentMethod,
+          ...(paymentMethod === 'credit_card' ? {
+            card_number_last_four: cardNumber.slice(-4),
+            card_expiry: expiryDate,
+            cardholder_name: cardholderName,
+          } : {
+            account_holder_name: accountHolderName,
+            account_number_last_four: accountNumber.slice(-4),
+            routing_number: routingNumber,
+            account_number: accountNumber,
+            account_type: accountType,
+          }),
+        };
+
+        const { error: localError } = await supabase
+          .from('medalert_leads' as any)
+          .insert(localLeadData);
+
+        if (localError) {
+          console.error('Error saving to local medalert_leads:', localError);
+          // Don't throw here - we still want to show success for the external lead creation
+        }
+      } catch (localError) {
+        console.error('Error saving to local table:', localError);
+        // Don't throw - the external lead was still created successfully
+      }
 
       toast({
         title: 'Lead Created Successfully',
@@ -359,7 +536,7 @@ const MedalertQuoteForm = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">
-                    Email Address <span className="text-red-500">*</span>
+                    Email Address <span className="text-gray-400">(Optional)</span>
                   </Label>
                   <Input
                     id="email"
@@ -373,7 +550,7 @@ const MedalertQuoteForm = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">
-                    Account Password <span className="text-red-500">*</span>
+                    Account Password <span className="text-gray-400">(Optional)</span>
                   </Label>
                   <Input
                     id="password"
@@ -384,7 +561,7 @@ const MedalertQuoteForm = () => {
                     className={errors.password ? 'border-red-500' : ''}
                   />
                   {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
-                  <p className="text-xs text-muted-foreground">Minimum 8 characters</p>
+                  <p className="text-xs text-muted-foreground">Minimum 8 characters if provided</p>
                 </div>
               </div>
 
@@ -426,10 +603,106 @@ const MedalertQuoteForm = () => {
                   type="tel"
                   placeholder="(555) 123-4567"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  onChange={(e) => {
+                    setPhoneNumber(e.target.value);
+                    // Reset DNC check when phone number changes
+                    setDncChecked(false);
+                    setDncResult(null);
+                  }}
                   className={errors.phoneNumber ? 'border-red-500' : ''}
                 />
                 {errors.phoneNumber && <p className="text-sm text-red-500">{errors.phoneNumber}</p>}
+              </div>
+
+              {/* DNC Check Section */}
+              <div className="p-4 border rounded-lg bg-muted/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-sm">DNC/TCPA Check <span className="text-red-500">*</span></h4>
+                    <p className="text-xs text-muted-foreground">Required before submission</p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={checkDnc}
+                    disabled={dncChecking || !phoneNumber}
+                    variant={dncResult?.isTcpa ? "destructive" : "default"}
+                    className={dncResult?.isDnc && !dncResult?.isTcpa ? "bg-yellow-600 hover:bg-yellow-700 text-white" : ""}
+                    size="sm"
+                  >
+                    {dncChecking ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Checking...
+                      </>
+                    ) : dncChecked ? (
+                      'Check Again'
+                    ) : (
+                      'Check DNC/TCPA'
+                    )}
+                  </Button>
+                </div>
+
+                {dncResult && (
+                  <div className={`p-3 rounded text-sm ${
+                    dncResult.isTcpa 
+                      ? 'bg-red-100 text-red-800 border border-red-200' 
+                      : dncResult.isDnc 
+                        ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                        : 'bg-green-100 text-green-800 border border-green-200'
+                  }`}>
+                    <div className="flex items-start gap-2">
+                      <div className="mt-0.5">
+                        {dncResult.isTcpa ? (
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                        ) : dncResult.isDnc ? (
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                        ) : (
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">
+                          {dncResult.isTcpa 
+                            ? 'TCPA/Litigator Detected' 
+                            : dncResult.isDnc 
+                              ? 'DNC Listed' 
+                              : 'Clear - Safe to Contact'}
+                        </p>
+                        <p className="text-xs mt-1">{dncResult.message}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-start space-x-2 pt-2">
+                  <Checkbox
+                    id="dnc-confirm"
+                    checked={dncChecked}
+                    onCheckedChange={(checked) => setDncChecked(checked as boolean)}
+                    disabled={!dncResult || dncResult.isTcpa}
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <Label
+                      htmlFor="dnc-confirm"
+                      className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${dncResult?.isTcpa ? 'text-red-500' : ''}`}
+                    >
+                      I confirm the DNC/TCPA check has been completed
+                      {dncResult?.isTcpa && ' (BLOCKED - Cannot proceed)'}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      You must check DNC/TCPA status and confirm before submitting
+                    </p>
+                  </div>
+                </div>
+                {errors.dnc && (
+                  <p className="text-sm text-red-500">{errors.dnc}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -732,14 +1005,18 @@ const MedalertQuoteForm = () => {
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
-              className="min-w-[200px]"
+              disabled={isSubmitting || dncResult?.isTcpa || !dncChecked}
+              className={`min-w-[200px] ${dncResult?.isTcpa ? 'bg-red-600 hover:bg-red-700' : ''}`}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Submitting...
                 </>
+              ) : dncResult?.isTcpa ? (
+                'TCPA - Cannot Submit'
+              ) : !dncChecked ? (
+                'Check DNC Required'
               ) : (
                 'Submit Quote'
               )}
