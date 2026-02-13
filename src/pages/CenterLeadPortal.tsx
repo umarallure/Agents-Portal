@@ -28,6 +28,14 @@ type Lead = {
   submission_date: string | null;
 };
 
+// List of lead vendors allowed to use Medalert features
+const ALLOWED_MEDALERT_VENDORS = [
+  "AJ BPO",
+  "WinBPO",
+  "Argon Comm",
+  "Test"
+];
+
 const CenterLeadPortal = () => {
   const { user, signOut, loading: authLoading } = useAuth();
   const { centerInfo, leadVendor, loading: centerLoading } = useCenterUser();
@@ -295,21 +303,26 @@ const CenterLeadPortal = () => {
                 <Plus className="h-4 w-4 mr-2" />
                 Create Lead
               </Button>
-              <Button 
-                onClick={() => navigate('/medalert-quote')}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <Shield className="h-4 w-4 mr-2" />
-                Medalert Quote
-              </Button>
-              <Button 
-                onClick={() => navigate('/medalert-leads')}
-                variant="outline"
-                className="border-blue-600 text-blue-600 hover:bg-blue-50"
-              >
-                <Shield className="h-4 w-4 mr-2" />
-                My Medalert Leads
-              </Button>
+              {/* Show Medalert buttons only for authorized vendors */}
+              {leadVendor && ALLOWED_MEDALERT_VENDORS.includes(leadVendor) && (
+                <>
+                  <Button 
+                    onClick={() => navigate('/medalert-quote')}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    Medalert Quote
+                  </Button>
+                  <Button 
+                    onClick={() => navigate('/medalert-leads')}
+                    variant="outline"
+                    className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    My Medalert Leads
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 

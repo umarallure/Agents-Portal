@@ -11,6 +11,14 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { TaskNotificationPanel } from './TaskNotificationPanel';
 
+// List of lead vendors allowed to use Medalert features
+const ALLOWED_MEDALERT_VENDORS = [
+  "AJ BPO",
+  "WinBPO",
+  "Argon Comm",
+  "Test"
+];
+
 interface NavigationHeaderProps {
   title: string;
   showBackButton?: boolean;
@@ -20,7 +28,7 @@ interface NavigationHeaderProps {
 export const NavigationHeader = ({ title, showBackButton = false, backTo }: NavigationHeaderProps) => {
   const { user, signOut } = useAuth();
   const { isLicensedAgent, loading: licensedLoading } = useLicensedAgent();
-  const { isCenterUser, loading: centerLoading } = useCenterUser();
+  const { isCenterUser, loading: centerLoading, leadVendor } = useCenterUser();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isBufferAgent, setIsBufferAgent] = useState(false);
@@ -184,14 +192,19 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                       <Calendar className="mr-2 h-4 w-4" />
                       Calendar View
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/medalert-leads')}>
-                      <Shield className="mr-2 h-4 w-4" />
-                      My Medalert Leads
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/medalert-quote')}>
-                      <ShieldCheck className="mr-2 h-4 w-4" />
-                      Medalert Quote
-                    </DropdownMenuItem>
+                    {/* Show Medalert menu items only for authorized vendors */}
+                    {leadVendor && ALLOWED_MEDALERT_VENDORS.includes(leadVendor) && (
+                      <>
+                        <DropdownMenuItem onClick={() => navigate('/medalert-leads')}>
+                          <Shield className="mr-2 h-4 w-4" />
+                          My Medalert Leads
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => navigate('/medalert-quote')}>
+                          <ShieldCheck className="mr-2 h-4 w-4" />
+                          Medalert Quote
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     <DropdownMenuItem onClick={() => navigate('/agent-licensing')}>
                       <ShieldCheck className="mr-2 h-4 w-4" />
                       Find Eligible Agents

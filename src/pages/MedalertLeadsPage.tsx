@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { NavigationHeader } from '@/components/NavigationHeader';
+import { useCenterUser } from '@/hooks/useCenterUser';
 import {
   Dialog,
   DialogContent,
@@ -44,8 +45,17 @@ type MedalertLead = {
   zip_code: string;
 };
 
+// List of lead vendors allowed to use Medalert features
+const ALLOWED_MEDALERT_VENDORS = [
+  "AJ BPO",
+  "WinBPO",
+  "Argon Comm",
+  "Test"
+];
+
 const MedalertLeadsPage = () => {
   const { user, loading: authLoading } = useAuth();
+  const { leadVendor, loading: centerLoading } = useCenterUser();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -230,7 +240,10 @@ const MedalertLeadsPage = () => {
     </Card>
   );
 
-  if (isLoading) {
+  // Check if user is authorized to use Medalert features
+  const isAuthorized = leadVendor && ALLOWED_MEDALERT_VENDORS.includes(leadVendor);
+
+  if (isLoading || centerLoading) {
     return (
       <div className="min-h-screen bg-background">
         <NavigationHeader title="My Medalert Leads" />
@@ -239,6 +252,39 @@ const MedalertLeadsPage = () => {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <span className="ml-2 text-muted-foreground">Loading your Medalert leads...</span>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied if not authorized
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-background">
+        <NavigationHeader title="My Medalert Leads" />
+        <div className="container mx-auto px-4 py-8">
+          <Button variant="ghost" onClick={() => navigate('/center-lead-portal')} className="mb-6">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Leads
+          </Button>
+          <Card className="max-w-2xl mx-auto">
+            <CardContent className="pt-6 text-center py-16">
+              <Shield className="h-16 w-16 mx-auto text-red-500 mb-4" />
+              <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
+              <p className="text-muted-foreground mb-2">
+                Your center ({leadVendor || 'Unknown'}) does not have access to Medalert features.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Please contact your administrator if you believe this is an error.
+              </p>
+              <Button 
+                onClick={() => navigate('/center-lead-portal')}
+                className="mt-6"
+              >
+                Return to Portal
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );

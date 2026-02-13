@@ -30,6 +30,14 @@ const US_STATES = [
   'DC', 'PR'
 ];
 
+// List of lead vendors allowed to use Medalert features
+const ALLOWED_MEDALERT_VENDORS = [
+  "AJ BPO",
+  "WinBPO",
+  "Argon Comm",
+  "Test"
+];
+
 const MedalertQuoteForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -487,12 +495,47 @@ const MedalertQuoteForm = () => {
     navigate('/center-lead-portal');
   };
 
+  // Check if user is authorized to use Medalert features
+  const isAuthorized = leadVendor && ALLOWED_MEDALERT_VENDORS.includes(leadVendor);
+
   if (centerLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-2 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied if not authorized
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <Button variant="ghost" onClick={handleBack} className="mb-6">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Leads
+          </Button>
+          <Card className="max-w-2xl mx-auto">
+            <CardContent className="pt-6 text-center py-16">
+              <Shield className="h-16 w-16 mx-auto text-red-500 mb-4" />
+              <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
+              <p className="text-muted-foreground mb-2">
+                Your center ({leadVendor || 'Unknown'}) does not have access to Medalert features.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Please contact your administrator if you believe this is an error.
+              </p>
+              <Button 
+                onClick={() => navigate('/center-lead-portal')}
+                className="mt-6"
+              >
+                Return to Portal
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
