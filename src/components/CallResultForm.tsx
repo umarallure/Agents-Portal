@@ -51,8 +51,7 @@ const carrierOptions = [
   "GTL",
   "Aetna",
   "Americo",
-  "CICA",
-  "N/A"
+  "CICA"
 ];
 
 const productTypeOptions = [
@@ -66,8 +65,7 @@ const productTypeOptions = [
   "GI",
   "Immediate",
   "Level",
-  "ROP",
-  "N/A"
+  "ROP"
 ];
 
 const bufferAgentOptions = [
@@ -97,7 +95,6 @@ const agentOptions = [
   "Tatumn",
   "Benjamin",
   "Brandon Blake Flinchum",
-  "N/A",
   "Kaye",
   "Isaac",
   "Abdul",
@@ -115,8 +112,7 @@ const licensedAccountOptions = [
   "Trinity",
   "Benjamin",
   "Tatumn",
-  "Noah",
-  "N/A"
+  "Noah"
 ];
 
 const dqReasonOptions = [
