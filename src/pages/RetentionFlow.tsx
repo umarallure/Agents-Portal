@@ -42,6 +42,7 @@ const AGENT_SSN_MAPPING: Record<string, string> = {
 const retentionAgentOptions = [
   "Qasim Raja",
   "Hussain Khan",
+  "Raja Arbaz Nawaz",
   "Muhammad Ahmed",
   "Justine",
   "Ayan Ali",

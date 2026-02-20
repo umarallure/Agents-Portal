@@ -84,6 +84,7 @@ const bufferAgentOptions = [
   "Brandon Blake Flinchum",
   "Elijah K",
   "Hussain Khan",
+  "Raja Arbaz Nawaz",
   "Ayan Ali",
   "N/A",
 ];

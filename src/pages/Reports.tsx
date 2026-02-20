@@ -239,6 +239,7 @@ export const ReportsPage = () => {
       "Aqib Afridi",
       "Qasim Raja",
       "Hussain Khan",
+      "Raja Arbaz Nawaz",
       "Ayan Ali",
       "Juan Buffer",  // Alternative name
       "Angy Camacho", // Alternative name
