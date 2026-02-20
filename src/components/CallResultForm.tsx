@@ -652,6 +652,29 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
     let finalSubmissionId = submissionId;
 
     try {
+      // Validation when application is submitted
+      if (applicationSubmitted === true) {
+        const missingFields: string[] = [];
+        
+        if (!licensedAgentAccount) missingFields.push("Licensed Agent Account");
+        if (!carrier) missingFields.push("Carrier");
+        if (!productType) missingFields.push("Product Type");
+        if (!draftDate) missingFields.push("Draft Date");
+        if (!monthlyPremium) missingFields.push("Monthly Premium");
+        if (!coverageAmount) missingFields.push("Coverage Amount");
+        if (sentToUnderwriting === null) missingFields.push("Sent to Underwriting");
+        
+        if (missingFields.length > 0) {
+          toast({
+            title: "Required Fields Missing",
+            description: `Please fill in the following fields: ${missingFields.join(", ")}`,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       // Validation for Fulfilled carrier requirements
       if (status === "Fulfilled carrier requirements" && !carrierRequirementCarrier) {
         toast({
@@ -1596,13 +1619,17 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 </div>
               </div>
             <div className="space-y-4 p-4 border rounded-lg bg-green-50">
-              <h3 className="font-semibold text-green-800">Application Submitted Details</h3>
+              <h3 className="font-semibold text-green-800">
+                Application Submitted Details <span className="text-red-500">* All fields required</span>
+              </h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="licensedAgentAccount">Licensed Agent Account</Label>
-                  <Select value={licensedAgentAccount} onValueChange={setLicensedAgentAccount}>
-                    <SelectTrigger>
+                  <Label htmlFor="licensedAgentAccount">
+                    Licensed Agent Account <span className="text-red-500">*</span>
+                  </Label>
+                  <Select value={licensedAgentAccount} onValueChange={setLicensedAgentAccount} required={applicationSubmitted === true}>
+                    <SelectTrigger className={applicationSubmitted === true && !licensedAgentAccount ? 'border-red-500 focus:border-red-500' : ''}>
                       <SelectValue placeholder="Select licensed account" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1613,12 +1640,17 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                       ))}
                     </SelectContent>
                   </Select>
+                  {applicationSubmitted === true && !licensedAgentAccount && (
+                    <p className="text-sm text-red-500 mt-1">Licensed Agent Account is required</p>
+                  )}
                 </div>
 
                 <div>
-                  <Label htmlFor="carrier">Carrier Name</Label>
-                  <Select value={carrier} onValueChange={setCarrier}>
-                    <SelectTrigger>
+                  <Label htmlFor="carrier">
+                    Carrier Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Select value={carrier} onValueChange={setCarrier} required={applicationSubmitted === true}>
+                    <SelectTrigger className={applicationSubmitted === true && !carrier ? 'border-red-500 focus:border-red-500' : ''}>
                       <SelectValue placeholder="Select carrier" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1629,12 +1661,17 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                       ))}
                     </SelectContent>
                   </Select>
+                  {applicationSubmitted === true && !carrier && (
+                    <p className="text-sm text-red-500 mt-1">Carrier is required</p>
+                  )}
                 </div>
 
                 <div>
-                  <Label htmlFor="productType">Product Type</Label>
-                  <Select value={productType} onValueChange={setProductType}>
-                    <SelectTrigger>
+                  <Label htmlFor="productType">
+                    Product Type <span className="text-red-500">*</span>
+                  </Label>
+                  <Select value={productType} onValueChange={setProductType} required={applicationSubmitted === true}>
+                    <SelectTrigger className={applicationSubmitted === true && !productType ? 'border-red-500 focus:border-red-500' : ''}>
                       <SelectValue placeholder="Select product type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1645,6 +1682,9 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                       ))}
                     </SelectContent>
                   </Select>
+                  {applicationSubmitted === true && !productType && (
+                    <p className="text-sm text-red-500 mt-1">Product Type is required</p>
+                  )}
                 </div>
 
                 <div>
@@ -1667,14 +1707,17 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                 </div>
 
                 <div>
-                  <Label>Draft Date</Label>
+                  <Label>
+                    Draft Date <span className="text-red-500">*</span>
+                  </Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal",
-                          !draftDate && "text-muted-foreground"
+                          !draftDate && "text-muted-foreground",
+                          applicationSubmitted === true && !draftDate ? 'border-red-500 focus:border-red-500' : ''
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -1691,10 +1734,15 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                       />
                     </PopoverContent>
                   </Popover>
+                  {applicationSubmitted === true && !draftDate && (
+                    <p className="text-sm text-red-500 mt-1">Draft Date is required</p>
+                  )}
                 </div>
 
                 <div>
-                  <Label htmlFor="monthlyPremium">Monthly Premium</Label>
+                  <Label htmlFor="monthlyPremium">
+                    Monthly Premium <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="monthlyPremium"
                     type="number"
@@ -1702,32 +1750,47 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                     value={monthlyPremium}
                     onChange={(e) => setMonthlyPremium(e.target.value)}
                     placeholder="0.00"
+                    required={applicationSubmitted === true}
+                    className={applicationSubmitted === true && !monthlyPremium ? 'border-red-500 focus:border-red-500' : ''}
                   />
+                  {applicationSubmitted === true && !monthlyPremium && (
+                    <p className="text-sm text-red-500 mt-1">Monthly Premium is required</p>
+                  )}
                 </div>
 
                 <div>
-                  <Label htmlFor="coverageAmount">Coverage Amount</Label>
+                  <Label htmlFor="coverageAmount">
+                    Coverage Amount <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="coverageAmount"
                     type="number"
                     value={coverageAmount}
                     onChange={(e) => setCoverageAmount(e.target.value)}
                     placeholder="0.00"
+                    required={applicationSubmitted === true}
+                    className={applicationSubmitted === true && !coverageAmount ? 'border-red-500 focus:border-red-500' : ''}
                   />
+                  {applicationSubmitted === true && !coverageAmount && (
+                    <p className="text-sm text-red-500 mt-1">Coverage Amount is required</p>
+                  )}
                 </div>
               </div>
 
               {/* Sent to Underwriting Question */}
               <div className="space-y-3 mt-6">
                 <Label className="text-base font-semibold">
-                  Sent to Underwriting?
+                  Sent to Underwriting? <span className="text-red-500">*</span>
                 </Label>
                 <div className="flex gap-4">
                   <Button
                     type="button"
                     variant={sentToUnderwriting === true ? "default" : "outline"}
                     onClick={() => setSentToUnderwriting(true)}
-                    className="flex items-center gap-2"
+                    className={cn(
+                      "flex items-center gap-2",
+                      applicationSubmitted === true && sentToUnderwriting === null ? 'border-red-500' : ''
+                    )}
                   >
                     <CheckCircle className="h-4 w-4" />
                     Yes
@@ -1736,7 +1799,10 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                     type="button"
                     variant={sentToUnderwriting === false ? "default" : "outline"}
                     onClick={() => setSentToUnderwriting(false)}
-                    className="flex items-center gap-2"
+                    className={cn(
+                      "flex items-center gap-2",
+                      applicationSubmitted === true && sentToUnderwriting === null ? 'border-red-500' : ''
+                    )}
                   >
                     <XCircle className="h-4 w-4" />
                     No
@@ -1746,6 +1812,9 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                   <div className="text-sm text-muted-foreground mt-2">
                     Call Result will be: <strong>{sentToUnderwriting ? "Underwriting" : "Submitted"}</strong>
                   </div>
+                )}
+                {applicationSubmitted === true && sentToUnderwriting === null && (
+                  <p className="text-sm text-red-500 mt-1">Sent to Underwriting is required</p>
                 )}
               </div>
 
