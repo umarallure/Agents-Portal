@@ -66,6 +66,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
+import { TagInput } from "@/components/ui/tag-input";
 
 const calculateAge = (dob: string): string => {
   if (!dob) return '';
@@ -249,15 +250,21 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
     }
   };
 
-  // List of conditions from the questions to show as checkboxes
-  const questionConditions = [
+  // Conditions grouped by question
+  const question1Conditions = [
     "Alzheimer's Dementia", 'Congestive Heart Failure', 'Organ Transplant', 'HIV', 'AIDS', 'ARC', 'Leukemia', 
-    'Tuberculosis', 'Chronic Respiratory Disease', 'Paralyzed', 'Amputation', 'Nursing Home', 'Wheelchair', 
-    'Oxygen', 'Heart Attack', 'Cancer', 'Stroke', 'Kidney Failure', 'Organ Removal', 'Kidney Disorder', 
+    'Tuberculosis', 'Chronic Respiratory Disease', 'Paralyzed', 'Amputation', 'Nursing Home', 'Wheelchair', 'Oxygen'
+  ];
+
+  const question2Conditions = [
+    'Heart Attack', 'Cancer', 'Stroke', 'Kidney Failure', 'Organ Removal', 'Kidney Disorder', 
     'Lung Disorder', 'Brain Disorder', 'Circulatory System Disorder', 'Liver Disorder', 'Sickle Cell Anemia', 
     'Aneurysm', 'Diabetic Coma', 'Cirrhosis of the Liver', 'Multiple Sclerosis', 'Chronic Pneumonia', 'Hepatitis',
-    'Stents', 'Pacemaker', 'Defibrillator', 'Valve Replacement', 'TIA', 'Neuropathy', 'Retinopathy', 
-    'COPD', 'Bipolar', 'Schizophrenia'
+    'Stents', 'Pacemaker', 'Defibrillator', 'Valve Replacement', 'TIA'
+  ];
+
+  const question3Conditions = [
+    'Neuropathy', 'Retinopathy', 'Diabetic Amputation', 'COPD', 'Bipolar', 'Schizophrenia'
   ];
 
   const getValueByFieldName = (name: string) => {
@@ -585,8 +592,9 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
       });
       
       // Pre-fill checkboxes based on existing health conditions
+      const allConditions = [...question1Conditions, ...question2Conditions, ...question3Conditions];
       const checkboxes: Record<string, boolean> = {};
-      questionConditions.forEach(condition => {
+      allConditions.forEach(condition => {
         checkboxes[condition] = healthValue.some((m: string) => m.toLowerCase().includes(condition.toLowerCase()));
       });
       setUnderwritingCheckboxes(checkboxes);
@@ -771,7 +779,7 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
 
   return (
     <Card className="h-full flex flex-col">
-      <CardHeader className="pb-4 flex-shrink-0">
+      <CardHeader className="pb-2 flex-shrink-0">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">Verification Panel</CardTitle>
           <div className="flex items-center gap-2">
@@ -829,7 +837,7 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4 flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)', minHeight: '500px' }}>
+      <CardContent className="space-y-4 flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
         {sortedItems.map((item) => (
           <div key={item.id} className="space-y-2">
             <div className="flex items-center gap-2">
@@ -1056,22 +1064,22 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
         ))}
 
         {/* BPO Closer Notes - Read Only */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           <Label className="text-sm font-medium">BPO Closer Notes</Label>
-          <div className="bg-gray-50 p-3 rounded-md border text-xs min-h-[60px] whitespace-pre-wrap">
+          <div className="bg-gray-50 p-2 rounded-md border text-xs min-h-[40px] whitespace-pre-wrap">
             {getValueByFieldName('additional_notes') || 'No BPO closer notes available'}
           </div>
         </div>
 
         {/* LA Notes - Editable */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           <Label className="text-sm font-medium">LA Notes</Label>
           <Textarea
             value={laNotes}
             onChange={(e) => setLaNotes(e.target.value)}
             placeholder="Add LA notes here..."
             className="text-xs"
-            rows={3}
+            rows={2}
           />
         </div>
 
@@ -1311,8 +1319,13 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
         </div>
 
         {/* Underwriting Modal */}
-        <Dialog open={showUnderwritingModal} onOpenChange={setShowUnderwritingModal}>
-          <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-y-auto w-full">
+        <Dialog open={showUnderwritingModal} onOpenChange={() => {}}>
+          <DialogContent 
+            className="max-w-[95vw] max-h-[95vh] overflow-y-auto w-full"
+            onInteractOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => e.preventDefault()}
+            hideCloseButton
+          >
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold text-purple-700">Underwriting</DialogTitle>
               <DialogDescription className="text-base">
@@ -1329,114 +1342,144 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
                 </p>
               </div>
 
-              {/* Underwriting Script - Two Column Layout */}
+              {/* Underwriting Script */}
               <div className="bg-gray-50 p-4 rounded-lg border">
                 <h4 className="font-bold text-2xl mb-3">Underwriting Questions</h4>
                 
-                {/* Two Column Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Left Column - Questions */}
-                  <div className="space-y-4 text-xl">
-                    <p className="font-medium">
-                      "I am going to ask you some medical questions and we expect your honesty that is going to save us a lot of time. And, this will help us evaluate which insurance carrier comes back with the maximum benefit at the lowest rates for you."
-                    </p>
+                <div className="space-y-4 text-xl">
+                  <p className="font-medium">
+                    "I am going to ask you some medical questions and we expect your honesty that is going to save us a lot of time. And, this will help us evaluate which insurance carrier comes back with the maximum benefit at the lowest rates for you."
+                  </p>
+                  
+                  {/* Question 1 */}
+                  <div className="space-y-3 p-4 bg-white rounded-lg border">
+                    <p className="font-bold text-xl">Question 1:</p>
+                    <p className="text-lg">Have you ever been diagnosed or treated for Alzheimer's Dementia, Congestive heart failure, organ transplant, HIV, AIDS, ARC, Leukemia, Tuberculosis, chronic Respiratory disease, currently paralyzed, amputation due to a disease? Are you currently hospitalized in a nursing facility? Due to a disease are you currently confined to a wheelchair? Are you currently on oxygen?</p>
                     
-                    <div className="space-y-3 ml-4">
-                      <p className="font-bold text-xl">Question 1:</p>
-                      <p className="text-lg">Have you ever been diagnosed or treated for Alzheimer's Dementia, Congestive heart failure, organ transplant, HIV, AIDS, ARC, Leukemia, Tuberculosis, chronic Respiratory disease, currently paralyzed, amputation due to a disease? Are you currently hospitalized in a nursing facility? Due to a disease are you currently confined to a wheelchair? Are you currently on oxygen?</p>
-                      
-                      <p className="font-bold mt-4 text-xl">Question 2:</p>
-                      <p className="text-lg">In the last 5 years, have you had any heart attacks, cancers, Alzheimer's, dementia, congestive heart failure, kidney failure or an organ removal? Have you ever had any disorders of the kidney, lung, brain, heart, circulatory system or liver? Or In the last 3 years have you been diagnosed and treated for leukemia, sickle cell anemia, brain disorder, Alzheimer's or dementia, aneurysm, diabetic coma, amputation due to any disease, cirrhosis of the liver, Multiple Sclerosis, chronic respiratory disease, tuberculosis, chronic pneumonia, hepatitis? Or In the last 2 years if you had any stents, pacemaker, defibrillator, valve replacement, stroke, TIA or paralysis?</p>
-                      
-                      <p className="font-bold mt-4 text-xl">Question 3:</p>
-                      <p className="text-lg">Or if you have any complications from diabetes? Like (Neuropathy, amputation due to diabetes, retinopathy, diabetic coma, etc) Have you been treated or diagnosed with COPD, Bipolar, or schizophrenia?</p>
-                    </div>
-
-                    {/* Tobacco Question */}
-                    <div className="mt-4 p-3 bg-yellow-50 rounded border border-yellow-200">
-                      <p className="font-bold mb-2 text-xl">Tobacco Usage:</p>
-                      <p className="text-lg">Have you consumed any tobacco or nicotine products in the last 12 months?</p>
-                      <div className="flex gap-4 mt-2">
-                        <label className="flex items-center gap-2 text-xl">
-                          <input 
-                            type="radio" 
-                            name="tobacco" 
-                            checked={underwritingData.tobaccoLast12Months === 'yes'}
-                            onChange={() => setUnderwritingData({...underwritingData, tobaccoLast12Months: 'yes'})}
-                          />
-                          Yes
-                        </label>
-                        <label className="flex items-center gap-2 text-xl">
-                          <input 
-                            type="radio" 
-                            name="tobacco" 
-                            checked={underwritingData.tobaccoLast12Months === 'no'}
-                            onChange={() => setUnderwritingData({...underwritingData, tobaccoLast12Months: 'no'})}
-                          />
-                          No
-                        </label>
+                    <div className="mt-3">
+                      <p className="text-sm text-gray-600 mb-2">Select any conditions mentioned:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {question1Conditions.map((condition) => (
+                          <label key={condition} className="flex items-center gap-1.5 px-3 py-1.5 border rounded-full hover:bg-purple-50 cursor-pointer text-sm transition-colors">
+                            <input 
+                              type="checkbox"
+                              checked={underwritingCheckboxes[condition] || false}
+                              onChange={(e) => handleUnderwritingCheckboxChange(condition, e.target.checked)}
+                              className="w-4 h-4"
+                            />
+                            {condition}
+                          </label>
+                        ))}
                       </div>
                     </div>
-
-                    <p className="font-medium text-xl mt-4">Lastly, do you have any health conditions or take any prescribed medication on a regular basis?</p>
+                  </div>
+                  
+                  {/* Question 2 */}
+                  <div className="space-y-3 p-4 bg-white rounded-lg border">
+                    <p className="font-bold text-xl">Question 2:</p>
+                    <p className="text-lg">In the last 5 years, have you had any heart attacks, cancers, Alzheimer's, dementia, congestive heart failure, kidney failure or an organ removal? Have you ever had any disorders of the kidney, lung, brain, heart, circulatory system or liver? Or In the last 3 years have you been diagnosed and treated for leukemia, sickle cell anemia, brain disorder, Alzheimer's or dementia, aneurysm, diabetic coma, amputation due to any disease, cirrhosis of the liver, Multiple Sclerosis, chronic respiratory disease, tuberculosis, chronic pneumonia, hepatitis? Or In the last 2 years if you had any stents, pacemaker, defibrillator, valve replacement, stroke, TIA or paralysis?</p>
                     
-                    {/* Follow Up Questions */}
-                    <div className="ml-4 mt-3 space-y-2">
-                      <p className="font-bold text-xl">Follow Up:</p>
-                      <ul className="list-disc ml-4 text-lg">
-                        <li>How many medications are you taking on a daily basis?</li>
-                        <li>Do you know what those medications are for?</li>
-                        <li>Do you have your medications, or a list of your medications nearby?</li>
-                      </ul>
+                    <div className="mt-3">
+                      <p className="text-sm text-gray-600 mb-2">Select any conditions mentioned:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {question2Conditions.map((condition) => (
+                          <label key={condition} className="flex items-center gap-1.5 px-3 py-1.5 border rounded-full hover:bg-purple-50 cursor-pointer text-sm transition-colors">
+                            <input 
+                              type="checkbox"
+                              checked={underwritingCheckboxes[condition] || false}
+                              onChange={(e) => handleUnderwritingCheckboxChange(condition, e.target.checked)}
+                              className="w-4 h-4"
+                            />
+                            {condition}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Question 3 */}
+                  <div className="space-y-3 p-4 bg-white rounded-lg border">
+                    <p className="font-bold text-xl">Question 3:</p>
+                    <p className="text-lg">Or if you have any complications from diabetes? Like (Neuropathy, amputation due to diabetes, retinopathy, diabetic coma, etc) Have you been treated or diagnosed with COPD, Bipolar, or schizophrenia?</p>
+                    
+                    <div className="mt-3">
+                      <p className="text-sm text-gray-600 mb-2">Select any conditions mentioned:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {question3Conditions.map((condition) => (
+                          <label key={condition} className="flex items-center gap-1.5 px-3 py-1.5 border rounded-full hover:bg-purple-50 cursor-pointer text-sm transition-colors">
+                            <input 
+                              type="checkbox"
+                              checked={underwritingCheckboxes[condition] || false}
+                              onChange={(e) => handleUnderwritingCheckboxChange(condition, e.target.checked)}
+                              className="w-4 h-4"
+                            />
+                            {condition}
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Right Column - Checkboxes */}
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 max-h-[600px] overflow-y-auto">
-                    <h5 className="font-bold text-xl mb-3 text-purple-700">Select Conditions Mentioned:</h5>
-                    <p className="text-sm text-gray-600 mb-3">Check any conditions the customer mentions. These will be added to Health Conditions.</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {questionConditions.map((condition) => (
-                        <label key={condition} className="flex items-center gap-2 p-2 border rounded hover:bg-purple-50 cursor-pointer text-sm">
-                          <input 
-                            type="checkbox"
-                            checked={underwritingCheckboxes[condition] || false}
-                            onChange={(e) => handleUnderwritingCheckboxChange(condition, e.target.checked)}
-                            className="w-4 h-4"
-                          />
-                          <span className="truncate" title={condition}>{condition}</span>
-                        </label>
-                      ))}
+                  {/* Tobacco Question */}
+                  <div className="mt-4 p-3 bg-yellow-50 rounded border border-yellow-200">
+                    <p className="font-bold mb-2 text-xl">Tobacco Usage:</p>
+                    <p className="text-lg">Have you consumed any tobacco or nicotine products in the last 12 months?</p>
+                    <div className="flex gap-4 mt-2">
+                      <label className="flex items-center gap-2 text-xl">
+                        <input 
+                          type="radio" 
+                          name="tobacco" 
+                          checked={underwritingData.tobaccoLast12Months === 'yes'}
+                          onChange={() => setUnderwritingData({...underwritingData, tobaccoLast12Months: 'yes'})}
+                        />
+                        Yes
+                      </label>
+                      <label className="flex items-center gap-2 text-xl">
+                        <input 
+                          type="radio" 
+                          name="tobacco" 
+                          checked={underwritingData.tobaccoLast12Months === 'no'}
+                          onChange={() => setUnderwritingData({...underwritingData, tobaccoLast12Months: 'no'})}
+                        />
+                        No
+                      </label>
                     </div>
+                  </div>
+
+                  <p className="font-medium text-xl mt-4">Lastly, do you have any health conditions or take any prescribed medication on a regular basis?</p>
+                  
+                  {/* Follow Up Questions */}
+                  <div className="p-4 bg-white rounded-lg border">
+                    <p className="font-bold text-xl">Follow Up:</p>
+                    <ul className="list-disc ml-6 text-lg mt-2">
+                      <li>How many medications are you taking on a daily basis?</li>
+                      <li>Do you know what those medications are for?</li>
+                      <li>Do you have your medications, or a list of your medications nearby?</li>
+                    </ul>
                   </div>
                 </div>
               </div>
 
               {/* Health Conditions */}
               <div className="space-y-2">
-                <Label className="text-xl font-bold">Health Conditions (comma separated):</Label>
-                <Input
-                  value={underwritingData.healthConditions.join(', ')}
-                  onChange={(e) => setUnderwritingData({
-                    ...underwritingData,
-                    healthConditions: e.target.value.split(',').map(s => s.trim()).filter(s => s)
-                  })}
-                  placeholder="Enter any health conditions (comma separated)..."
-                  className="text-xl h-12"
+                <Label className="text-xl font-bold">Health Conditions:</Label>
+                <TagInput
+                  tags={underwritingData.healthConditions}
+                  onChange={(tags) => setUnderwritingData({...underwritingData, healthConditions: tags})}
+                  placeholder="Type and press Enter to add conditions..."
+                  className="text-xl"
                 />
+                <p className="text-sm text-gray-500">Click on conditions above to add them, or type custom conditions.</p>
               </div>
 
               {/* Medications */}
               <div className="space-y-2">
-                <Label className="text-xl font-bold">Medications (comma separated):</Label>
-                <Input
-                  value={underwritingData.medications.join(', ')}
-                  onChange={(e) => setUnderwritingData({
-                    ...underwritingData,
-                    medications: e.target.value.split(',').map(m => m.trim()).filter(m => m)
-                  })}
-                  placeholder="Enter medications (comma separated)..."
-                  className="text-xl h-12"
+                <Label className="text-xl font-bold">Medications:</Label>
+                <TagInput
+                  tags={underwritingData.medications}
+                  onChange={(tags) => setUnderwritingData({...underwritingData, medications: tags})}
+                  placeholder="Type and press Enter to add medications..."
+                  className="text-xl"
                 />
               </div>
 
@@ -1531,80 +1574,260 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
               </div>
             </div>
 
-            <DialogFooter className="mt-4">
-              <Button variant="outline" onClick={() => setShowUnderwritingModal(false)} className="text-lg px-6">
-                Cancel
-              </Button>
-              <Button 
-                onClick={() => {
-                  // Save underwriting data to verification fields
-                  // Update tobacco use
-                  const tobaccoItem = verificationItems?.find(i => i.field_name === 'tobacco_use');
-                  if (tobaccoItem && underwritingData.tobaccoLast12Months) {
-                    updateVerifiedValue(tobaccoItem.id, underwritingData.tobaccoLast12Months === 'yes' ? 'Yes' : 'No');
-                    toggleVerification(tobaccoItem.id, true);
-                  }
-                  
-                  // Update health conditions
-                  const healthConditionsItem = verificationItems?.find(i => i.field_name === 'health_conditions');
-                  if (healthConditionsItem && underwritingData.healthConditions.length > 0) {
-                    updateVerifiedValue(healthConditionsItem.id, underwritingData.healthConditions.join(', '));
-                    toggleVerification(healthConditionsItem.id, true);
-                  }
-                  
-                  // Update medications
-                  const medicationsItem = verificationItems?.find(i => i.field_name === 'medications');
-                  if (medicationsItem && underwritingData.medications.length > 0) {
-                    updateVerifiedValue(medicationsItem.id, underwritingData.medications.join(', '));
-                    toggleVerification(medicationsItem.id, true);
-                  }
-                  
-                  // Update height
-                  const heightItem = verificationItems?.find(i => i.field_name === 'height');
-                  if (heightItem && underwritingData.height) {
-                    updateVerifiedValue(heightItem.id, underwritingData.height);
-                    toggleVerification(heightItem.id, true);
-                  }
-                  
-                  // Update weight
-                  const weightItem = verificationItems?.find(i => i.field_name === 'weight');
-                  if (weightItem && underwritingData.weight) {
-                    updateVerifiedValue(weightItem.id, underwritingData.weight);
-                    toggleVerification(weightItem.id, true);
-                  }
-                  
-                  // Update carrier
-                  const carrierItem = verificationItems?.find(i => i.field_name === 'carrier');
-                  if (carrierItem && underwritingData.carrier) {
-                    updateVerifiedValue(carrierItem.id, underwritingData.carrier);
-                    toggleVerification(carrierItem.id, true);
-                  }
-                  
-                  // Update coverage amount
-                  const coverageItem = verificationItems?.find(i => i.field_name === 'coverage_amount');
-                  if (coverageItem && underwritingData.coverageAmount) {
-                    updateVerifiedValue(coverageItem.id, underwritingData.coverageAmount.replace('$', '').replace(',', ''));
-                    toggleVerification(coverageItem.id, true);
-                  }
-                  
-                  // Update monthly premium
-                  const premiumItem = verificationItems?.find(i => i.field_name === 'monthly_premium');
-                  if (premiumItem && underwritingData.monthlyPremium) {
-                    updateVerifiedValue(premiumItem.id, underwritingData.monthlyPremium.replace('$', '').replace(',', ''));
-                    toggleVerification(premiumItem.id, true);
-                  }
-                  
-                  toast({
-                    title: "Underwriting Complete",
-                    description: "All verified fields have been updated with checkmarks."
-                  });
-                  setShowUnderwritingModal(false);
-                  refetch();
-                }} 
-                className="text-lg px-6 bg-green-600 hover:bg-green-700"
-              >
-                Save & Verify All
-              </Button>
+            {/* Health Kit App - Embedded View */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xl font-bold">Health Kit - Rate Quote Tool</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open('https://insurancetoolkits.com/login', '_blank')}
+                >
+                  Open in New Tab ↗
+                </Button>
+              </div>
+              <p className="text-sm text-gray-600">Log in below to access the rate quote tool. Your session will stay active in this popup.</p>
+              <div className="border-2 border-blue-300 rounded-lg overflow-hidden bg-white" style={{ height: 'calc(100vh - 250px)' }}>
+                <iframe
+                  style={{ border: 'none', height: '100%', width: '100%' }}
+                  src="https://insurancetoolkits.com/login"
+                  title="Health Kit Login"
+                  className="health-kit-frame"
+                  id="healthKitIframe"
+                />
+              </div>
+              <div className="flex gap-2 mt-2 flex-wrap">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
+                    if (iframe) iframe.src = 'https://insurancetoolkits.com/fex/quoter';
+                  }}
+                >
+                  Go to Quote Tool
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
+                    if (!iframe) return;
+                    
+                    // Build URL with current form values - try multiple parameter names
+                    const params = new URLSearchParams();
+                    
+                    // Coverage Amount - try various param names
+                    if (underwritingData.coverageAmount) {
+                      const coverage = underwritingData.coverageAmount.replace(/[^0-9]/g, '');
+                      params.set('face', coverage);
+                      params.set('faceamount', coverage);
+                      params.set('coverage_amount', coverage);
+                      params.set('coverage', coverage);
+                      params.set('amount', coverage);
+                    }
+                    
+                    // Premium - try various param names
+                    if (underwritingData.monthlyPremium) {
+                      const premium = underwritingData.monthlyPremium.replace(/[^0-9.]/g, '');
+                      params.set('premium', premium);
+                      params.set('monthly_premium', premium);
+                      params.set('price', premium);
+                    }
+                    
+                    // Height - try various param names
+                    if (underwritingData.height) {
+                      params.set('height', underwritingData.height);
+                      params.set('h', underwritingData.height);
+                      params.set('ft', underwritingData.height);
+                    }
+                    
+                    // Weight - try various param names
+                    if (underwritingData.weight) {
+                      const weight = underwritingData.weight.replace(/[^0-9]/g, '');
+                      params.set('weight', weight);
+                      params.set('w', weight);
+                      params.set('lbs', weight);
+                    }
+                    
+                    // Tobacco - try various param names
+                    if (underwritingData.tobaccoLast12Months) {
+                      params.set('tobacco', underwritingData.tobaccoLast12Months);
+                      params.set('tobacco_use', underwritingData.tobaccoLast12Months);
+                      params.set('smoker', underwritingData.tobaccoLast12Months);
+                    }
+                    
+                    const baseUrl = 'https://insurancetoolkits.com/fex/quoter';
+                    const queryString = params.toString();
+                    const fullUrl = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+                    
+                    console.log('Loading with params:', fullUrl);
+                    iframe.src = fullUrl;
+                  }}
+                >
+                  Load with Current Values
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
+                    if (iframe) iframe.src = 'https://insurancetoolkits.com/login';
+                  }}
+                >
+                  Back to Login
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                💡 Tip: Click "Load with Current Values" after entering Coverage Amount, Height, Weight, and Tobacco to pre-fill the quote tool.
+              </p>
+              <div className="flex gap-2 mt-2">
+                <Input
+                  placeholder="Which param worked? (e.g. face, coverage)"
+                  className="text-sm h-8"
+                  id="healthKitParamFeedback"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const feedback = (document.getElementById('healthKitParamFeedback') as HTMLInputElement)?.value;
+                    if (feedback) {
+                      console.log('User feedback on working params:', feedback);
+                      toast({ title: "Thanks!", description: "We'll refine the params based on your feedback." });
+                    }
+                  }}
+                >
+                  Submit Feedback
+                </Button>
+              </div>
+            </div>
+
+            <DialogFooter className="mt-4 flex-col gap-2">
+              <div className="text-sm text-gray-600 text-center">
+                Clicking "Save & Verify All" will save all fields below to the verification panel and mark them as verified ✓
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => {
+                    // Save underwriting data to verification fields - Also update local state for immediate UI update
+                    
+                    // Update tobacco use
+                    const tobaccoItem = verificationItems?.find(i => i.field_name === 'tobacco_use');
+                    if (tobaccoItem && underwritingData.tobaccoLast12Months) {
+                      const tobaccoValue = underwritingData.tobaccoLast12Months === 'yes' ? 'Yes' : 'No';
+                      updateVerifiedValue(tobaccoItem.id, tobaccoValue);
+                      setInputValues(prev => ({ ...prev, [tobaccoItem.id]: tobaccoValue }));
+                      toggleVerification(tobaccoItem.id, true);
+                    }
+                    
+                    // Update health conditions
+                    const healthConditionsItem = verificationItems?.find(i => i.field_name === 'health_conditions');
+                    if (healthConditionsItem && underwritingData.healthConditions.length > 0) {
+                      const healthValue = underwritingData.healthConditions.join(', ');
+                      updateVerifiedValue(healthConditionsItem.id, healthValue);
+                      setInputValues(prev => ({ ...prev, [healthConditionsItem.id]: healthValue }));
+                      toggleVerification(healthConditionsItem.id, true);
+                    }
+                    
+                    // Update medications
+                    const medicationsItem = verificationItems?.find(i => i.field_name === 'medications');
+                    if (medicationsItem && underwritingData.medications.length > 0) {
+                      const medsValue = underwritingData.medications.join(', ');
+                      updateVerifiedValue(medicationsItem.id, medsValue);
+                      setInputValues(prev => ({ ...prev, [medicationsItem.id]: medsValue }));
+                      toggleVerification(medicationsItem.id, true);
+                    }
+                    
+                    // Update height
+                    const heightItem = verificationItems?.find(i => i.field_name === 'height');
+                    if (heightItem && underwritingData.height) {
+                      updateVerifiedValue(heightItem.id, underwritingData.height);
+                      setInputValues(prev => ({ ...prev, [heightItem.id]: underwritingData.height }));
+                      toggleVerification(heightItem.id, true);
+                    }
+                    
+                    // Update weight
+                    const weightItem = verificationItems?.find(i => i.field_name === 'weight');
+                    if (weightItem && underwritingData.weight) {
+                      updateVerifiedValue(weightItem.id, underwritingData.weight);
+                      setInputValues(prev => ({ ...prev, [weightItem.id]: underwritingData.weight }));
+                      toggleVerification(weightItem.id, true);
+                    }
+                    
+                    // Update carrier
+                    const carrierItem = verificationItems?.find(i => i.field_name === 'carrier');
+                    if (carrierItem && underwritingData.carrier) {
+                      updateVerifiedValue(carrierItem.id, underwritingData.carrier);
+                      setInputValues(prev => ({ ...prev, [carrierItem.id]: underwritingData.carrier }));
+                      toggleVerification(carrierItem.id, true);
+                    }
+                    
+                    // Update coverage amount
+                    const coverageItem = verificationItems?.find(i => i.field_name === 'coverage_amount');
+                    if (coverageItem && underwritingData.coverageAmount) {
+                      const coverageValue = underwritingData.coverageAmount.replace('$', '').replace(',', '');
+                      updateVerifiedValue(coverageItem.id, coverageValue);
+                      setInputValues(prev => ({ ...prev, [coverageItem.id]: coverageValue }));
+                      toggleVerification(coverageItem.id, true);
+                    }
+                    
+                    // Update monthly premium
+                    const premiumItem = verificationItems?.find(i => i.field_name === 'monthly_premium');
+                    if (premiumItem && underwritingData.monthlyPremium) {
+                      const premiumValue = underwritingData.monthlyPremium.replace('$', '').replace(',', '');
+                      updateVerifiedValue(premiumItem.id, premiumValue);
+                      setInputValues(prev => ({ ...prev, [premiumItem.id]: premiumValue }));
+                      toggleVerification(premiumItem.id, true);
+                    }
+                    
+                    // Update doctor's name
+                    const doctorsItem = verificationItems?.find(i => i.field_name === 'doctors_name');
+                    if (doctorsItem) {
+                      const doctorsValue = inputValues[doctorsItem.id] || doctorsItem.verified_value || doctorsItem.original_value || '';
+                      if (doctorsValue) {
+                        updateVerifiedValue(doctorsItem.id, doctorsValue);
+                        setInputValues(prev => ({ ...prev, [doctorsItem.id]: doctorsValue }));
+                        toggleVerification(doctorsItem.id, true);
+                      }
+                    }
+                    
+                    // Update existing coverage
+                    const existingCoverageItem = verificationItems?.find(i => i.field_name === 'existing_coverage');
+                    if (existingCoverageItem) {
+                      const existingCoverageValue = inputValues[existingCoverageItem.id] || existingCoverageItem.verified_value || existingCoverageItem.original_value || '';
+                      if (existingCoverageValue) {
+                        updateVerifiedValue(existingCoverageItem.id, existingCoverageValue);
+                        setInputValues(prev => ({ ...prev, [existingCoverageItem.id]: existingCoverageValue }));
+                        toggleVerification(existingCoverageItem.id, true);
+                      }
+                    }
+                    
+                    // Update product level (insurance_application_details)
+                    const productLevelItem = verificationItems?.find(i => i.field_name === 'insurance_application_details');
+                    if (productLevelItem && underwritingData.productLevel) {
+                      updateVerifiedValue(productLevelItem.id, underwritingData.productLevel);
+                      setInputValues(prev => ({ ...prev, [productLevelItem.id]: underwritingData.productLevel }));
+                      toggleVerification(productLevelItem.id, true);
+                    }
+                    
+                    toast({
+                      title: "Underwriting Complete",
+                      description: "All verified fields have been updated with checkmarks."
+                    });
+                    setShowUnderwritingModal(false);
+                    refetch();
+                  }} 
+                  className="text-lg px-6 bg-green-600 hover:bg-green-700 flex-1"
+                >
+                  Save & Verify All
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
