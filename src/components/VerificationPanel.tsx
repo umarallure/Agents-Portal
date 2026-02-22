@@ -1574,139 +1574,143 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
               </div>
             </div>
 
-            {/* Health Kit App - Embedded View */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xl font-bold">Health Kit - Rate Quote Tool</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open('https://insurancetoolkits.com/login', '_blank')}
-                >
-                  Open in New Tab ↗
-                </Button>
-              </div>
-              <p className="text-sm text-gray-600">Log in below to access the rate quote tool. Your session will stay active in this popup.</p>
-              <div className="border-2 border-blue-300 rounded-lg overflow-hidden bg-white" style={{ height: 'calc(100vh - 250px)' }}>
-                <iframe
-                  style={{ border: 'none', height: '100%', width: '100%' }}
-                  src="https://insurancetoolkits.com/login"
-                  title="Health Kit Login"
-                  className="health-kit-frame"
-                  id="healthKitIframe"
-                />
-              </div>
-              <div className="flex gap-2 mt-2 flex-wrap">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
-                    if (iframe) iframe.src = 'https://insurancetoolkits.com/fex/quoter';
-                  }}
-                >
-                  Go to Quote Tool
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
-                    if (!iframe) return;
-                    
-                    // Build URL with current form values - try multiple parameter names
-                    const params = new URLSearchParams();
-                    
-                    // Coverage Amount - try various param names
-                    if (underwritingData.coverageAmount) {
-                      const coverage = underwritingData.coverageAmount.replace(/[^0-9]/g, '');
-                      params.set('face', coverage);
-                      params.set('faceamount', coverage);
-                      params.set('coverage_amount', coverage);
-                      params.set('coverage', coverage);
-                      params.set('amount', coverage);
-                    }
-                    
-                    // Premium - try various param names
-                    if (underwritingData.monthlyPremium) {
-                      const premium = underwritingData.monthlyPremium.replace(/[^0-9.]/g, '');
-                      params.set('premium', premium);
-                      params.set('monthly_premium', premium);
-                      params.set('price', premium);
-                    }
-                    
-                    // Height - try various param names
-                    if (underwritingData.height) {
-                      params.set('height', underwritingData.height);
-                      params.set('h', underwritingData.height);
-                      params.set('ft', underwritingData.height);
-                    }
-                    
-                    // Weight - try various param names
-                    if (underwritingData.weight) {
-                      const weight = underwritingData.weight.replace(/[^0-9]/g, '');
-                      params.set('weight', weight);
-                      params.set('w', weight);
-                      params.set('lbs', weight);
-                    }
-                    
-                    // Tobacco - try various param names
-                    if (underwritingData.tobaccoLast12Months) {
-                      params.set('tobacco', underwritingData.tobaccoLast12Months);
-                      params.set('tobacco_use', underwritingData.tobaccoLast12Months);
-                      params.set('smoker', underwritingData.tobaccoLast12Months);
-                    }
-                    
-                    const baseUrl = 'https://insurancetoolkits.com/fex/quoter';
-                    const queryString = params.toString();
-                    const fullUrl = queryString ? `${baseUrl}?${queryString}` : baseUrl;
-                    
-                    console.log('Loading with params:', fullUrl);
-                    iframe.src = fullUrl;
-                  }}
-                >
-                  Load with Current Values
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
-                    if (iframe) iframe.src = 'https://insurancetoolkits.com/login';
-                  }}
-                >
-                  Back to Login
-                </Button>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                💡 Tip: Click "Load with Current Values" after entering Coverage Amount, Height, Weight, and Tobacco to pre-fill the quote tool.
-              </p>
-              <div className="flex gap-2 mt-2">
-                <Input
-                  placeholder="Which param worked? (e.g. face, coverage)"
-                  className="text-sm h-8"
-                  id="healthKitParamFeedback"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const feedback = (document.getElementById('healthKitParamFeedback') as HTMLInputElement)?.value;
-                    if (feedback) {
-                      console.log('User feedback on working params:', feedback);
-                      toast({ title: "Thanks!", description: "We'll refine the params based on your feedback." });
-                    }
-                  }}
-                >
-                  Submit Feedback
-                </Button>
-              </div>
-            </div>
+{/* Health Kit App - Embedded View */}
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xl font-bold">Health Kit - Rate Quote Tool</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open('https://insurancetoolkits.com/login', '_blank')}
+                  >
+                    Open in New Tab ↗
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">Log in below to access the rate quote tool. Your session will stay active in this popup.</p>
+              </CardHeader>
+              <CardContent>
+                <div className="border-2 border-blue-300 rounded-lg overflow-hidden bg-white" style={{ height: 'calc(100vh - 300px)' }}>
+                  <iframe
+                    style={{ border: 'none', height: '100%', width: '100%' }}
+                    src="https://insurancetoolkits.com/login"
+                    title="Health Kit Login"
+                    className="health-kit-frame"
+                    id="healthKitIframe"
+                  />
+                </div>
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
+                      if (iframe) iframe.src = 'https://insurancetoolkits.com/fex/quoter';
+                    }}
+                  >
+                    Go to Quote Tool
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
+                      if (!iframe) return;
+                      
+                      // Build URL with current form values - try multiple parameter names
+                      const params = new URLSearchParams();
+                      
+                      // Coverage Amount - try various param names
+                      if (underwritingData.coverageAmount) {
+                        const coverage = underwritingData.coverageAmount.replace(/[^0-9]/g, '');
+                        params.set('face', coverage);
+                        params.set('faceamount', coverage);
+                        params.set('coverage_amount', coverage);
+                        params.set('coverage', coverage);
+                        params.set('amount', coverage);
+                      }
+                      
+                      // Premium - try various param names
+                      if (underwritingData.monthlyPremium) {
+                        const premium = underwritingData.monthlyPremium.replace(/[^0-9.]/g, '');
+                        params.set('premium', premium);
+                        params.set('monthly_premium', premium);
+                        params.set('price', premium);
+                      }
+                      
+                      // Height - try various param names
+                      if (underwritingData.height) {
+                        params.set('height', underwritingData.height);
+                        params.set('h', underwritingData.height);
+                        params.set('ft', underwritingData.height);
+                      }
+                      
+                      // Weight - try various param names
+                      if (underwritingData.weight) {
+                        const weight = underwritingData.weight.replace(/[^0-9]/g, '');
+                        params.set('weight', weight);
+                        params.set('w', weight);
+                        params.set('lbs', weight);
+                      }
+                      
+                      // Tobacco - try various param names
+                      if (underwritingData.tobaccoLast12Months) {
+                        params.set('tobacco', underwritingData.tobaccoLast12Months);
+                        params.set('tobacco_use', underwritingData.tobaccoLast12Months);
+                        params.set('smoker', underwritingData.tobaccoLast12Months);
+                      }
+                      
+                      const baseUrl = 'https://insurancetoolkits.com/fex/quoter';
+                      const queryString = params.toString();
+                      const fullUrl = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+                      
+                      console.log('Loading with params:', fullUrl);
+                      iframe.src = fullUrl;
+                    }}
+                  >
+                    Load with Current Values
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
+                      if (iframe) iframe.src = 'https://insurancetoolkits.com/login';
+                    }}
+                  >
+                    Back to Login
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  💡 Tip: Click "Load with Current Values" after entering Coverage Amount, Height, Weight, and Tobacco to pre-fill the quote tool.
+                </p>
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    placeholder="Which param worked? (e.g. face, coverage)"
+                    className="text-sm h-8"
+                    id="healthKitParamFeedback"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const feedback = (document.getElementById('healthKitParamFeedback') as HTMLInputElement)?.value;
+                      if (feedback) {
+                        console.log('User feedback on working params:', feedback);
+                        toast({ title: "Thanks!", description: "We'll refine the params based on your feedback." });
+                      }
+                    }}
+                  >
+                    Submit Feedback
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
             <DialogFooter className="mt-4 flex-col gap-2">
               <div className="text-sm text-gray-600 text-center">
