@@ -441,9 +441,9 @@ const CallResultUpdate = () => {
         {showVerificationPanel && verificationSessionId ? (
           <>
             {/* Main Content - 50/50 Split */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-start">
               {/* Verification Panel - Left Half */}
-              <div>
+              <div className="w-full">
                 <VerificationPanel 
                   sessionId={verificationSessionId}
                   onTransferReady={handleTransferReady}
@@ -451,7 +451,7 @@ const CallResultUpdate = () => {
               </div>
               
               {/* Call Result Form - Right Half */}
-              <div>
+              <div className="w-full">
                 <CallResultForm 
                   submissionId={submissionId!} 
                   customerName={lead.customer_full_name}
@@ -460,20 +460,66 @@ const CallResultUpdate = () => {
               </div>
             </div>
             
-            {/* Additional Notes - Bottom Collapsible */}
-            <DetailedLeadInfoCard lead={lead} />
+            {/* Health Kit App - Embedded View */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold">Health Kit - Rate Quote Tool</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open('https://insurancetoolkits.com/login', '_blank')}
+                >
+                  Open in New Tab ↗
+                </Button>
+              </div>
+              <p className="text-sm text-gray-600">Log in below to access the rate quote tool. Your session will stay active in this panel.</p>
+              <div className="border-2 border-blue-300 rounded-lg overflow-hidden bg-white" style={{ height: 'calc(100vh - 120px)' }}>
+                <iframe
+                  style={{ border: 'none', height: '100%', width: '100%' }}
+                  src="https://insurancetoolkits.com/login"
+                  title="Health Kit Login"
+                  className="health-kit-frame"
+                  id="healthKitIframePage"
+                />
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const iframe = document.getElementById('healthKitIframePage') as HTMLIFrameElement;
+                    if (iframe) iframe.src = 'https://insurancetoolkits.com/fex/quoter';
+                  }}
+                >
+                  Go to Quote Tool
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const iframe = document.getElementById('healthKitIframePage') as HTMLIFrameElement;
+                    if (iframe) iframe.src = 'https://insurancetoolkits.com/login';
+                  }}
+                >
+                  Back to Login
+                </Button>
+              </div>
+            </div>
           </>
         ) : (
           /* Original layout when no verification panel */
           <>
-            <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+            <div className="grid gap-6 grid-cols-1 lg:grid-cols-2 items-start">
               {/* Lead Details */}
-              <div className="space-y-6">
+              <div className="space-y-6 w-full">
                 <DetailedLeadInfoCard lead={lead} />
               </div>
               
               {/* Call Result Form */}
-              <div>
+              <div className="w-full">
                 <CallResultForm 
                   submissionId={submissionId!} 
                   customerName={lead.customer_full_name}
