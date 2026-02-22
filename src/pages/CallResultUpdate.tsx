@@ -461,53 +461,57 @@ const CallResultUpdate = () => {
             </div>
             
             {/* Health Kit App - Embedded View */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold">Health Kit - Rate Quote Tool</h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open('https://insurancetoolkits.com/login', '_blank')}
-                >
-                  Open in New Tab ↗
-                </Button>
-              </div>
-              <p className="text-sm text-gray-600">Log in below to access the rate quote tool. Your session will stay active in this panel.</p>
-              <div className="border-2 border-blue-300 rounded-lg overflow-hidden bg-white" style={{ height: 'calc(100vh - 120px)' }}>
-                <iframe
-                  style={{ border: 'none', height: '100%', width: '100%' }}
-                  src="https://insurancetoolkits.com/login"
-                  title="Health Kit Login"
-                  className="health-kit-frame"
-                  id="healthKitIframePage"
-                />
-              </div>
-              <div className="flex gap-2 mt-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    const iframe = document.getElementById('healthKitIframePage') as HTMLIFrameElement;
-                    if (iframe) iframe.src = 'https://insurancetoolkits.com/fex/quoter';
-                  }}
-                >
-                  Go to Quote Tool
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const iframe = document.getElementById('healthKitIframePage') as HTMLIFrameElement;
-                    if (iframe) iframe.src = 'https://insurancetoolkits.com/login';
-                  }}
-                >
-                  Back to Login
-                </Button>
-              </div>
-            </div>
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl">Health Kit - Rate Quote Tool</CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open('https://insurancetoolkits.com/login', '_blank')}
+                  >
+                    Open in New Tab ↗
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">Log in below to access the rate quote tool. Your session will stay active in this panel.</p>
+              </CardHeader>
+              <CardContent>
+                <div className="border-2 border-blue-300 rounded-lg overflow-hidden bg-white" style={{ height: 'calc(100vh - 120px)' }}>
+                  <iframe
+                    style={{ border: 'none', height: '100%', width: '100%' }}
+                    src="https://insurancetoolkits.com/login"
+                    title="Health Kit Login"
+                    className="health-kit-frame"
+                    id="healthKitIframePage"
+                  />
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const iframe = document.getElementById('healthKitIframePage') as HTMLIFrameElement;
+                      if (iframe) iframe.src = 'https://insurancetoolkits.com/fex/quoter';
+                    }}
+                  >
+                    Go to Quote Tool
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const iframe = document.getElementById('healthKitIframePage') as HTMLIFrameElement;
+                      if (iframe) iframe.src = 'https://insurancetoolkits.com/login';
+                    }}
+                  >
+                    Back to Login
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </>
         ) : (
           /* Original layout when no verification panel */
