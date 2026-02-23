@@ -2,13 +2,31 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, FileSpreadsheet, MessageSquare, ArrowLeft } from "lucide-react";
+import { CheckCircle, FileSpreadsheet, MessageSquare, ArrowLeft, Phone } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const CallResultJourney = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const submissionId = searchParams.get("submissionId");
+  const medAlertPitched = searchParams.get("medAlertPitched") === "true";
   const [currentStep, setCurrentStep] = useState(0);
+  const [showMedAlertDialog, setShowMedAlertDialog] = useState(medAlertPitched);
+  const { toast } = useToast();
+
+  const maTransitionScript = `I've got good news and I've got bad news. 
+
+The bad news is that I cannot offer you any insurance coverage. Based on the medication coming back from your medical records, none of the carriers will approve you for coverage. The good news is that I can still offer you a protection solution. Let me get you over to our med alert team, and they can make sure we can still help you out today. Please hold while I add them into the call.`;
+
+  const medAlertDID = "475 236 5826";
 
   const steps = [
     {
@@ -125,6 +143,48 @@ const CallResultJourney = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Med Alert Transition Dialog */}
+        <Dialog open={showMedAlertDialog} onOpenChange={() => {}}>
+          <DialogContent className="max-w-3xl" preventOutsideClick>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-purple-700 text-2xl">
+                <Phone className="h-6 w-6" />
+                Med Alert Transition
+              </DialogTitle>
+              <DialogDescription className="text-base">
+                Read this script to the customer before transferring
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <p className="font-semibold text-purple-700 text-lg mb-2">Transition Script:</p>
+                <div className="p-4 bg-gray-50 rounded border text-lg leading-relaxed whitespace-pre-wrap">{maTransitionScript}</div>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-purple-50 rounded border border-purple-200">
+                <div>
+                  <p className="font-semibold text-purple-700 text-lg">LA Med Alert DID:</p>
+                  <span className="font-mono text-2xl">{medAlertDID}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => {
+                    navigator.clipboard.writeText(medAlertDID);
+                    toast({ title: "Copied!", description: "DID copied to clipboard" });
+                  }}
+                >
+                  Copy
+                </Button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button size="lg" onClick={() => setShowMedAlertDialog(false)}>
+                I've Transferred the Call
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className="flex gap-4 justify-center">
           <Button 

@@ -196,6 +196,17 @@ const RetentionFlow = () => {
   const [shortFormNotes, setShortFormNotes] = useState<string>('');
   const [submittingShortForm, setSubmittingShortForm] = useState(false);
 
+  // Med Alert State
+  const [pitchMedAlert, setPitchMedAlert] = useState(false);
+  const [showMedAlertDialog, setShowMedAlertDialog] = useState(false);
+
+  // Med Alert Constants
+  const maTransitionScript = `I've got good news and I've got bad news. 
+
+The bad news is that I cannot offer you any insurance coverage. Based on the medication coming back from your medical records, none of the carriers will approve you for coverage. The good news is that I can still offer you a protection solution. Let me get you over to our med alert team, and they can make sure we can still help you out today. Please hold while I add them into the call.`;
+
+  const medAlertDID = "475 236 5826";
+
   // Agent Info (Mocked for now as not in DB)
   const [agentInfo, setAgentInfo] = useState({
     name: '',
@@ -1182,6 +1193,67 @@ const RetentionFlow = () => {
 
       if (ddfError) throw ddfError;
 
+      // 4. Handle Med Alert pitch if selected
+      if (pitchMedAlert && lead) {
+        try {
+          // Call create-lead function
+          const { error: createLeadError } = await supabase.functions.invoke('create-lead', {
+            body: {
+              submission_id: submissionId,
+              customer_full_name: lead.customer_full_name,
+              phone_number: lead.phone_number,
+              email: lead.email,
+              date_of_birth: lead.date_of_birth,
+              age: lead.age ? parseInt(lead.age.toString()) : null,
+              street_address: lead.street_address,
+              city: lead.city,
+              state: lead.state,
+              zip_code: lead.zip_code,
+              lead_vendor: lead.lead_vendor,
+              source: 'Med Alert Pitch - Retention',
+              form_version: '2.0'
+            }
+          });
+
+          if (createLeadError) {
+            console.error("Error creating Med Alert lead:", createLeadError);
+          } else {
+            console.log("Med Alert lead created successfully");
+          }
+
+          // Send Slack notification to medalert-notification channel
+          const { error: medAlertSlackError } = await supabase.functions.invoke('medalert-notification', {
+            body: {
+              submissionId: submissionId,
+              leadData: {
+                customer_full_name: lead.customer_full_name,
+                phone_number: lead.phone_number,
+                email: lead.email,
+                date_of_birth: lead.date_of_birth,
+                age: lead.age?.toString(),
+                address: lead.street_address,
+                city: lead.city,
+                state: lead.state,
+                zip_code: lead.zip_code,
+                lead_vendor: lead.lead_vendor
+              },
+              agentName: retentionAgent,
+              status: shortFormStatus,
+              dqReason: null
+            }
+          });
+
+          if (medAlertSlackError) {
+            console.error("Error sending Med Alert Slack notification:", medAlertSlackError);
+          } else {
+            console.log("Med Alert Slack notification sent successfully");
+          }
+        } catch (medAlertError) {
+          console.error("Med Alert lead creation/notification failed:", medAlertError);
+          // Don't fail the entire process if Med Alert fails
+        }
+      }
+
       toast({
         title: "Success",
         description: "Call result updated successfully",
@@ -1237,13 +1309,82 @@ const RetentionFlow = () => {
             className="min-h-[100px]"
           />
         </div>
+
+        {/* Pitch Med Alert Button - shows for DQ-like statuses */}
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full border-purple-500 text-purple-600 hover:bg-purple-50"
+            onClick={() => {
+              setPitchMedAlert(!pitchMedAlert);
+              if (!pitchMedAlert) {
+                setShowMedAlertDialog(true);
+              }
+            }}
+          >
+            {pitchMedAlert ? "Cancel Med Alert Pitch" : "Pitch Med Alert"}
+          </Button>
+        </div>
+
+        {/* Med Alert Transition Dialog */}
+        <Dialog open={showMedAlertDialog} onOpenChange={() => {}}>
+          <DialogContent className="max-w-3xl" preventOutsideClick>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-purple-700 text-2xl">
+                <Phone className="h-6 w-6" />
+                Med Alert Transition
+              </DialogTitle>
+              <DialogDescription className="text-base">
+                Read this script to the customer before transferring
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <p className="font-semibold text-purple-700 text-lg mb-2">Transition Script:</p>
+                <div className="p-4 bg-gray-50 rounded border text-lg leading-relaxed whitespace-pre-wrap">{maTransitionScript}</div>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-purple-50 rounded border border-purple-200">
+                <div>
+                  <p className="font-semibold text-purple-700 text-lg">LA Med Alert DID:</p>
+                  <span className="font-mono text-2xl">{medAlertDID}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => {
+                    navigator.clipboard.writeText(medAlertDID);
+                    toast({ title: "Copied!", description: "DID copied to clipboard" });
+                  }}
+                >
+                  Copy
+                </Button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button size="lg" onClick={() => setShowMedAlertDialog(false)}>
+                I've Transferred the Call
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
       <CardFooter className="flex justify-between">
         <Button variant="outline" onClick={() => setStep(4)}>Back to Instructions</Button>
-        <Button onClick={handleShortFormSubmit} disabled={submittingShortForm}>
-          {submittingShortForm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          Submit & Finish
-        </Button>
+        <div className="flex gap-2">
+          {pitchMedAlert && (
+            <Button 
+              onClick={() => setShowMedAlertDialog(true)}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              Show Transfer Script
+            </Button>
+          )}
+          <Button onClick={handleShortFormSubmit} disabled={submittingShortForm}>
+            {submittingShortForm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Submit & Finish
+          </Button>
+        </div>
       </CardFooter>
     </Card>
   );
