@@ -23,7 +23,7 @@ import { AppFixTaskTypeSelector } from "@/components/AppFixTaskTypeSelector";
 interface CallResultFormProps {
   submissionId: string;
   customerName?: string;
-  onSuccess?: () => void;
+  onSuccess?: (medAlertPitched?: boolean) => void;
 }
 
 const statusOptions = [
@@ -399,6 +399,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
   const [carrierAttempted3, setCarrierAttempted3] = useState("");
   const [carrierRequirementCarrier, setCarrierRequirementCarrier] = useState("");
   const [showAppFixForm, setShowAppFixForm] = useState(false);
+  const [pitchMedAlert, setPitchMedAlert] = useState(false);
   
   const { toast } = useToast();
   const { vendorNames, didMapping, loading: vendorsLoading, error: vendorsError } = useLeadVendors();
@@ -605,6 +606,18 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
   // Show DID warning for GI - Currently DQ status
   const showDIDWarning = applicationSubmitted === false && status === "GI - Currently DQ" && leadVendor;
   const vendorDID = leadVendor ? getLeadVendorDID(leadVendor, didMapping) : null;
+
+  // Show Pitch Med Alert button for DQ, Not Interested, or GI - Currently DQ
+  const showPitchMedAlertButton = applicationSubmitted === false && 
+    ["DQ", "Not Interested", "GI - Currently DQ"].includes(status);
+
+  // Med Alert DID
+  const medAlertDID = "475 236 5826";
+
+  // MA Transition Script
+  const maTransitionScript = `I've got good news and I've got bad news. 
+
+The bad news is that I cannot offer you any insurance coverage. Based on the medication coming back from your medical records, none of the carriers will approve you for coverage. The good news is that I can still offer you a protection solution. Let me get you over to our med alert team, and they can make sure we can still help you out today. Please hold while I add them into the call.`;
 
   const handleCopyDID = () => {
     if (vendorDID) {
@@ -1212,7 +1225,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
               }
             });
 
-            if (disconnectedError) {
+          if (disconnectedError) {
               console.error("Error sending disconnected call notification:", disconnectedError);
               // Don't fail the entire process if disconnected notification fails
             } else {
@@ -1222,6 +1235,120 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
         } catch (disconnectedError) {
           console.error("Disconnected call notification failed:", disconnectedError);
           // Don't fail the entire process if disconnected notification fails
+        }
+      }
+
+      // Send Med Alert notification and create lead if pitchMedAlert is checked
+      if (pitchMedAlert) {
+        try {
+          // Fetch verification session data
+          const { data: verificationSession } = await supabase
+            .from('verification_sessions')
+            .select('*')
+            .eq('submission_id', submissionId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          // Fetch all verification items for the session
+          const { data: verificationItems } = await supabase
+            .from('verification_items')
+            .select('*')
+            .eq('session_id', verificationSession?.id);
+
+          // Build lead data from verification items
+          const leadDataFromVerification: Record<string, string> = {};
+          if (verificationItems) {
+            verificationItems.forEach((item: any) => {
+              leadDataFromVerification[item.field_name] = item.verified_value || item.original_value || '';
+            });
+          }
+
+          // Also get lead data from leads table
+          const { data: leadData } = await supabase
+            .from("leads")
+            .select("*")
+            .eq("submission_id", submissionId)
+            .single();
+
+          const customerFullName = leadDataFromVerification.customer_full_name || leadData?.customer_full_name || 'Unknown';
+          const phoneNumber = leadDataFromVerification.phone_number || leadData?.phone_number || '';
+          const email = leadDataFromVerification.email || leadData?.email || '';
+          const dateOfBirth = leadDataFromVerification.date_of_birth || leadData?.date_of_birth || '';
+          const age = leadDataFromVerification.age || leadData?.age?.toString() || '';
+          const address = leadDataFromVerification.street_address || leadData?.address || '';
+          const city = leadDataFromVerification.city || leadData?.city || '';
+          const state = leadDataFromVerification.state || leadData?.state || '';
+          const zipCode = leadDataFromVerification.zip_code || leadData?.zip_code || '';
+          const height = leadDataFromVerification.height || '';
+          const weight = leadDataFromVerification.weight || '';
+          const tobaccoUse = leadDataFromVerification.tobacco_use || '';
+          const healthConditions = leadDataFromVerification.health_conditions || '';
+          const medications = leadDataFromVerification.medications || '';
+          const leadVendor = leadDataFromVerification.lead_vendor || leadData?.lead_vendor || '';
+
+          const ageNum = age ? parseInt(age) : null;
+          // Call create-lead function
+          const { error: createLeadError } = await supabase.functions.invoke('create-lead', {
+            body: {
+              submission_id: submissionId,
+              customer_full_name: customerFullName,
+              phone_number: phoneNumber,
+              email: email,
+              date_of_birth: dateOfBirth,
+              age: ageNum,
+              street_address: address,
+              city: city,
+              state: state,
+              zip_code: zipCode,
+              height: height,
+              weight: weight,
+              tobacco_use: tobaccoUse,
+              health_conditions: healthConditions,
+              medications: medications,
+              lead_vendor: leadVendor,
+              source: 'Med Alert Pitch',
+              form_version: '2.0'
+            }
+          });
+
+          if (createLeadError) {
+            console.error("Error creating Med Alert lead:", createLeadError);
+          } else {
+            console.log("Med Alert lead created successfully");
+          }
+
+          // Send Slack notification to medalert-notification channel
+          const { error: medAlertSlackError } = await supabase.functions.invoke('medalert-notification', {
+            body: {
+              submissionId: submissionId,
+              leadData: {
+                customer_full_name: customerFullName,
+                phone_number: phoneNumber,
+                email: email,
+                date_of_birth: dateOfBirth,
+                age: age,
+                address: address,
+                city: city,
+                state: state,
+                zip_code: zipCode,
+                lead_vendor: leadVendor
+              },
+              agentName: licensedAgentAccount || bufferAgent || agentWhoTookCall || 'Unknown Agent',
+              status: finalStatus,
+              dqReason: showStatusReasonDropdown ? statusReason : null
+            }
+          });
+
+          if (medAlertSlackError) {
+            console.error("Error sending Med Alert Slack notification:", medAlertSlackError);
+          } else {
+            console.log("Med Alert Slack notification sent successfully");
+          }
+
+        } catch (medAlertError) {
+          console.error("Med Alert lead creation/notification failed:", medAlertError);
+          // Don't fail the entire process if Med Alert fails
         }
       }
 
@@ -1442,7 +1569,7 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
 
       // Call onSuccess callback to navigate to journey page
       if (onSuccess) {
-        onSuccess();
+        onSuccess(pitchMedAlert);
       } else {
         // Reset form if no callback provided (only for new entries)
         if (!existingResult) {
@@ -1926,6 +2053,58 @@ export const CallResultForm = ({ submissionId, customerName, onSuccess }: CallRe
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+
+              {/* Pitch Med Alert Button - shows for DQ, Not Interested, GI - Currently DQ */}
+              {showPitchMedAlertButton && (
+                <div className="mt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-purple-500 text-purple-600 hover:bg-purple-50"
+                    onClick={() => setPitchMedAlert(!pitchMedAlert)}
+                  >
+                    {pitchMedAlert ? "Cancel Med Alert Pitch" : "Pitch Med Alert"}
+                  </Button>
+                </div>
+              )}
+
+              {/* Med Alert Transition Section */}
+              {pitchMedAlert && (
+                <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="font-bold text-purple-700">Med Alert Transition Script</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(maTransitionScript);
+                          toast({ title: "Copied!", description: "Script copied to clipboard" });
+                        }}
+                      >
+                        Copy Script
+                      </Button>
+                    </div>
+                    <div className="p-3 bg-white rounded border text-sm whitespace-pre-wrap">{maTransitionScript}</div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Label className="font-bold text-purple-700">LA Med Alert DID:</Label>
+                      <span className="font-mono text-lg">{medAlertDID}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(medAlertDID);
+                          toast({ title: "Copied!", description: "DID copied to clipboard" });
+                        }}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
 

@@ -539,7 +539,7 @@ const CallResultUpdateV2 = () => {
                       <CallResultForm 
                         submissionId={submissionId!} 
                         customerName={lead?.customer_full_name}
-                        onSuccess={() => navigate(`/call-result-journey?submissionId=${submissionId}`)}
+                        onSuccess={(medAlertPitched) => navigate(`/call-result-journey?submissionId=${submissionId}${medAlertPitched ? '&medAlertPitched=true' : ''}`)}
                       />
                     </CollapsibleContent>
                   </div>
@@ -561,7 +561,7 @@ const CallResultUpdateV2 = () => {
                 <CallResultForm 
                   submissionId={submissionId!} 
                   customerName={lead.customer_full_name}
-                  onSuccess={() => navigate(`/call-result-journey?submissionId=${submissionId}`)}
+                  onSuccess={(medAlertPitched) => navigate(`/call-result-journey?submissionId=${submissionId}${medAlertPitched ? '&medAlertPitched=true' : ''}`)}
                 />
               </div>
             </div>
