@@ -939,7 +939,7 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
                 className="text-xs"
               />
             )}
-            {item.field_name === 'phone_number' && (
+            {item.field_name === 'age' && (
               <Button 
                 size="sm" 
                 className="w-full h-8 text-xs bg-purple-600 hover:bg-purple-700 text-white font-medium"
@@ -1334,128 +1334,113 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
             </DialogHeader>
             
             <div className="space-y-6 py-4 text-xl">
-              {/* MIB Disclosure */}
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <h4 className="font-bold text-blue-800 mb-2 text-2xl">MIB Disclosure</h4>
-                <p className="text-xl">
-                  "Before we proceed, I want to let you know that as part of the application process, we may check your medical history through the MIB (formerly known as the Medical Information Bureau). This is a consumer reporting agency that collects and exchanges information with member insurance companies about individuals who have applied for insurance. This helps us assess your application fairly and accurately."
-                </p>
-              </div>
-
-              {/* Underwriting Script */}
-              <div className="bg-gray-50 p-4 rounded-lg border">
-                <h4 className="font-bold text-2xl mb-3">Underwriting Questions</h4>
-                
-                <div className="space-y-4 text-xl">
-                  <p className="font-medium">
-                    "I am going to ask you some medical questions and we expect your honesty that is going to save us a lot of time. And, this will help us evaluate which insurance carrier comes back with the maximum benefit at the lowest rates for you."
-                  </p>
+              {/* Two Column Layout: Questions (Left) and Toolkit (Right) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                {/* Left Column: Underwriting Script */}
+                <div className="bg-gray-50 p-4 rounded-lg border h-full overflow-y-auto">
+                  <h4 className="font-bold text-2xl mb-3">Underwriting Questions</h4>
                   
-                  {/* Question 1 */}
-                  <div className="space-y-3 p-4 bg-white rounded-lg border">
-                    <p className="font-bold text-xl">Question 1:</p>
-                    <p className="text-lg">Have you ever been diagnosed or treated for Alzheimer's Dementia, Congestive heart failure, organ transplant, HIV, AIDS, ARC, Leukemia, Tuberculosis, chronic Respiratory disease, currently paralyzed, amputation due to a disease? Are you currently hospitalized in a nursing facility? Due to a disease are you currently confined to a wheelchair? Are you currently on oxygen?</p>
+                  <div className="space-y-4 text-xl">
+                    <p className="font-medium">
+                      "I am going to ask you some medical questions and we expect your honesty that is going to save us a lot of time. And, this will help us evaluate which insurance carrier comes back with the maximum benefit at the lowest rates for you."
+                    </p>
                     
-                    <div className="mt-3">
-                      <p className="text-sm text-gray-600 mb-2">Select any conditions mentioned:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {question1Conditions.map((condition) => (
-                          <label key={condition} className="flex items-center gap-1.5 px-3 py-1.5 border rounded-full hover:bg-purple-50 cursor-pointer text-sm transition-colors">
-                            <input 
-                              type="checkbox"
-                              checked={underwritingCheckboxes[condition] || false}
-                              onChange={(e) => handleUnderwritingCheckboxChange(condition, e.target.checked)}
-                              className="w-4 h-4"
-                            />
-                            {condition}
-                          </label>
-                        ))}
+                    {/* Question 1 */}
+                    <div className="space-y-3 p-4 bg-white rounded-lg border">
+                      <p className="font-bold text-xl">Question 1:</p>
+                      <p className="text-lg">Have you ever been diagnosed or treated for Alzheimer's Dementia, Congestive heart failure, organ transplant, HIV, AIDS, ARC, Leukemia, Tuberculosis, chronic Respiratory disease, currently paralyzed, amputation due to a disease? Are you currently hospitalized in a nursing facility? Due to a disease are you currently confined to a wheelchair? Are you currently on oxygen?</p>
+                    </div>
+                    
+                    {/* Question 2 */}
+                    <div className="space-y-3 p-4 bg-white rounded-lg border">
+                      <p className="font-bold text-xl">Question 2:</p>
+                      <p className="text-lg">In the last 5 years, have you had any heart attacks, cancers, Alzheimer's, dementia, congestive heart failure, kidney failure or an organ removal? Have you ever had any disorders of the kidney, lung, brain, heart, circulatory system or liver? Or In the last 3 years have you been diagnosed and treated for leukemia, sickle cell anemia, brain disorder, Alzheimer's or dementia, aneurysm, diabetic coma, amputation due to any disease, cirrhosis of the liver, Multiple Sclerosis, chronic respiratory disease, tuberculosis, chronic pneumonia, hepatitis? Or In the last 2 years if you had any stents, pacemaker, defibrillator, valve replacement, stroke, TIA or paralysis?</p>
+                    </div>
+                    
+                    {/* Question 3 */}
+                    <div className="space-y-3 p-4 bg-white rounded-lg border">
+                      <p className="font-bold text-xl">Question 3:</p>
+                      <p className="text-lg">Or if you have any complications from diabetes? Like (Neuropathy, amputation due to diabetes, retinopathy, diabetic coma, etc) Have you been treated or diagnosed with COPD, Bipolar, or schizophrenia?</p>
+                    </div>
+
+                    {/* Tobacco Question */}
+                    <div className="mt-4 p-3 bg-yellow-50 rounded border border-yellow-200">
+                      <p className="font-bold mb-2 text-xl">Tobacco Usage:</p>
+                      <p className="text-lg">Have you consumed any tobacco or nicotine products in the last 12 months?</p>
+                      <div className="flex gap-4 mt-2">
+                        <label className="flex items-center gap-2 text-xl">
+                          <input 
+                            type="radio" 
+                            name="tobacco" 
+                            checked={underwritingData.tobaccoLast12Months === 'yes'}
+                            onChange={() => setUnderwritingData({...underwritingData, tobaccoLast12Months: 'yes'})}
+                          />
+                          Yes
+                        </label>
+                        <label className="flex items-center gap-2 text-xl">
+                          <input 
+                            type="radio" 
+                            name="tobacco" 
+                            checked={underwritingData.tobaccoLast12Months === 'no'}
+                            onChange={() => setUnderwritingData({...underwritingData, tobaccoLast12Months: 'no'})}
+                          />
+                          No
+                        </label>
                       </div>
                     </div>
-                  </div>
-                  
-                  {/* Question 2 */}
-                  <div className="space-y-3 p-4 bg-white rounded-lg border">
-                    <p className="font-bold text-xl">Question 2:</p>
-                    <p className="text-lg">In the last 5 years, have you had any heart attacks, cancers, Alzheimer's, dementia, congestive heart failure, kidney failure or an organ removal? Have you ever had any disorders of the kidney, lung, brain, heart, circulatory system or liver? Or In the last 3 years have you been diagnosed and treated for leukemia, sickle cell anemia, brain disorder, Alzheimer's or dementia, aneurysm, diabetic coma, amputation due to any disease, cirrhosis of the liver, Multiple Sclerosis, chronic respiratory disease, tuberculosis, chronic pneumonia, hepatitis? Or In the last 2 years if you had any stents, pacemaker, defibrillator, valve replacement, stroke, TIA or paralysis?</p>
-                    
-                    <div className="mt-3">
-                      <p className="text-sm text-gray-600 mb-2">Select any conditions mentioned:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {question2Conditions.map((condition) => (
-                          <label key={condition} className="flex items-center gap-1.5 px-3 py-1.5 border rounded-full hover:bg-purple-50 cursor-pointer text-sm transition-colors">
-                            <input 
-                              type="checkbox"
-                              checked={underwritingCheckboxes[condition] || false}
-                              onChange={(e) => handleUnderwritingCheckboxChange(condition, e.target.checked)}
-                              className="w-4 h-4"
-                            />
-                            {condition}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Question 3 */}
-                  <div className="space-y-3 p-4 bg-white rounded-lg border">
-                    <p className="font-bold text-xl">Question 3:</p>
-                    <p className="text-lg">Or if you have any complications from diabetes? Like (Neuropathy, amputation due to diabetes, retinopathy, diabetic coma, etc) Have you been treated or diagnosed with COPD, Bipolar, or schizophrenia?</p>
-                    
-                    <div className="mt-3">
-                      <p className="text-sm text-gray-600 mb-2">Select any conditions mentioned:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {question3Conditions.map((condition) => (
-                          <label key={condition} className="flex items-center gap-1.5 px-3 py-1.5 border rounded-full hover:bg-purple-50 cursor-pointer text-sm transition-colors">
-                            <input 
-                              type="checkbox"
-                              checked={underwritingCheckboxes[condition] || false}
-                              onChange={(e) => handleUnderwritingCheckboxChange(condition, e.target.checked)}
-                              className="w-4 h-4"
-                            />
-                            {condition}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Tobacco Question */}
-                  <div className="mt-4 p-3 bg-yellow-50 rounded border border-yellow-200">
-                    <p className="font-bold mb-2 text-xl">Tobacco Usage:</p>
-                    <p className="text-lg">Have you consumed any tobacco or nicotine products in the last 12 months?</p>
-                    <div className="flex gap-4 mt-2">
-                      <label className="flex items-center gap-2 text-xl">
-                        <input 
-                          type="radio" 
-                          name="tobacco" 
-                          checked={underwritingData.tobaccoLast12Months === 'yes'}
-                          onChange={() => setUnderwritingData({...underwritingData, tobaccoLast12Months: 'yes'})}
-                        />
-                        Yes
-                      </label>
-                      <label className="flex items-center gap-2 text-xl">
-                        <input 
-                          type="radio" 
-                          name="tobacco" 
-                          checked={underwritingData.tobaccoLast12Months === 'no'}
-                          onChange={() => setUnderwritingData({...underwritingData, tobaccoLast12Months: 'no'})}
-                        />
-                        No
-                      </label>
+                    <p className="font-medium text-xl mt-4">Lastly, do you have any health conditions or take any prescribed medication on a regular basis?</p>
+                    
+                    {/* Follow Up Questions */}
+                    <div className="p-4 bg-white rounded-lg border">
+                      <p className="font-bold text-xl">Follow Up:</p>
+                      <ul className="list-disc ml-6 text-lg mt-2">
+                        <li>How many medications are you taking on a daily basis?</li>
+                        <li>Do you know what those medications are for?</li>
+                        <li>Do you have your medications, or a list of your medications nearby?</li>
+                      </ul>
                     </div>
                   </div>
+                </div>
 
-                  <p className="font-medium text-xl mt-4">Lastly, do you have any health conditions or take any prescribed medication on a regular basis?</p>
-                  
-                  {/* Follow Up Questions */}
-                  <div className="p-4 bg-white rounded-lg border">
-                    <p className="font-bold text-xl">Follow Up:</p>
-                    <ul className="list-disc ml-6 text-lg mt-2">
-                      <li>How many medications are you taking on a daily basis?</li>
-                      <li>Do you know what those medications are for?</li>
-                      <li>Do you have your medications, or a list of your medications nearby?</li>
-                    </ul>
+                {/* Right Column: Insurance Toolkit iframe */}
+                <div className="bg-white border-2 border-purple-200 rounded-lg overflow-hidden flex flex-col">
+                  <div className="bg-purple-600 text-white px-4 py-2 font-bold text-lg flex justify-between items-center flex-shrink-0">
+                    <span>Insurance Toolkit</span>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
+                          if (iframe) iframe.src = 'https://insurancetoolkits.com/fex/quoter';
+                        }}
+                      >
+                        Quote Tool
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs text-white border-white hover:bg-purple-700"
+                        onClick={() => {
+                          const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
+                          if (iframe) iframe.src = 'https://insurancetoolkits.com/login';
+                        }}
+                      >
+                        Login
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="border-2 border-purple-300 rounded-lg overflow-hidden bg-white flex-1" style={{ minHeight: '600px' }}>
+                    <iframe
+                      style={{ border: 'none', height: '100%', width: '100%' }}
+                      src="https://insurancetoolkits.com/login"
+                      title="Insurance Toolkit"
+                      id="healthKitIframe"
+                    />
                   </div>
                 </div>
               </div>
@@ -1480,38 +1465,6 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
                   onChange={(tags) => setUnderwritingData({...underwritingData, medications: tags})}
                   placeholder="Type and press Enter to add medications..."
                   className="text-xl"
-                />
-              </div>
-
-              {/* Doctor's Name */}
-              <div className="space-y-2">
-                <Label className="text-xl font-bold">Doctor's Name:</Label>
-                <Input
-                  value={inputValues[verificationItems?.find(i => i.field_name === 'doctors_name')?.id || ''] || verificationItems?.find(i => i.field_name === 'doctors_name')?.verified_value || verificationItems?.find(i => i.field_name === 'doctors_name')?.original_value || ''}
-                  onChange={(e) => {
-                    const doctorsItem = verificationItems?.find(i => i.field_name === 'doctors_name');
-                    if (doctorsItem) {
-                      handleFieldValueChange(doctorsItem.id, e.target.value, 'doctors_name');
-                    }
-                  }}
-                  placeholder="Enter doctor's name..."
-                  className="text-xl h-12"
-                />
-              </div>
-
-              {/* Existing Coverage */}
-              <div className="space-y-2">
-                <Label className="text-xl font-bold">Existing Coverage:</Label>
-                <Input
-                  value={inputValues[verificationItems?.find(i => i.field_name === 'existing_coverage')?.id || ''] || verificationItems?.find(i => i.field_name === 'existing_coverage')?.verified_value || verificationItems?.find(i => i.field_name === 'existing_coverage')?.original_value || ''}
-                  onChange={(e) => {
-                    const existingCoverageItem = verificationItems?.find(i => i.field_name === 'existing_coverage');
-                    if (existingCoverageItem) {
-                      handleFieldValueChange(existingCoverageItem.id, e.target.value, 'existing_coverage');
-                    }
-                  }}
-                  placeholder="Enter existing coverage..."
-                  className="text-xl h-12"
                 />
               </div>
 
@@ -1572,145 +1525,7 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
                   />
                 </div>
               </div>
-            </div>
-
-{/* Health Kit App - Embedded View */}
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xl font-bold">Health Kit - Rate Quote Tool</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open('https://insurancetoolkits.com/login', '_blank')}
-                  >
-                    Open in New Tab ↗
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">Log in below to access the rate quote tool. Your session will stay active in this popup.</p>
-              </CardHeader>
-              <CardContent>
-                <div className="border-2 border-blue-300 rounded-lg overflow-hidden bg-white" style={{ height: 'calc(100vh - 300px)' }}>
-                  <iframe
-                    style={{ border: 'none', height: '100%', width: '100%' }}
-                    src="https://insurancetoolkits.com/login"
-                    title="Health Kit Login"
-                    className="health-kit-frame"
-                    id="healthKitIframe"
-                  />
-                </div>
-                <div className="flex gap-2 mt-2 flex-wrap">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
-                      if (iframe) iframe.src = 'https://insurancetoolkits.com/fex/quoter';
-                    }}
-                  >
-                    Go to Quote Tool
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
-                      if (!iframe) return;
-                      
-                      // Build URL with current form values - try multiple parameter names
-                      const params = new URLSearchParams();
-                      
-                      // Coverage Amount - try various param names
-                      if (underwritingData.coverageAmount) {
-                        const coverage = underwritingData.coverageAmount.replace(/[^0-9]/g, '');
-                        params.set('face', coverage);
-                        params.set('faceamount', coverage);
-                        params.set('coverage_amount', coverage);
-                        params.set('coverage', coverage);
-                        params.set('amount', coverage);
-                      }
-                      
-                      // Premium - try various param names
-                      if (underwritingData.monthlyPremium) {
-                        const premium = underwritingData.monthlyPremium.replace(/[^0-9.]/g, '');
-                        params.set('premium', premium);
-                        params.set('monthly_premium', premium);
-                        params.set('price', premium);
-                      }
-                      
-                      // Height - try various param names
-                      if (underwritingData.height) {
-                        params.set('height', underwritingData.height);
-                        params.set('h', underwritingData.height);
-                        params.set('ft', underwritingData.height);
-                      }
-                      
-                      // Weight - try various param names
-                      if (underwritingData.weight) {
-                        const weight = underwritingData.weight.replace(/[^0-9]/g, '');
-                        params.set('weight', weight);
-                        params.set('w', weight);
-                        params.set('lbs', weight);
-                      }
-                      
-                      // Tobacco - try various param names
-                      if (underwritingData.tobaccoLast12Months) {
-                        params.set('tobacco', underwritingData.tobaccoLast12Months);
-                        params.set('tobacco_use', underwritingData.tobaccoLast12Months);
-                        params.set('smoker', underwritingData.tobaccoLast12Months);
-                      }
-                      
-                      const baseUrl = 'https://insurancetoolkits.com/fex/quoter';
-                      const queryString = params.toString();
-                      const fullUrl = queryString ? `${baseUrl}?${queryString}` : baseUrl;
-                      
-                      console.log('Loading with params:', fullUrl);
-                      iframe.src = fullUrl;
-                    }}
-                  >
-                    Load with Current Values
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const iframe = document.getElementById('healthKitIframe') as HTMLIFrameElement;
-                      if (iframe) iframe.src = 'https://insurancetoolkits.com/login';
-                    }}
-                  >
-                    Back to Login
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  💡 Tip: Click "Load with Current Values" after entering Coverage Amount, Height, Weight, and Tobacco to pre-fill the quote tool.
-                </p>
-                <div className="flex gap-2 mt-2">
-                  <Input
-                    placeholder="Which param worked? (e.g. face, coverage)"
-                    className="text-sm h-8"
-                    id="healthKitParamFeedback"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const feedback = (document.getElementById('healthKitParamFeedback') as HTMLInputElement)?.value;
-                      if (feedback) {
-                        console.log('User feedback on working params:', feedback);
-                        toast({ title: "Thanks!", description: "We'll refine the params based on your feedback." });
-                      }
-                    }}
-                  >
-                    Submit Feedback
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
 
             <DialogFooter className="mt-4 flex-col gap-2">
               <div className="text-sm text-gray-600 text-center">
