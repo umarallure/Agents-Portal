@@ -20,6 +20,7 @@ import MedalertQuoteForm from "./pages/MedalertQuoteForm";
 import MedalertLeadsPage from "./pages/MedalertLeadsPage";
 import CommissionPortal from "./pages/CommissionPortal";
 import CallResultUpdate from "./pages/CallResultUpdate";
+import CallResultUpdateV2 from "./pages/CallResultUpdateV2";
 import CallResultJourney from "./pages/CallResultJourney";
 import NewCallback from "./pages/NewCallback";
 import DailyDealFlowPage from "./pages/DailyDealFlow/DailyDealFlowPage";
@@ -113,11 +114,19 @@ const App = () => (
                 </LicensedAgentProtectedRoute>
               } 
             />
-            <Route 
+<Route 
               path="/call-result-update" 
               element={
                 <ProtectedRoute>
                   <CallResultUpdate />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/call-result-update-v2" 
+              element={
+                <ProtectedRoute>
+                  <CallResultUpdateV2 />
                 </ProtectedRoute>
               } 
             />
