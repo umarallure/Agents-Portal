@@ -74,6 +74,7 @@ export const GridToolbar = ({
   const bufferAgentOptions = [
     "All Buffer Agents",
     "Justine",
+    "Maria",
     "Muhammad Ahmed",
     "Elijah K",
     "Brandon Blake Flinchum",
