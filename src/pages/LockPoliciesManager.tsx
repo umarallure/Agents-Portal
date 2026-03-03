@@ -34,6 +34,7 @@ interface Policy {
   lock_status: string | null;
   locked_at: string | null;
   locked_by_name: string | null;
+  lock_reason: string | null;
 }
 
 const ITEMS_PER_PAGE = 25;
@@ -88,7 +89,8 @@ const LockPoliciesManager = () => {
         sales_agent: policy.sales_agent,
         lock_status: policy.lock_status,
         locked_at: policy.locked_at,
-        locked_by_name: policy.locked_by_name
+        locked_by_name: policy.locked_by_name,
+        lock_reason: policy.lock_reason
       }));
 
       setPolicies(mappedPolicies);
@@ -121,7 +123,7 @@ const LockPoliciesManager = () => {
     const matchesStatus = statusFilter === 'all' || policy.policy_status === statusFilter;
     
     const matchesLock = lockFilter === 'all' || 
-      (lockFilter === 'locked' && (policy.lock_status === 'locked_successfully' || policy.lock_status === 'already_locked')) ||
+      (lockFilter === 'locked' && (policy.lock_status === 'locked_successfully' || policy.lock_status === 'already_locked' || policy.lock_status === 'unable_to_lock')) ||
       (lockFilter === 'pending' && (!policy.lock_status || policy.lock_status === 'pending'));
     
     return matchesSearch && matchesStatus && matchesLock;
@@ -141,6 +143,9 @@ const LockPoliciesManager = () => {
     }
     if (status === 'already_locked') {
       return <Badge className="bg-yellow-100 text-yellow-800"><Lock className="h-3 w-3 mr-1" /> Already Locked</Badge>;
+    }
+    if (status === 'unable_to_lock') {
+      return <Badge className="bg-red-100 text-red-800"><Lock className="h-3 w-3 mr-1" /> Unable to Lock</Badge>;
     }
     return <Badge variant="secondary"><Unlock className="h-3 w-3 mr-1" /> Pending</Badge>;
   };
@@ -243,6 +248,7 @@ const LockPoliciesManager = () => {
                     <TableHead>Policy #</TableHead>
                     <TableHead>Policy Status</TableHead>
                     <TableHead>Lock Status</TableHead>
+                    <TableHead>Reason</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Agent</TableHead>
                     <TableHead>Locked By</TableHead>
@@ -255,6 +261,13 @@ const LockPoliciesManager = () => {
                       <TableCell>{policy.policy_number || 'N/A'}</TableCell>
                       <TableCell>{getPolicyStatusBadge(policy.policy_status)}</TableCell>
                       <TableCell>{getLockStatusBadge(policy.lock_status)}</TableCell>
+                      <TableCell>
+                        {policy.lock_reason ? (
+                          <span className="text-sm text-red-600">{policy.lock_reason}</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>{formatDateToEST(policy.deal_creation_date)}</TableCell>
                       <TableCell>{policy.sales_agent || 'N/A'}</TableCell>
                       <TableCell>
