@@ -101,7 +101,8 @@ const LockPolicies = () => {
   const [activeTab, setActiveTab] = useState<'current' | 'retroactive'>('current');
   const [showPolicyDialog, setShowPolicyDialog] = useState(false);
   
-  const [dispositionType, setDispositionType] = useState<'locked_successfully' | 'already_locked' | ''>('');
+  const [dispositionType, setDispositionType] = useState<'locked_successfully' | 'already_locked' | 'unable_to_lock' | ''>('');
+  const [lockReason, setLockReason] = useState<string[]>([]);
   const [password, setPassword] = useState('');
   const [savingDisposition, setSavingDisposition] = useState(false);
   
@@ -227,7 +228,16 @@ const LockPolicies = () => {
       return;
     }
 
-    if (!password.trim()) {
+    if (dispositionType === 'unable_to_lock' && lockReason.length === 0) {
+      toast({
+        title: "Required",
+        description: "Please select at least one reason",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (dispositionType !== 'unable_to_lock' && !password.trim()) {
       toast({
         title: "Required",
         description: "Please enter your password",
@@ -236,7 +246,7 @@ const LockPolicies = () => {
       return;
     }
 
-    if (password !== localStorage.getItem('lock_policy_password')) {
+    if (dispositionType !== 'unable_to_lock' && password !== localStorage.getItem('lock_policy_password')) {
       toast({
         title: "Incorrect Password",
         description: "The password you entered is incorrect.",
@@ -247,7 +257,19 @@ const LockPolicies = () => {
     
     setSavingDisposition(true);
     try {
-      const lockStatusValue = dispositionType === 'locked_successfully' ? 'locked_successfully' : 'already_locked';
+      let lockStatusValue: string;
+      let lockReasonValue: string | null = null;
+      
+      if (dispositionType === 'locked_successfully') {
+        lockStatusValue = 'locked_successfully';
+      } else if (dispositionType === 'already_locked') {
+        lockStatusValue = 'already_locked';
+      } else if (dispositionType === 'unable_to_lock') {
+        lockStatusValue = 'unable_to_lock';
+        lockReasonValue = lockReason.join(', ');
+      } else {
+        lockStatusValue = dispositionType;
+      }
       
       const { error } = await supabase
         .from('monday_com_deals')
@@ -256,7 +278,8 @@ const LockPolicies = () => {
           locked_at: new Date().toISOString(),
           locked_by: LOCK_POLICIES_USER_ID,
           locked_by_name: 'Justine',
-          lock_password: dispositionType === 'locked_successfully' ? password : null
+          lock_password: dispositionType === 'locked_successfully' ? password : null,
+          lock_reason: lockReasonValue
         })
         .eq('id', selectedPolicy.id);
 
@@ -269,6 +292,7 @@ const LockPolicies = () => {
       
       setShowPolicyDialog(false);
       setDispositionType('');
+      setLockReason([]);
       setPassword('');
       
       fetchPolicies();
@@ -296,6 +320,7 @@ const LockPolicies = () => {
     if (!selectedPolicy) return;
     setShowPolicyDialog(true);
     setDispositionType('');
+    setLockReason([]);
     setPassword('');
   };
 
@@ -499,7 +524,7 @@ const LockPolicies = () => {
               
               <div className="space-y-2">
                 <Label htmlFor="disposition">Disposition</Label>
-                <RadioGroup value={dispositionType} onValueChange={(val) => setDispositionType(val as any)} className="flex flex-col space-y-1">
+                <RadioGroup value={dispositionType} onValueChange={(val) => { setDispositionType(val as any); setLockReason([]); }} className="flex flex-col space-y-1">
                   <div className="flex items-center space-x-2 p-3 border rounded hover:bg-accent cursor-pointer">
                     <RadioGroupItem value="locked_successfully" id="locked_successfully" />
                     <Label htmlFor="locked_successfully" className="cursor-pointer flex-1">
@@ -512,27 +537,68 @@ const LockPolicies = () => {
                       Already Locked
                     </Label>
                   </div>
+                  <div className="flex items-center space-x-2 p-3 border rounded hover:bg-accent cursor-pointer">
+                    <RadioGroupItem value="unable_to_lock" id="unable_to_lock" />
+                    <Label htmlFor="unable_to_lock" className="cursor-pointer flex-1">
+                      Unable to lock (Client's Information incorrect)
+                    </Label>
+                  </div>
                 </RadioGroup>
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="lock-password">Your Password</Label>
-                <Input 
-                  id="lock-password" 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                />
-              </div>
+              {dispositionType === 'unable_to_lock' && (
+                <div className="space-y-2 pt-2">
+                  <Label>Reason (select all that apply)</Label>
+                  <div className="space-y-2 border rounded p-3">
+                    {['First Name', 'Last Name', 'SSN', 'DOB'].map((reason) => (
+                      <div key={reason} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`reason-${reason}`}
+                          checked={lockReason.includes(reason)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setLockReason([...lockReason, reason]);
+                            } else {
+                              setLockReason(lockReason.filter(r => r !== reason));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`reason-${reason}`} className="cursor-pointer">
+                          {reason}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {dispositionType !== 'unable_to_lock' && (
+                <div className="space-y-2">
+                  <Label htmlFor="lock-password">Your Password</Label>
+                  <Input 
+                    id="lock-password" 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                  />
+                </div>
+              )}
             </div>
           )}
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowPolicyDialog(false); setDispositionType(''); setPassword(''); }}>
+            <Button variant="outline" onClick={() => { setShowPolicyDialog(false); setDispositionType(''); setLockReason([]); setPassword(''); }}>
               Cancel
             </Button>
-            <Button onClick={handleSaveDisposition} disabled={!dispositionType || !password || savingDisposition}>
+            <Button 
+              onClick={handleSaveDisposition} 
+              disabled={
+                !dispositionType || 
+                (dispositionType === 'unable_to_lock' ? lockReason.length === 0 : !password) || 
+                savingDisposition
+              }
+            >
               {savingDisposition ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Lock className="h-4 w-4 mr-2" />}
               Save & Lock
             </Button>
