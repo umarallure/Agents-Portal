@@ -6,7 +6,7 @@ import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, 
 import { useAuth } from '@/hooks/useAuth';
 import { useLicensedAgent } from '@/hooks/useLicensedAgent';
 import { useCenterUser } from '@/hooks/useCenterUser';
-import { canAccessNavigation, isBufferAgent as checkIsBufferAgent, canAccessLockPolicies } from '@/lib/userPermissions';
+import { canAccessNavigation, isBufferAgent as checkIsBufferAgent, canAccessLockPolicies, canAccessLockPoliciesManager } from '@/lib/userPermissions';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { TaskNotificationPanel } from './TaskNotificationPanel';
@@ -34,6 +34,7 @@ const [isAdmin, setIsAdmin] = useState(false);
   const [isBufferAgent, setIsBufferAgent] = useState(false);
   const [bufferLoading, setBufferLoading] = useState(true);
   const [canAccessLockPoliciesPage, setCanAccessLockPoliciesPage] = useState(false);
+  const [canAccessLockPoliciesManagerPage, setCanAccessLockPoliciesManagerPage] = useState(false);
   
   const isBen = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79';
   const isAuthorizedUser = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79' || user?.id === '9c004d97-b5fb-4ed6-805e-e2c383fe8b6f' || user?.id === 'c2f07638-d3d2-4fe9-9a65-f57395745695' || user?.id === '30b23a3f-df6b-40af-85d1-84d3e6f0b8b4'|| user?.id === 'd68d18e4-9deb-4282-b4d0-1e6e6a0789e9';
@@ -69,6 +70,7 @@ const checkBufferStatus = async () => {
         const result = await checkIsBufferAgent(user.id);
         setIsBufferAgent(result);
         setCanAccessLockPoliciesPage(canAccessLockPolicies(user.id));
+        setCanAccessLockPoliciesManagerPage(canAccessLockPoliciesManager(user.id));
       } catch (error) {
         console.error('Error checking buffer agent status:', error);
       } finally {
@@ -242,6 +244,18 @@ const checkBufferStatus = async () => {
                     <DropdownMenuItem onClick={() => navigate('/lock-policies')}>
                       <LockIcon className="mr-2 h-4 w-4" />
                       Lock Policies
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                
+                {/* Lock Policies Manager - Only for Ben */}
+                {canAccessLockPoliciesManagerPage && (
+                  <>
+                    <DropdownMenuLabel>Policy Operations</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => navigate('/lock-policies-manager')}>
+                      <LockIcon className="mr-2 h-4 w-4" />
+                      Lock Policies Manager
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>
