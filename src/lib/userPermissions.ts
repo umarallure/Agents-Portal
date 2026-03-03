@@ -1,4 +1,10 @@
+export const LOCK_POLICIES_USER_ID = '5c2822bb-225d-4fbc-8d3f-92f9c2562eac';
+
 export const RESTRICTED_USER_IDS = ['adda1255-2a0b-41da-9df0-3100d01b8649', 'eceb7ac0-0e4a-44ad-bb70-ba66010d0baa'];
+
+export const canAccessLockPolicies = (userId: string | undefined): boolean => {
+  return userId === LOCK_POLICIES_USER_ID;
+};
 
 /**
  * Check if the current user has restricted access (read-only view)

@@ -2,11 +2,11 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, Search, ArrowLeft, DollarSign, ShieldCheck, Zap, Users, Calendar, Inbox, Shield } from 'lucide-react';
+import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, Search, ArrowLeft, DollarSign, ShieldCheck, Zap, Users, Calendar, Inbox, Shield, Lock as LockIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLicensedAgent } from '@/hooks/useLicensedAgent';
 import { useCenterUser } from '@/hooks/useCenterUser';
-import { canAccessNavigation, isBufferAgent as checkIsBufferAgent } from '@/lib/userPermissions';
+import { canAccessNavigation, isBufferAgent as checkIsBufferAgent, canAccessLockPolicies } from '@/lib/userPermissions';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { TaskNotificationPanel } from './TaskNotificationPanel';
@@ -30,9 +30,10 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
   const { isLicensedAgent, loading: licensedLoading } = useLicensedAgent();
   const { isCenterUser, loading: centerLoading, leadVendor } = useCenterUser();
   const navigate = useNavigate();
-  const [isAdmin, setIsAdmin] = useState(false);
+const [isAdmin, setIsAdmin] = useState(false);
   const [isBufferAgent, setIsBufferAgent] = useState(false);
   const [bufferLoading, setBufferLoading] = useState(true);
+  const [canAccessLockPoliciesPage, setCanAccessLockPoliciesPage] = useState(false);
   
   const isBen = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79';
   const isAuthorizedUser = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79' || user?.id === '9c004d97-b5fb-4ed6-805e-e2c383fe8b6f' || user?.id === 'c2f07638-d3d2-4fe9-9a65-f57395745695' || user?.id === '30b23a3f-df6b-40af-85d1-84d3e6f0b8b4'|| user?.id === 'd68d18e4-9deb-4282-b4d0-1e6e6a0789e9';
@@ -58,7 +59,7 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
       }
     };
 
-    const checkBufferStatus = async () => {
+const checkBufferStatus = async () => {
       if (!user) {
         setBufferLoading(false);
         return;
@@ -67,6 +68,7 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
       try {
         const result = await checkIsBufferAgent(user.id);
         setIsBufferAgent(result);
+        setCanAccessLockPoliciesPage(canAccessLockPolicies(user.id));
       } catch (error) {
         console.error('Error checking buffer agent status:', error);
       } finally {
@@ -213,7 +215,7 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                   </>
                 )}
                 
-                {/* Buffer/Retention Agent - Available for buffer agents */}
+{/* Buffer/Retention Agent - Available for buffer agents */}
                 {isBufferAgent && !bufferLoading && !isLicensedAgent && !isCenterUser && !isAuthorizedUser && (
                   <>
                     <DropdownMenuLabel>Retention Agent</DropdownMenuLabel>
@@ -228,6 +230,18 @@ export const NavigationHeader = ({ title, showBackButton = false, backTo }: Navi
                     <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                       <Grid3X3 className="mr-2 h-4 w-4" />
                       Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                
+                {/* Lock Policies - Only for Justine */}
+                {canAccessLockPoliciesPage && (
+                  <>
+                    <DropdownMenuLabel>Policy Operations</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => navigate('/lock-policies')}>
+                      <LockIcon className="mr-2 h-4 w-4" />
+                      Lock Policies
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </>

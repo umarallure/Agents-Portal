@@ -42,6 +42,7 @@ import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
 import LAReadyPage from "./pages/LAReadyPage";
 import RetentionFlow from "./pages/RetentionFlow";
+import LockPolicies from "./pages/LockPolicies";
 import RetentionCallNotificationPopup from "./components/RetentionCallNotificationPopup";
 
 const queryClient = new QueryClient();
@@ -282,11 +283,19 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            <Route 
+<Route 
               path="/retention-flow" 
               element={
                 <ProtectedRoute>
                   <RetentionFlow />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/lock-policies" 
+              element={
+                <ProtectedRoute>
+                  <LockPolicies />
                 </ProtectedRoute>
               } 
             />
