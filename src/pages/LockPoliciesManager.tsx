@@ -126,7 +126,8 @@ const LockPoliciesManager = () => {
     const matchesStatus = statusFilter === 'all' || policy.policy_status === statusFilter;
     
     const matchesLock = lockFilter === 'all' || 
-      (lockFilter === 'locked' && (policy.lock_status === 'locked_successfully' || policy.lock_status === 'already_locked' || policy.lock_status === 'unable_to_lock')) ||
+      (lockFilter === 'locked' && (policy.lock_status === 'locked_successfully' || policy.lock_status === 'already_locked')) ||
+      (lockFilter === 'unable_to_lock' && policy.lock_status === 'unable_to_lock') ||
       (lockFilter === 'pending' && (!policy.lock_status || policy.lock_status === 'pending'));
     
     return matchesSearch && matchesStatus && matchesLock;
@@ -238,6 +239,7 @@ const LockPoliciesManager = () => {
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
                 <SelectItem value="locked">Locked</SelectItem>
+                <SelectItem value="unable_to_lock">Unable to Lock</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
               </SelectContent>
             </Select>
