@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, KeyRound, ChevronRight, MapPin, Phone } from 'lucide-react';
+import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, KeyRound, ChevronRight, MapPin, Phone, Eye, EyeOff } from 'lucide-react';
 import { canAccessLockPolicies, LOCK_POLICIES_USER_ID } from '@/lib/userPermissions';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -29,6 +29,7 @@ interface Policy {
   phone_number: string | null;
   sales_agent: string | null;
   lock_status: string | null;
+  lock_password: string | null;
 }
 
 interface LeadInfo {
@@ -101,9 +102,11 @@ const LockPolicies = () => {
   const [activeTab, setActiveTab] = useState<'current' | 'retroactive'>('current');
   const [showPolicyDialog, setShowPolicyDialog] = useState(false);
   
-  const [dispositionType, setDispositionType] = useState<'locked_successfully' | 'already_locked' | ''>('');
+  const [dispositionType, setDispositionType] = useState<'locked_successfully' | 'already_locked' | 'unable_to_lock' | ''>('');
+  const [lockReason, setLockReason] = useState<string[]>([]);
   const [password, setPassword] = useState('');
   const [savingDisposition, setSavingDisposition] = useState(false);
+  const [showStoredPassword, setShowStoredPassword] = useState(false);
   
   const hasPassword = typeof window !== 'undefined' && !!localStorage.getItem('lock_policy_password');
 
@@ -123,7 +126,7 @@ const LockPolicies = () => {
         .eq('carrier', 'ANAM')
         .in('policy_status', ['Issued Paid', 'Issued Not Paid', 'Pending', 'Pending Lapse'])
         .eq('is_active', true)
-        .or('lock_status.is.null,lock_status.not.eq.locked_successfully')
+        .or('lock_status.is.null,lock_status.eq.locked_successfully,lock_status.eq.already_locked,lock_status.eq.unable_to_lock')
         .order('deal_creation_date', { ascending: false });
 
       if (error) {
@@ -149,7 +152,8 @@ const LockPolicies = () => {
           deal_creation_date: policy.deal_creation_date,
           phone_number: policy.phone_number,
           sales_agent: policy.sales_agent,
-          lock_status: policy.lock_status
+          lock_status: policy.lock_status,
+          lock_password: policy.lock_password
         };
         
         const creationDate = p.deal_creation_date ? new Date(p.deal_creation_date) : null;
@@ -227,7 +231,16 @@ const LockPolicies = () => {
       return;
     }
 
-    if (!password.trim()) {
+    if (dispositionType === 'unable_to_lock' && lockReason.length === 0) {
+      toast({
+        title: "Required",
+        description: "Please select at least one reason",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (dispositionType !== 'unable_to_lock' && !password.trim()) {
       toast({
         title: "Required",
         description: "Please enter your password",
@@ -236,7 +249,7 @@ const LockPolicies = () => {
       return;
     }
 
-    if (password !== localStorage.getItem('lock_policy_password')) {
+    if (dispositionType !== 'unable_to_lock' && password !== localStorage.getItem('lock_policy_password')) {
       toast({
         title: "Incorrect Password",
         description: "The password you entered is incorrect.",
@@ -247,7 +260,19 @@ const LockPolicies = () => {
     
     setSavingDisposition(true);
     try {
-      const lockStatusValue = dispositionType === 'locked_successfully' ? 'locked_successfully' : 'already_locked';
+      let lockStatusValue: string;
+      let lockReasonValue: string | null = null;
+      
+      if (dispositionType === 'locked_successfully') {
+        lockStatusValue = 'locked_successfully';
+      } else if (dispositionType === 'already_locked') {
+        lockStatusValue = 'already_locked';
+      } else if (dispositionType === 'unable_to_lock') {
+        lockStatusValue = 'unable_to_lock';
+        lockReasonValue = lockReason.join(', ');
+      } else {
+        lockStatusValue = dispositionType;
+      }
       
       const { error } = await supabase
         .from('monday_com_deals')
@@ -256,7 +281,8 @@ const LockPolicies = () => {
           locked_at: new Date().toISOString(),
           locked_by: LOCK_POLICIES_USER_ID,
           locked_by_name: 'Justine',
-          lock_password: dispositionType === 'locked_successfully' ? password : null
+          lock_password: dispositionType === 'locked_successfully' ? password : null,
+          lock_reason: lockReasonValue
         })
         .eq('id', selectedPolicy.id);
 
@@ -269,6 +295,7 @@ const LockPolicies = () => {
       
       setShowPolicyDialog(false);
       setDispositionType('');
+      setLockReason([]);
       setPassword('');
       
       fetchPolicies();
@@ -296,6 +323,7 @@ const LockPolicies = () => {
     if (!selectedPolicy) return;
     setShowPolicyDialog(true);
     setDispositionType('');
+    setLockReason([]);
     setPassword('');
   };
 
@@ -390,10 +418,27 @@ const LockPolicies = () => {
           <div className="text-sm text-muted-foreground">
             {currentPoliciesList.length > 0 ? `Policy ${selectedPolicyIndex + 1} of ${currentPoliciesList.length}` : 'No policies'}
           </div>
-          <Button onClick={handleOpenPolicyDetails}>
-            <Lock className="h-4 w-4 mr-2" />
-            Lock This Policy
-          </Button>
+          {selectedPolicy?.lock_password ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Password:</span>
+              <span className="font-mono font-medium">
+                {showStoredPassword ? selectedPolicy.lock_password : '••••••••'}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowStoredPassword(!showStoredPassword)}
+                className="h-8 w-8 p-0"
+              >
+                {showStoredPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={handleOpenPolicyDetails}>
+              <Lock className="h-4 w-4 mr-2" />
+              Lock This Policy
+            </Button>
+          )}
         </CardFooter>
       </Card>
     );
@@ -499,7 +544,7 @@ const LockPolicies = () => {
               
               <div className="space-y-2">
                 <Label htmlFor="disposition">Disposition</Label>
-                <RadioGroup value={dispositionType} onValueChange={(val) => setDispositionType(val as any)} className="flex flex-col space-y-1">
+                <RadioGroup value={dispositionType} onValueChange={(val) => { setDispositionType(val as any); setLockReason([]); }} className="flex flex-col space-y-1">
                   <div className="flex items-center space-x-2 p-3 border rounded hover:bg-accent cursor-pointer">
                     <RadioGroupItem value="locked_successfully" id="locked_successfully" />
                     <Label htmlFor="locked_successfully" className="cursor-pointer flex-1">
@@ -512,27 +557,68 @@ const LockPolicies = () => {
                       Already Locked
                     </Label>
                   </div>
+                  <div className="flex items-center space-x-2 p-3 border rounded hover:bg-accent cursor-pointer">
+                    <RadioGroupItem value="unable_to_lock" id="unable_to_lock" />
+                    <Label htmlFor="unable_to_lock" className="cursor-pointer flex-1">
+                      Unable to lock (Client's Information incorrect)
+                    </Label>
+                  </div>
                 </RadioGroup>
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="lock-password">Your Password</Label>
-                <Input 
-                  id="lock-password" 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                />
-              </div>
+              {dispositionType === 'unable_to_lock' && (
+                <div className="space-y-2 pt-2">
+                  <Label>Reason (select all that apply)</Label>
+                  <div className="space-y-2 border rounded p-3">
+                    {['First Name', 'Last Name', 'SSN', 'DOB'].map((reason) => (
+                      <div key={reason} className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`reason-${reason}`}
+                          checked={lockReason.includes(reason)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setLockReason([...lockReason, reason]);
+                            } else {
+                              setLockReason(lockReason.filter(r => r !== reason));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`reason-${reason}`} className="cursor-pointer">
+                          {reason}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {dispositionType !== 'unable_to_lock' && (
+                <div className="space-y-2">
+                  <Label htmlFor="lock-password">Your Password</Label>
+                  <Input 
+                    id="lock-password" 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                  />
+                </div>
+              )}
             </div>
           )}
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowPolicyDialog(false); setDispositionType(''); setPassword(''); }}>
+            <Button variant="outline" onClick={() => { setShowPolicyDialog(false); setDispositionType(''); setLockReason([]); setPassword(''); }}>
               Cancel
             </Button>
-            <Button onClick={handleSaveDisposition} disabled={!dispositionType || !password || savingDisposition}>
+            <Button 
+              onClick={handleSaveDisposition} 
+              disabled={
+                !dispositionType || 
+                (dispositionType === 'unable_to_lock' ? lockReason.length === 0 : !password) || 
+                savingDisposition
+              }
+            >
               {savingDisposition ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Lock className="h-4 w-4 mr-2" />}
               Save & Lock
             </Button>
