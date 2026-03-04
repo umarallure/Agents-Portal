@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ShieldCheck, Search, Lock, Unlock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, ShieldCheck, Search, Lock, Unlock, ChevronLeft, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import { canAccessLockPoliciesManager } from '@/lib/userPermissions';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -35,6 +35,7 @@ interface Policy {
   locked_at: string | null;
   locked_by_name: string | null;
   lock_reason: string | null;
+  lock_password: string | null;
 }
 
 const ITEMS_PER_PAGE = 25;
@@ -64,6 +65,7 @@ const LockPoliciesManager = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [lockFilter, setLockFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<number>>(new Set());
 
   const fetchPolicies = useCallback(async () => {
     setLoading(true);
@@ -90,7 +92,8 @@ const LockPoliciesManager = () => {
         lock_status: policy.lock_status,
         locked_at: policy.locked_at,
         locked_by_name: policy.locked_by_name,
-        lock_reason: policy.lock_reason
+        lock_reason: policy.lock_reason,
+        lock_password: policy.lock_password
       }));
 
       setPolicies(mappedPolicies);
@@ -163,6 +166,18 @@ const LockPoliciesManager = () => {
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
+  };
+
+  const togglePasswordVisibility = (policyId: number) => {
+    setVisiblePasswords(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(policyId)) {
+        newSet.delete(policyId);
+      } else {
+        newSet.add(policyId);
+      }
+      return newSet;
+    });
   };
 
   return (
@@ -249,6 +264,7 @@ const LockPoliciesManager = () => {
                     <TableHead>Policy Status</TableHead>
                     <TableHead>Lock Status</TableHead>
                     <TableHead>Reason</TableHead>
+                    <TableHead>Password</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Agent</TableHead>
                     <TableHead>Locked By</TableHead>
@@ -264,6 +280,29 @@ const LockPoliciesManager = () => {
                       <TableCell>
                         {policy.lock_reason ? (
                           <span className="text-sm text-red-600">{policy.lock_reason}</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {policy.lock_password ? (
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono">
+                              {visiblePasswords.has(policy.id) ? policy.lock_password : '••••••••'}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => togglePasswordVisibility(policy.id)}
+                              className="h-6 w-6 p-0"
+                            >
+                              {visiblePasswords.has(policy.id) ? (
+                                <EyeOff className="h-3 w-3" />
+                              ) : (
+                                <Eye className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </div>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
