@@ -126,7 +126,6 @@ const LockPolicies = () => {
         .eq('carrier', 'ANAM')
         .in('policy_status', ['Issued Paid', 'Issued Not Paid', 'Pending', 'Pending Lapse'])
         .eq('is_active', true)
-        .or('lock_status.is.null,lock_status.eq.locked_successfully,lock_status.eq.already_locked,lock_status.eq.unable_to_lock')
         .order('deal_creation_date', { ascending: false });
 
       if (error) {
