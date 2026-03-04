@@ -126,7 +126,6 @@ const LockPolicies = () => {
         .eq('carrier', 'ANAM')
         .in('policy_status', ['Issued Paid', 'Issued Not Paid', 'Pending', 'Pending Lapse'])
         .eq('is_active', true)
-        .or('lock_status.is.null,lock_status.eq.already_locked,lock_status.eq.unable_to_lock')
         .order('deal_creation_date', { ascending: false });
 
       if (error) {
@@ -142,6 +141,8 @@ const LockPolicies = () => {
       const fiveDaysAgoDate = new Date(fiveDaysAgoStr);
       
       (policies || []).forEach((policy: any) => {
+        if (policy.lock_status === 'locked_successfully') return;
+        
         const p: Policy = {
           id: policy.id,
           deal_name: policy.deal_name,
