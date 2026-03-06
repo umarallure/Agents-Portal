@@ -61,6 +61,7 @@ const BUFFER_AGENT_OPTIONS = [
   "Aqib Afridi",
   "Qasim Raja",
   "Hussain Khan",
+  "Raja Arbaz Nawaz",
   "Ayan Ali",
   "N/A",
 ];

@@ -61,6 +61,7 @@ const bufferAgentOptions = [
     "Qasim Raja",
     "Noah Akins",
     "Hussain Khan",
+    "Raja Arbaz Nawaz",
     "N/A"
 ];
 
@@ -77,6 +78,7 @@ const retentionAgentOptions = [
   "All Retention Agents",
   "Qasim Raja",
   "Hussain Khan",
+  "Raja Arbaz Nawaz",
   "Muhammad Ahmed",
   "Hammad Rafique",
   "Justin",
