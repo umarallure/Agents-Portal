@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, KeyRound, ChevronRight, MapPin, Phone, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, ChevronRight, MapPin, Phone, Eye, EyeOff } from 'lucide-react';
 import { canAccessLockPolicies, LOCK_POLICIES_USER_ID } from '@/lib/userPermissions';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -108,7 +108,7 @@ const LockPolicies = () => {
   const [savingDisposition, setSavingDisposition] = useState(false);
   const [showStoredPassword, setShowStoredPassword] = useState(false);
   
-  const hasPassword = typeof window !== 'undefined' && !!localStorage.getItem('lock_policy_password');
+  const hasPassword = false;
 
   const currentPoliciesList = activeTab === 'current' ? currentPolicies : retroactivePolicies;
   const selectedPolicy = currentPoliciesList[selectedPolicyIndex] || null;
@@ -212,7 +212,7 @@ const LockPolicies = () => {
     } finally {
       setLoading(false);
     }
-  }, [toast, selectedPolicyIndex, activeTab]);
+  }, [toast]);
 
   useEffect(() => {
     if (!canAccessLockPolicies(user?.id)) {
@@ -220,7 +220,7 @@ const LockPolicies = () => {
       return;
     }
     fetchPolicies();
-  }, [user, navigate, fetchPolicies]);
+  }, [user, navigate]);
 
   const handleSaveDisposition = async () => {
     if (!selectedPolicy || !dispositionType) {
@@ -244,16 +244,7 @@ const LockPolicies = () => {
     if (dispositionType !== 'unable_to_lock' && !password.trim()) {
       toast({
         title: "Required",
-        description: "Please enter your password",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (dispositionType !== 'unable_to_lock' && password !== localStorage.getItem('lock_policy_password')) {
-      toast({
-        title: "Incorrect Password",
-        description: "The password you entered is incorrect.",
+        description: "Please enter a password to save",
         variant: "destructive",
       });
       return;
@@ -450,28 +441,10 @@ const LockPolicies = () => {
       <NavigationHeader title="Lock Policies" />
       
       <div className="container mx-auto p-6">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <ShieldCheck className="h-4 w-4 text-green-600" />
             <span>Only accessible to Justine</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {hasPassword ? (
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                <KeyRound className="h-3 w-3 mr-1" /> Password Set
-              </Badge>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => {
-                const newPassword = prompt("Set your lock policy password:");
-                if (newPassword && newPassword.trim()) {
-                  localStorage.setItem('lock_policy_password', newPassword.trim());
-                  window.location.reload();
-                }
-              }}>
-                <KeyRound className="h-4 w-4 mr-2" />
-                Set Password
-              </Button>
-            )}
           </div>
         </div>
 
@@ -598,10 +571,10 @@ const LockPolicies = () => {
                   <Label htmlFor="lock-password">Your Password</Label>
                   <Input 
                     id="lock-password" 
-                    type="password" 
+                    type="text" 
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
+                    placeholder="Enter password to save"
                   />
                 </div>
               )}
