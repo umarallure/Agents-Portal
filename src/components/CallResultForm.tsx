@@ -42,6 +42,7 @@ const statusOptions = [
 const carrierOptions = [
   "Liberty",
   "SBLI",
+  "American Home Life",
   "Corebridge",
   "MOH",
   "Aflac",
@@ -89,19 +90,13 @@ const bufferAgentOptions = [
 ];
 
 const agentOptions = [
-  "Claudia",
   "Lydia",
   "Muhammad Ahmed",
   "Zack",
   "Tatumn",
   "Benjamin",
   "Brandon Blake Flinchum",
-  "Kaye",
   "Isaac",
-  "Abdul",
-  "Nicole Mejia",
-  "Precy Lou",
-  "Laiza Batain",
   "N/A"
 ];
 
