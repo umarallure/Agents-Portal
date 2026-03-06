@@ -77,7 +77,7 @@ const LICENSED_ACCOUNT_OPTIONS = [
 
 const CARRIER_OPTIONS = [
   "Liberty", "SBLI", "Corebridge", "MOH", "Transamerica", "RNA", "AMAM","Aflac",
-  "GTL", "Aetna", "Americo", "CICA", "N/A"
+  "GTL", "Aetna", "Americo", "CICA","American Home Life" ,"N/A"
 ];
 
 const PRODUCT_TYPE_OPTIONS = [
