@@ -77,6 +77,7 @@ const bufferAgentOptions = [
   "Muhammad Ahmed",
   "Catarina",
   "Nicole Mejia",
+  "Aubrey Nichols",
   "Laiza Batain",
   "Aqib Afridi",
   "Qasim Raja",
