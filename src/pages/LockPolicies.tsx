@@ -41,6 +41,8 @@ interface LeadInfo {
   city: string | null;
   zip_code: string | null;
   phone_number: string | null;
+  verified_ssn: string | null;
+  verified_dob: string | null;
 }
 
 const getBusinessDateDaysAgo = (days: number): Date => {
@@ -176,7 +178,7 @@ const LockPolicies = () => {
         
         const { data: leads, error: leadsError } = await supabase
           .from('leads')
-          .select('customer_full_name, date_of_birth, social_security, state, street_address, city, zip_code, phone_number')
+          .select('customer_full_name, date_of_birth, social_security, state, street_address, city, zip_code, phone_number, submission_id')
           .ilike('customer_full_name', normalizedGhlName)
           .limit(1);
         
@@ -187,6 +189,37 @@ const LockPolicies = () => {
         const infoMap: Record<string, LeadInfo> = {};
         if (leads && leads.length > 0) {
           const lead = leads[0];
+          
+          let verified_ssn: string | null = null;
+          let verified_dob: string | null = null;
+          
+          if (lead.submission_id) {
+            const { data: sessions } = await supabase
+              .from('verification_sessions')
+              .select('id')
+              .eq('submission_id', lead.submission_id)
+              .limit(1);
+            
+            if (sessions && sessions.length > 0) {
+              const sessionId = sessions[0].id;
+              
+              const { data: verificationItems } = await supabase
+                .from('verification_items')
+                .select('field_name, verified_value, is_verified')
+                .eq('session_id', sessionId);
+              
+              if (verificationItems) {
+                for (const item of verificationItems) {
+                  if (item.field_name === 'social_security' && item.is_verified) {
+                    verified_ssn = item.verified_value;
+                  } else if (item.field_name === 'date_of_birth' && item.is_verified) {
+                    verified_dob = item.verified_value;
+                  }
+                }
+              }
+            }
+          }
+          
           infoMap[normalizedGhlName] = {
             date_of_birth: lead.date_of_birth,
             social_security: lead.social_security,
@@ -195,7 +228,9 @@ const LockPolicies = () => {
             street_address: lead.street_address,
             city: lead.city,
             zip_code: lead.zip_code,
-            phone_number: lead.phone_number
+            phone_number: lead.phone_number,
+            verified_ssn,
+            verified_dob
           };
         }
         setLeadInfoMap(infoMap);
@@ -330,7 +365,9 @@ const LockPolicies = () => {
       street_address: null,
       city: null,
       zip_code: null,
-      phone_number: selectedPolicy.phone_number
+      phone_number: selectedPolicy.phone_number,
+      verified_ssn: null,
+      verified_dob: null
     };
     
     const { firstName, lastName } = extractFirstLastName(leadInfo.customer_full_name);
@@ -364,12 +401,18 @@ const LockPolicies = () => {
                 <Calendar className="h-3 w-3" /> Date of Birth
               </span>
               <span className="font-medium text-lg">{formatDateToEST(leadInfo.date_of_birth)}</span>
+              {leadInfo.verified_dob && (
+                <span className="text-xs text-green-600">(Verified: {formatDateToEST(leadInfo.verified_dob)})</span>
+              )}
             </div>
             <div className="space-y-1">
               <span className="text-muted-foreground text-sm flex items-center gap-1">
                 <Hash className="h-3 w-3" /> SSN
               </span>
               <span className="font-medium text-lg">{formatSSN(leadInfo.social_security)}</span>
+              {leadInfo.verified_ssn && (
+                <span className="text-xs text-green-600">(Verified: {formatSSN(leadInfo.verified_ssn)})</span>
+              )}
             </div>
             <div className="space-y-1">
               <span className="text-muted-foreground text-sm flex items-center gap-1">
