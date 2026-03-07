@@ -100,8 +100,20 @@ const LockPolicies = () => {
   const [currentPolicies, setCurrentPolicies] = useState<Policy[]>([]);
   const [retroactivePolicies, setRetroactivePolicies] = useState<Policy[]>([]);
   const [leadInfoMap, setLeadInfoMap] = useState<Record<string, LeadInfo>>({});
-  const [selectedPolicyIndex, setSelectedPolicyIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState<'current' | 'retroactive'>('current');
+  const [selectedPolicyIndex, setSelectedPolicyIndex] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lockPolicyIndex');
+      return saved ? parseInt(saved, 10) : 0;
+    }
+    return 0;
+  });
+  const [activeTab, setActiveTab] = useState<'current' | 'retroactive'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lockPolicyTab');
+      return (saved as 'current' | 'retroactive') || 'current';
+    }
+    return 'current';
+  });
   const [showPolicyDialog, setShowPolicyDialog] = useState(false);
   
   const [dispositionType, setDispositionType] = useState<'locked_successfully' | 'already_locked' | 'unable_to_lock' | ''>('');
@@ -268,8 +280,18 @@ const LockPolicies = () => {
       navigate('/dashboard');
       return;
     }
-    fetchPolicies();
-  }, [user, navigate, fetchPolicies]);
+    if (currentPolicies.length === 0 && retroactivePolicies.length === 0) {
+      fetchPolicies();
+    }
+  }, [user, navigate]);
+
+  useEffect(() => {
+    localStorage.setItem('lockPolicyIndex', selectedPolicyIndex.toString());
+  }, [selectedPolicyIndex]);
+
+  useEffect(() => {
+    localStorage.setItem('lockPolicyTab', activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     if (currentPolicies.length > 0 || retroactivePolicies.length > 0) {
@@ -360,11 +382,9 @@ const LockPolicies = () => {
   };
 
   const handleNextPolicy = () => {
-    if (selectedPolicyIndex < currentPoliciesList.length - 1) {
-      setSelectedPolicyIndex(selectedPolicyIndex + 1);
-    } else {
-      setSelectedPolicyIndex(0);
-    }
+    const newIndex = selectedPolicyIndex < currentPoliciesList.length - 1 ? selectedPolicyIndex + 1 : 0;
+    setSelectedPolicyIndex(newIndex);
+    localStorage.setItem('lockPolicyIndex', newIndex.toString());
   };
 
   const handleOpenPolicyDetails = () => {
@@ -505,11 +525,15 @@ const LockPolicies = () => {
       <NavigationHeader title="Lock Policies" />
       
       <div className="container mx-auto p-6">
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <ShieldCheck className="h-4 w-4 text-green-600" />
             <span>Only accessible to Justine</span>
           </div>
+          <Button variant="outline" size="sm" onClick={() => { fetchPolicies(); setTimeout(() => fetchLeadInfo(), 100); }}>
+            <Loader2 className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
 
         {loading ? (
@@ -528,7 +552,7 @@ const LockPolicies = () => {
           </Card>
         ) : (
           <>
-            <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val as 'current' | 'retroactive'); setSelectedPolicyIndex(0); }} className="w-full">
+            <Tabs value={activeTab} onValueChange={(val) => { const newTab = val as 'current' | 'retroactive'; setActiveTab(newTab); localStorage.setItem('lockPolicyTab', newTab); setSelectedPolicyIndex(0); localStorage.setItem('lockPolicyIndex', '0'); }} className="w-full">
               <TabsList className="mb-6">
                 <TabsTrigger value="current" className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
