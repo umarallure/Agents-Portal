@@ -189,35 +189,47 @@ const LockPolicies = () => {
         const infoMap: Record<string, LeadInfo> = {};
         if (leads && leads.length > 0) {
           const lead = leads[0];
+          console.log('Lead submission_id:', lead.submission_id);
           
           let verified_ssn: string | null = null;
           let verified_dob: string | null = null;
           
           if (lead.submission_id) {
-            const { data: sessions } = await supabase
+            const { data: sessions, error: sessionsError } = await supabase
               .from('verification_sessions')
               .select('id')
               .eq('submission_id', lead.submission_id)
               .limit(1);
             
+            console.log('Sessions found:', sessions);
+            console.log('Sessions error:', sessionsError);
+            
             if (sessions && sessions.length > 0) {
               const sessionId = sessions[0].id;
+              console.log('Session ID:', sessionId);
               
-              const { data: verificationItems } = await supabase
+              const { data: verificationItems, error: itemsError } = await supabase
                 .from('verification_items')
-                .select('field_name, verified_value, is_verified')
+                .select('field_name, original_value, verified_value, is_verified')
                 .eq('session_id', sessionId);
+              
+              console.log('Verification items:', verificationItems);
+              console.log('Verification items error:', itemsError);
               
               if (verificationItems) {
                 for (const item of verificationItems) {
-                  if (item.field_name === 'social_security' && item.is_verified) {
-                    verified_ssn = item.verified_value;
-                  } else if (item.field_name === 'date_of_birth' && item.is_verified) {
-                    verified_dob = item.verified_value;
+                  if (item.field_name === 'social_security') {
+                    verified_ssn = item.is_verified ? (item.verified_value || item.original_value) : item.original_value;
+                    console.log('SSN - is_verified:', item.is_verified, 'verified_value:', item.verified_value, 'original_value:', item.original_value, 'final:', verified_ssn);
+                  } else if (item.field_name === 'date_of_birth') {
+                    verified_dob = item.is_verified ? (item.verified_value || item.original_value) : item.original_value;
+                    console.log('DOB - is_verified:', item.is_verified, 'verified_value:', item.verified_value, 'original_value:', item.original_value, 'final:', verified_dob);
                   }
                 }
               }
             }
+          } else {
+            console.log('No submission_id found for lead');
           }
           
           infoMap[normalizedGhlName] = {
@@ -400,18 +412,18 @@ const LockPolicies = () => {
               <span className="text-muted-foreground text-sm flex items-center gap-1">
                 <Calendar className="h-3 w-3" /> Date of Birth
               </span>
-              <span className="font-medium text-lg">{formatDateToEST(leadInfo.date_of_birth)}</span>
-              {leadInfo.verified_dob && (
-                <span className="text-xs text-green-600">(Verified: {formatDateToEST(leadInfo.verified_dob)})</span>
+              <span className="font-medium text-lg">{formatDateToEST(leadInfo.verified_dob || leadInfo.date_of_birth)}</span>
+              {leadInfo.verified_dob && leadInfo.verified_dob !== leadInfo.date_of_birth && (
+                <span className="text-xs text-green-600">(Original: {formatDateToEST(leadInfo.date_of_birth)})</span>
               )}
             </div>
             <div className="space-y-1">
               <span className="text-muted-foreground text-sm flex items-center gap-1">
                 <Hash className="h-3 w-3" /> SSN
               </span>
-              <span className="font-medium text-lg">{formatSSN(leadInfo.social_security)}</span>
-              {leadInfo.verified_ssn && (
-                <span className="text-xs text-green-600">(Verified: {formatSSN(leadInfo.verified_ssn)})</span>
+              <span className="font-medium text-lg">{formatSSN(leadInfo.verified_ssn || leadInfo.social_security)}</span>
+              {leadInfo.verified_ssn && leadInfo.verified_ssn !== leadInfo.social_security && (
+                <span className="text-xs text-green-600">(Original: {formatSSN(leadInfo.social_security)})</span>
               )}
             </div>
             <div className="space-y-1">
