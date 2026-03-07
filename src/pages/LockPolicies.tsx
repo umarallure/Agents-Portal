@@ -41,6 +41,8 @@ interface LeadInfo {
   city: string | null;
   zip_code: string | null;
   phone_number: string | null;
+  verified_ssn: string | null;
+  verified_dob: string | null;
 }
 
 const getBusinessDateDaysAgo = (days: number): Date => {
@@ -167,41 +169,6 @@ const LockPolicies = () => {
       
       setCurrentPolicies(current);
       setRetroactivePolicies(retroactive);
-      
-      const policiesToLookup = activeTab === 'current' ? current : retroactive;
-      const policyToLookup = policiesToLookup[selectedPolicyIndex];
-      
-      if (policyToLookup && policyToLookup.ghl_name) {
-        const normalizedGhlName = policyToLookup.ghl_name.toLowerCase().trim();
-        
-        const { data: leads, error: leadsError } = await supabase
-          .from('leads')
-          .select('customer_full_name, date_of_birth, social_security, state, street_address, city, zip_code, phone_number')
-          .ilike('customer_full_name', normalizedGhlName)
-          .limit(1);
-        
-        console.log('Searching for:', normalizedGhlName);
-        console.log('Leads found:', leads);
-        console.log('Leads error:', leadsError);
-        
-        const infoMap: Record<string, LeadInfo> = {};
-        if (leads && leads.length > 0) {
-          const lead = leads[0];
-          infoMap[normalizedGhlName] = {
-            date_of_birth: lead.date_of_birth,
-            social_security: lead.social_security,
-            state: lead.state,
-            customer_full_name: lead.customer_full_name,
-            street_address: lead.street_address,
-            city: lead.city,
-            zip_code: lead.zip_code,
-            phone_number: lead.phone_number
-          };
-        }
-        setLeadInfoMap(infoMap);
-      } else {
-        setLeadInfoMap({});
-      }
     } catch (error) {
       console.error('Error fetching policies:', error);
       toast({
@@ -214,13 +181,101 @@ const LockPolicies = () => {
     }
   }, [toast]);
 
+  const fetchLeadInfo = useCallback(async () => {
+    const policiesToLookup = activeTab === 'current' ? currentPolicies : retroactivePolicies;
+    const policyToLookup = policiesToLookup[selectedPolicyIndex];
+    
+    if (policyToLookup && policyToLookup.ghl_name) {
+      const normalizedGhlName = policyToLookup.ghl_name.toLowerCase().trim();
+      
+      const { data: leads, error: leadsError } = await supabase
+        .from('leads')
+        .select('customer_full_name, date_of_birth, social_security, state, street_address, city, zip_code, phone_number, submission_id')
+        .ilike('customer_full_name', normalizedGhlName)
+        .limit(1);
+      
+      console.log('Fetching lead info for:', normalizedGhlName);
+      console.log('Leads found:', leads);
+      console.log('Leads error:', leadsError);
+      
+      const infoMap: Record<string, LeadInfo> = {};
+      if (leads && leads.length > 0) {
+        const lead = leads[0];
+        console.log('Lead submission_id:', lead.submission_id);
+        
+        let verified_ssn: string | null = null;
+        let verified_dob: string | null = null;
+        
+        if (lead.submission_id) {
+          const { data: sessions, error: sessionsError } = await supabase
+            .from('verification_sessions')
+            .select('id')
+            .eq('submission_id', lead.submission_id)
+            .limit(1);
+          
+          console.log('Sessions found:', sessions);
+          console.log('Sessions error:', sessionsError);
+          
+          if (sessions && sessions.length > 0) {
+            const sessionId = sessions[0].id;
+            console.log('Session ID:', sessionId);
+            
+            const { data: verificationItems, error: itemsError } = await supabase
+              .from('verification_items')
+              .select('field_name, original_value, verified_value, is_verified')
+              .eq('session_id', sessionId);
+            
+            console.log('Verification items:', verificationItems);
+            console.log('Verification items error:', itemsError);
+            
+            if (verificationItems) {
+              for (const item of verificationItems) {
+                if (item.field_name === 'social_security') {
+                  verified_ssn = item.is_verified ? (item.verified_value || item.original_value) : item.original_value;
+                  console.log('SSN - is_verified:', item.is_verified, 'verified_value:', item.verified_value, 'original_value:', item.original_value, 'final:', verified_ssn);
+                } else if (item.field_name === 'date_of_birth') {
+                  verified_dob = item.is_verified ? (item.verified_value || item.original_value) : item.original_value;
+                  console.log('DOB - is_verified:', item.is_verified, 'verified_value:', item.verified_value, 'original_value:', item.original_value, 'final:', verified_dob);
+                }
+              }
+            }
+          }
+        } else {
+          console.log('No submission_id found for lead');
+        }
+        
+        infoMap[normalizedGhlName] = {
+          date_of_birth: lead.date_of_birth,
+          social_security: lead.social_security,
+          state: lead.state,
+          customer_full_name: lead.customer_full_name,
+          street_address: lead.street_address,
+          city: lead.city,
+          zip_code: lead.zip_code,
+          phone_number: lead.phone_number,
+          verified_ssn,
+          verified_dob
+        };
+      }
+      setLeadInfoMap(infoMap);
+    } else {
+      setLeadInfoMap({});
+    }
+  }, [activeTab, currentPolicies, retroactivePolicies, selectedPolicyIndex]);
+
   useEffect(() => {
     if (!canAccessLockPolicies(user?.id)) {
       navigate('/dashboard');
       return;
     }
     fetchPolicies();
-  }, [user, navigate]);
+  }, [user, navigate, fetchPolicies]);
+
+  useEffect(() => {
+    if (currentPolicies.length > 0 || retroactivePolicies.length > 0) {
+      fetchLeadInfo();
+    }
+  }, [selectedPolicyIndex, activeTab, fetchLeadInfo, currentPolicies.length, retroactivePolicies.length]);
 
   const handleSaveDisposition = async () => {
     if (!selectedPolicy || !dispositionType) {
@@ -291,6 +346,7 @@ const LockPolicies = () => {
       setPassword('');
       
       fetchPolicies();
+      setTimeout(() => fetchLeadInfo(), 100);
     } catch (error) {
       console.error('Error saving disposition:', error);
       toast({
@@ -330,7 +386,9 @@ const LockPolicies = () => {
       street_address: null,
       city: null,
       zip_code: null,
-      phone_number: selectedPolicy.phone_number
+      phone_number: selectedPolicy.phone_number,
+      verified_ssn: null,
+      verified_dob: null
     };
     
     const { firstName, lastName } = extractFirstLastName(leadInfo.customer_full_name);
@@ -363,13 +421,19 @@ const LockPolicies = () => {
               <span className="text-muted-foreground text-sm flex items-center gap-1">
                 <Calendar className="h-3 w-3" /> Date of Birth
               </span>
-              <span className="font-medium text-lg">{formatDateToEST(leadInfo.date_of_birth)}</span>
+              <span className="font-medium text-lg">{formatDateToEST(leadInfo.verified_dob || leadInfo.date_of_birth)}</span>
+              {leadInfo.verified_dob && leadInfo.verified_dob !== leadInfo.date_of_birth && (
+                <span className="text-xs text-green-600">(Original: {formatDateToEST(leadInfo.date_of_birth)})</span>
+              )}
             </div>
             <div className="space-y-1">
               <span className="text-muted-foreground text-sm flex items-center gap-1">
                 <Hash className="h-3 w-3" /> SSN
               </span>
-              <span className="font-medium text-lg">{formatSSN(leadInfo.social_security)}</span>
+              <span className="font-medium text-lg">{formatSSN(leadInfo.verified_ssn || leadInfo.social_security)}</span>
+              {leadInfo.verified_ssn && leadInfo.verified_ssn !== leadInfo.social_security && (
+                <span className="text-xs text-green-600">(Original: {formatSSN(leadInfo.social_security)})</span>
+              )}
             </div>
             <div className="space-y-1">
               <span className="text-muted-foreground text-sm flex items-center gap-1">
