@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, ChevronRight, MapPin, Phone, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, ChevronRight, ChevronLeft, MapPin, Phone, Eye, EyeOff } from 'lucide-react';
 import { canAccessLockPolicies, LOCK_POLICIES_USER_ID } from '@/lib/userPermissions';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -61,6 +61,20 @@ const getBusinessDateDaysAgo = (days: number): Date => {
 const formatDateToEST = (dateString: string | Date | null): string => {
   if (!dateString) return 'N/A';
   try {
+    // If it's already in YYYY-MM-DD format, parse directly without timezone conversion
+    if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const parts = dateString.split('-');
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const date = new Date(year, month, day);
+      const monthStr = String(date.getMonth() + 1).padStart(2, '0');
+      const dayStr = String(date.getDate()).padStart(2, '0');
+      const yearStr = date.getFullYear();
+      return `${monthStr}/${dayStr}/${yearStr}`;
+    }
+    
+    // For other formats (like ISO timestamps), use timezone conversion
     const date = new Date(dateString);
     const estDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
     const month = String(estDate.getMonth() + 1).padStart(2, '0');
@@ -243,10 +257,18 @@ const LockPolicies = () => {
             if (verificationItems) {
               for (const item of verificationItems) {
                 if (item.field_name === 'social_security') {
-                  verified_ssn = item.is_verified ? (item.verified_value || item.original_value) : item.original_value;
+                  if (item.is_verified && item.verified_value) {
+                    verified_ssn = item.verified_value;
+                  } else if (item.is_verified && item.original_value) {
+                    verified_ssn = item.original_value;
+                  }
                   console.log('SSN - is_verified:', item.is_verified, 'verified_value:', item.verified_value, 'original_value:', item.original_value, 'final:', verified_ssn);
                 } else if (item.field_name === 'date_of_birth') {
-                  verified_dob = item.is_verified ? (item.verified_value || item.original_value) : item.original_value;
+                  if (item.is_verified && item.verified_value) {
+                    verified_dob = item.verified_value;
+                  } else if (item.is_verified && item.original_value) {
+                    verified_dob = item.original_value;
+                  }
                   console.log('DOB - is_verified:', item.is_verified, 'verified_value:', item.verified_value, 'original_value:', item.original_value, 'final:', verified_dob);
                 }
               }
@@ -383,6 +405,12 @@ const LockPolicies = () => {
 
   const handleNextPolicy = () => {
     const newIndex = selectedPolicyIndex < currentPoliciesList.length - 1 ? selectedPolicyIndex + 1 : 0;
+    setSelectedPolicyIndex(newIndex);
+    localStorage.setItem('lockPolicyIndex', newIndex.toString());
+  };
+
+  const handlePrevPolicy = () => {
+    const newIndex = selectedPolicyIndex > 0 ? selectedPolicyIndex - 1 : currentPoliciesList.length - 1;
     setSelectedPolicyIndex(newIndex);
     localStorage.setItem('lockPolicyIndex', newIndex.toString());
   };
@@ -570,7 +598,11 @@ const LockPolicies = () => {
             {renderPolicyCard()}
             
             {currentPoliciesList.length > 1 && (
-              <div className="flex justify-center mt-6">
+              <div className="flex justify-center mt-6 gap-4">
+                <Button variant="outline" onClick={handlePrevPolicy} className="flex items-center gap-2">
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous Policy
+                </Button>
                 <Button variant="outline" onClick={handleNextPolicy} className="flex items-center gap-2">
                   Next Policy
                   <ChevronRight className="h-4 w-4" />

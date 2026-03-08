@@ -61,23 +61,31 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Clock, User, CheckCircle, XCircle, ArrowRight, Loader2, Copy, Calendar as CalendarIcon, Phone } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format } from "date-fns";
+import { Clock, User, CheckCircle, XCircle, ArrowRight, Loader2, Copy, Phone } from "lucide-react";
+
 import { TagInput } from "@/components/ui/tag-input";
 
 const calculateAge = (dob: string): string => {
   if (!dob) return '';
   
-  // Parse date in YYYY-MM-DD format
-  const parts = dob.split('-');
-  if (parts.length !== 3) return '';
+  let year: number, month: number, day: number;
   
-  const year = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10) - 1;
-  const day = parseInt(parts[2], 10);
+  // Handle both YYYY-MM-DD and MM/DD/YYYY formats
+  if (dob.includes('/')) {
+    // MM/DD/YYYY format
+    const parts = dob.split('/');
+    if (parts.length !== 3) return '';
+    month = parseInt(parts[0], 10) - 1;
+    day = parseInt(parts[1], 10);
+    year = parseInt(parts[2], 10);
+  } else {
+    // YYYY-MM-DD format
+    const parts = dob.split('-');
+    if (parts.length !== 3) return '';
+    year = parseInt(parts[0], 10);
+    month = parseInt(parts[1], 10) - 1;
+    day = parseInt(parts[2], 10);
+  }
   
   if (isNaN(year) || isNaN(month) || isNaN(day)) return '';
   
@@ -95,32 +103,7 @@ const calculateAge = (dob: string): string => {
   return age.toString();
 };
 
-const parseDobForEst = (dobValue: string): Date | undefined => {
-  if (!dobValue) return undefined;
-  
-  // Parse YYYY-MM-DD format directly
-  const parts = dobValue.split('-');
-  if (parts.length !== 3) return undefined;
-  
-  const year = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10) - 1;
-  const day = parseInt(parts[2], 10);
-  
-  if (isNaN(year) || isNaN(month) || isNaN(day)) return undefined;
-  
-  // Create date in UTC to avoid timezone issues, then set to local noon
-  const date = new Date(Date.UTC(year, month, day, 12, 0, 0));
-  return date;
-};
 
-const formatDateForDisplay = (dobValue: string): string => {
-  if (!dobValue) return '';
-  
-  const date = parseDobForEst(dobValue);
-  if (!date) return '';
-  
-  return format(date, 'MM/dd/yyyy');
-};
 import { useRealtimeVerification, VerificationItem } from "@/hooks/useRealtimeVerification";
 
 interface VerificationPanelProps {
@@ -205,7 +188,6 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
   const [isValidating, setIsValidating] = useState(false);
   const [validatedAddress, setValidatedAddress] = useState<any>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [calendarYear, setCalendarYear] = useState<number>(new Date().getFullYear());
   
   // DNC Check states
   const [dncChecking, setDncChecking] = useState(false);
@@ -881,56 +863,41 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
               />
             </div>
             {(item.field_name === 'date_of_birth' || item.field_name === 'dob') ? (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs w-full justify-start text-left font-normal h-9"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {inputValues[item.id] || item.original_value || item.verified_value ? 
-                      formatDateForDisplay(inputValues[item.id] || item.original_value || item.verified_value) : 
-                      `Select ${formatFieldName(item.field_name).toLowerCase()}`}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <div className="flex flex-col gap-2 p-2">
-                    <Select 
-                      value={calendarYear.toString()} 
-                      onValueChange={(val) => setCalendarYear(parseInt(val))}
-                    >
-                      <SelectTrigger className="w-full h-8 text-xs">
-                        <SelectValue placeholder="Select Year" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 100 }, (_, i) => {
-                          const year = new Date().getFullYear() - i;
-                          return (
-                            <SelectItem key={year} value={year.toString()} className="text-xs">
-                              {year}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                    <Calendar
-                      mode="single"
-                      key={calendarYear}
-                      fromDate={new Date(calendarYear, 0, 1)}
-                      toDate={new Date(calendarYear, 11, 31)}
-                      selected={parseDobForEst(inputValues[item.id] || item.original_value || item.verified_value || '')}
-                      onSelect={(date) => {
-                        if (date) {
-                          const formattedDate = format(date, 'yyyy-MM-dd');
-                          handleFieldValueChange(item.id, formattedDate, item.field_name);
-                        }
-                      }}
-                      initialFocus
-                    />
-                  </div>
-                </PopoverContent>
-              </Popover>
+              <div className="flex gap-2">
+                <Input
+                  value={inputValues[item.id] || ''}
+                  onChange={(e) => {
+                    let value = e.target.value;
+                    // Auto-format to MM/DD/YYYY as user types
+                    const cleaned = value.replace(/\D/g, '');
+                    if (cleaned.length >= 4) {
+                      value = cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4) + '/' + cleaned.slice(4, 8);
+                    } else if (cleaned.length >= 2) {
+                      value = cleaned.slice(0, 2) + '/' + cleaned.slice(2);
+                    } else {
+                      value = cleaned;
+                    }
+                    handleFieldValueChange(item.id, value, item.field_name);
+                  }}
+                  onBlur={(e) => {
+                    // Convert MM/DD/YYYY to YYYY-MM-DD on blur for storage
+                    const value = e.target.value;
+                    const parts = value.split('/');
+                    if (parts.length === 3) {
+                      const month = parts[0].padStart(2, '0');
+                      const day = parts[1].padStart(2, '0');
+                      const year = parts[2];
+                      if (year.length === 4) {
+                        const formatted = `${year}-${month}-${day}`;
+                        handleFieldValueChange(item.id, formatted, item.field_name);
+                      }
+                    }
+                  }}
+                  placeholder="MM/DD/YYYY"
+                  className="text-xs"
+                  maxLength={10}
+                />
+              </div>
             ) : (
               <Input
                 value={inputValues[item.id] || ''}

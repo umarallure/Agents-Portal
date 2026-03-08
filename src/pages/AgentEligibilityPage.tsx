@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { NavigationHeader } from '@/components/NavigationHeader';
 import AetnaStateAvailabilityManager from '@/components/AetnaStateAvailabilityManager';
 import AflacStateAvailabilityManager from '@/components/AflacStateAvailabilityManager';
+import AmericanHomeLifeStateAvailabilityManager from '@/components/AmericanHomeLifeStateAvailabilityManager';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -537,6 +538,7 @@ export function AgentEligibilityPage() {
       // Check if the carrier is Aetna or Aflac - use special function for these carriers
       const isAetna = carrierObj.carrier_name.toLowerCase() === 'aetna';
       const isAflac = carrierObj.carrier_name.toLowerCase() === 'aflac';
+      const isAmericanHomeLife = carrierObj.carrier_name.toLowerCase() === 'american home life';
       
       let data, error;
       
@@ -550,6 +552,13 @@ export function AgentEligibilityPage() {
       } else if (isAflac) {
         // Use Aflac-specific function
         const result = await supabase.rpc('get_eligible_agents_for_aflac' as any, {
+          p_state_name: stateObj.state_name
+        });
+        data = result.data;
+        error = result.error;
+      } else if (isAmericanHomeLife) {
+        // Use American Home Life-specific function
+        const result = await supabase.rpc('get_eligible_agents_for_american_home_life' as any, {
           p_state_name: stateObj.state_name
         });
         data = result.data;
@@ -577,12 +586,14 @@ export function AgentEligibilityPage() {
             ? `No agents are available for Aetna in ${stateObj.state_name} (requires upline approval and custom state availability)`
             : isAflac
             ? `No agents are available for Aflac in ${stateObj.state_name} (requires upline approval and custom state availability)`
+            : isAmericanHomeLife
+            ? `No agents are available for American Home Life in ${stateObj.state_name} (requires upline approval and custom state availability)`
             : `No agents found who are licensed for ${carrierObj.carrier_name} in ${stateObj.state_name}`,
         });
       } else {
         toast({
           title: "Search Complete",
-          description: `Found ${agentsList.length} eligible agent(s)${isAetna ? ' (Aetna requires upline licensing)' : isAflac ? ' (Aflac requires upline licensing)' : ''}`,
+          description: `Found ${agentsList.length} eligible agent(s)${isAetna ? ' (Aetna requires upline licensing)' : isAflac ? ' (Aflac requires upline licensing)' : isAmericanHomeLife ? ' (American Home Life requires upline licensing)' : ''}`,
         });
       }
     } catch (error: any) {
@@ -687,6 +698,17 @@ export function AgentEligibilityPage() {
                     <AlertTitle className="text-green-800">Aflac Special Requirements</AlertTitle>
                     <AlertDescription className="text-green-700">
                       Aflac uses a separate state availability system with custom per-agent approvals. All 52 US states/territories require upline license verification. Results will show agents based on their individual Aflac state availability settings.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* American Home Life Special Notice */}
+                {selectedCarrier && carriers.find(c => c.id === selectedCarrier)?.carrier_name.toLowerCase() === 'american home life' && (
+                  <Alert className="bg-purple-50 border-purple-200">
+                    <Info className="h-4 w-4 text-purple-600" />
+                    <AlertTitle className="text-purple-800">American Home Life Special Requirements</AlertTitle>
+                    <AlertDescription className="text-purple-700">
+                      American Home Life uses a separate state availability system with custom per-agent approvals. All 52 US states/territories require upline license verification. Results will show agents based on their individual American Home Life state availability settings.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -878,6 +900,10 @@ export function AgentEligibilityPage() {
                 <TabsTrigger value="aflac" className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-green-600" />
                   Aflac States
+                </TabsTrigger>
+                <TabsTrigger value="american_home_life" className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-purple-600" />
+                  American Home Life States
                 </TabsTrigger>
                 <TabsTrigger value="overrides" className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4" />
@@ -1153,6 +1179,11 @@ export function AgentEligibilityPage() {
               {/* Aflac States Tab */}
               <TabsContent value="aflac" className="space-y-4">
                 <AflacStateAvailabilityManager />
+              </TabsContent>
+
+              {/* American Home Life States Tab */}
+              <TabsContent value="american_home_life" className="space-y-4">
+                <AmericanHomeLifeStateAvailabilityManager />
               </TabsContent>
             </Tabs>
           )}
