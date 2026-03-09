@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, ChevronRight, ChevronLeft, MapPin, Phone, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, ChevronRight, ChevronLeft, MapPin, Phone, Eye, EyeOff, Copy } from 'lucide-react';
 import { canAccessLockPolicies, LOCK_POLICIES_USER_ID } from '@/lib/userPermissions';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -102,6 +102,14 @@ const extractFirstLastName = (fullName: string | null): { firstName: string; las
     return { firstName: parts[0], lastName: '' };
   }
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+};
+
+const generateLockPassword = (firstName: string, lastName: string, ssn: string | null): string => {
+  const cleanFirst = firstName.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  const cleanLast = lastName.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  const cleanSsn = ssn ? ssn.replace(/[^0-9]/g, '') : '';
+  const last4 = cleanSsn.length >= 4 ? cleanSsn.slice(-4) : '0000';
+  return `${cleanFirst}${cleanLast}${last4}`;
 };
 
 const LockPolicies = () => {
@@ -331,7 +339,7 @@ const LockPolicies = () => {
       return;
     }
 
-    if (dispositionType === 'unable_to_lock' && lockReason.length === 0) {
+    if (dispositionType === 'unable_to_lock' && !lockReason.includes('No reason given') && lockReason.length === 0) {
       toast({
         title: "Required",
         description: "Please select at least one reason",
@@ -417,10 +425,14 @@ const LockPolicies = () => {
 
   const handleOpenPolicyDetails = () => {
     if (!selectedPolicy) return;
+    const leadInfo = selectedLeadInfo;
+    const { firstName, lastName } = extractFirstLastName(leadInfo?.customer_full_name || null);
+    const ssn = leadInfo?.verified_ssn || leadInfo?.social_security || null;
+    const generatedPassword = generateLockPassword(firstName, lastName, ssn);
     setShowPolicyDialog(true);
     setDispositionType('');
     setLockReason([]);
-    setPassword('');
+    setPassword(generatedPassword);
   };
 
   const renderPolicyCard = () => {
@@ -538,10 +550,31 @@ const LockPolicies = () => {
               </Button>
             </div>
           ) : (
-            <Button onClick={handleOpenPolicyDetails}>
-              <Lock className="h-4 w-4 mr-2" />
-              Lock This Policy
-            </Button>
+            <div className="flex items-center gap-4">
+              {(() => {
+                const { firstName, lastName } = extractFirstLastName(leadInfo?.customer_full_name || null);
+                const ssn = leadInfo?.verified_ssn || leadInfo?.social_security || null;
+                const generatedPwd = generateLockPassword(firstName, lastName, ssn);
+                return (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Password:</span>
+                    <span className="font-mono font-medium text-green-600">{generatedPwd}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { navigator.clipboard.writeText(generatedPwd); toast({ title: 'Copied', description: 'Password copied to clipboard' }); }}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })()}
+              <Button onClick={handleOpenPolicyDetails}>
+                <Lock className="h-4 w-4 mr-2" />
+                Lock This Policy
+              </Button>
+            </div>
           )}
         </CardFooter>
       </Card>
@@ -664,7 +697,7 @@ const LockPolicies = () => {
                 <div className="space-y-2 pt-2">
                   <Label>Reason (select all that apply)</Label>
                   <div className="space-y-2 border rounded p-3">
-                    {['First Name', 'Last Name', 'SSN', 'DOB'].map((reason) => (
+                    {['First Name', 'Last Name', 'SSN', 'DOB', 'No reason given'].map((reason) => (
                       <div key={reason} className="flex items-center space-x-2">
                         <Checkbox 
                           id={`reason-${reason}`}
@@ -709,7 +742,7 @@ const LockPolicies = () => {
               onClick={handleSaveDisposition} 
               disabled={
                 !dispositionType || 
-                (dispositionType === 'unable_to_lock' ? lockReason.length === 0 : !password) || 
+                (dispositionType === 'unable_to_lock' ? (!lockReason.includes('No reason given') && lockReason.length === 0) : !password) || 
                 savingDisposition
               }
             >
