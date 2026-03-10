@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { isRestrictedUser, isCenterUser, isBufferAgent as checkIsBufferAgent } from '@/lib/userPermissions';
+import { isRestrictedUser, isCenterUser, isBufferAgent as checkIsBufferAgent, isLockPoliciesOnlyUser } from '@/lib/userPermissions';
 import { useLicensedAgent } from '@/hooks/useLicensedAgent';
 
 interface ProtectedRouteProps {
@@ -27,6 +27,19 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         isLicensedAgent,
         currentPath: location.pathname
       });
+
+      // Lock policies only user - can ONLY access /lock-policies
+      if (isLockPoliciesOnlyUser(user.id)) {
+        console.log('[ProtectedRoute] Lock policies only user detected');
+        const currentPath = location.pathname;
+        
+        // Only allow access to /lock-policies
+        if (currentPath !== '/lock-policies') {
+          console.log('[ProtectedRoute] Redirecting lock policies only user to /lock-policies');
+          navigate('/lock-policies', { replace: true });
+        }
+        return;
+      }
 
       // Check buffer agent status
       const bufferStatus = await checkIsBufferAgent(user.id);
