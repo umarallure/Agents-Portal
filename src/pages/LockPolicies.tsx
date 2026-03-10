@@ -378,8 +378,8 @@ const LockPolicies = () => {
         .update({ 
           lock_status: lockStatusValue,
           locked_at: new Date().toISOString(),
-          locked_by: LOCK_POLICIES_USER_ID,
-          locked_by_name: 'Justine',
+          locked_by: user?.id || LOCK_POLICIES_USER_ID,
+          locked_by_name: user?.email?.split('@')[0] || 'Agent',
           lock_password: dispositionType === 'locked_successfully' ? password : null,
           lock_reason: lockReasonValue
         })
@@ -589,7 +589,7 @@ const LockPolicies = () => {
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <ShieldCheck className="h-4 w-4 text-green-600" />
-            <span>Only accessible to Justine</span>
+            <span>Lock Policies Access</span>
           </div>
           <Button variant="outline" size="sm" onClick={() => { fetchPolicies(); setTimeout(() => fetchLeadInfo(), 100); }}>
             <Loader2 className="h-4 w-4 mr-2" />
