@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, ChevronRight, ChevronLeft, MapPin, Phone, Eye, EyeOff, Copy } from 'lucide-react';
+import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, ChevronRight, ChevronLeft, MapPin, Phone, Eye, EyeOff, Copy, PartyPopper } from 'lucide-react';
 import { canAccessLockPolicies, LOCK_POLICIES_USER_ID } from '@/lib/userPermissions';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -124,6 +124,8 @@ const LockPolicies = () => {
   
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+  const [todayLockCount, setTodayLockCount] = useState(0);
+  const [showCelebration, setShowCelebration] = useState(false);
   const [currentPolicies, setCurrentPolicies] = useState<Policy[]>([]);
   const [retroactivePolicies, setRetroactivePolicies] = useState<Policy[]>([]);
   const [leadInfoMap, setLeadInfoMap] = useState<Record<string, LeadInfo>>({});
@@ -310,6 +312,30 @@ const LockPolicies = () => {
     }
   }, [activeTab, currentPolicies, retroactivePolicies, selectedPolicyIndex]);
 
+  const fetchTodayLockCount = useCallback(async () => {
+    try {
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+
+      const { count, error } = await supabase
+        .from('monday_com_deals')
+        .select('*', { count: 'exact', head: true })
+        .eq('lock_status', 'locked_successfully')
+        .gte('locked_at', startOfDay)
+        .lt('locked_at', endOfDay);
+
+      if (error) throw error;
+      setTodayLockCount(count || 0);
+      
+      if ((count || 0) >= 50) {
+        setShowCelebration(true);
+      }
+    } catch (error) {
+      console.error('Error fetching today lock count:', error);
+    }
+  }, []);
+
   useEffect(() => {
     if (!canAccessLockPolicies(user?.id)) {
       navigate('/dashboard');
@@ -318,6 +344,7 @@ const LockPolicies = () => {
     if (currentPolicies.length === 0 && retroactivePolicies.length === 0) {
       fetchPolicies();
     }
+    fetchTodayLockCount();
   }, [user, navigate]);
 
   useEffect(() => {
@@ -404,6 +431,9 @@ const LockPolicies = () => {
       
       fetchPolicies();
       setTimeout(() => fetchLeadInfo(), 100);
+      if (dispositionType === 'locked_successfully') {
+        fetchTodayLockCount();
+      }
     } catch (error) {
       console.error('Error saving disposition:', error);
       toast({
@@ -596,11 +626,31 @@ const LockPolicies = () => {
             <ShieldCheck className="h-4 w-4 text-green-600" />
             <span>Lock Policies Access</span>
           </div>
-          <Button variant="outline" size="sm" onClick={() => { fetchPolicies(); setTimeout(() => fetchLeadInfo(), 100); }}>
-            <Loader2 className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-4">
+            <Card className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+              <div className="flex items-center gap-2">
+                <Lock className="h-4 w-4" />
+                <span className="font-semibold">Today's Progress:</span>
+                <span className="text-xl font-bold">{todayLockCount} / 50</span>
+              </div>
+            </Card>
+            <Button variant="outline" size="sm" onClick={() => { fetchPolicies(); fetchTodayLockCount(); setTimeout(() => fetchLeadInfo(), 100); }}>
+              <Loader2 className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
         </div>
+
+        {showCelebration && (
+          <Card className="mb-6 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-none shadow-lg animate-pulse">
+            <CardContent className="p-6 text-center">
+              <PartyPopper className="h-12 w-12 mx-auto mb-2" />
+              <h2 className="text-2xl font-bold">Congratulations!</h2>
+              <p className="text-lg">You've reached 50 policies locked today!</p>
+              <p className="text-sm mt-2 opacity-90">Great job! Keep up the excellent work!</p>
+            </CardContent>
+          </Card>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-12">
