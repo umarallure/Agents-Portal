@@ -317,6 +317,10 @@ const LockPolicies = () => {
   const fetchTodayLockCount = useCallback(async () => {
     try {
       const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const lastResetDate = localStorage.getItem('lockPoliciesResetDate');
+      const wasReset = lastResetDate === todayStr;
+
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
 
@@ -328,10 +332,15 @@ const LockPolicies = () => {
         .lt('locked_at', endOfDay);
 
       if (error) throw error;
-      setTodayLockCount(count || 0);
       
-      if ((count || 0) >= 34) {
-        setShowCelebration(true);
+      if (wasReset) {
+        setTodayLockCount(0);
+        setShowCelebration(false);
+      } else {
+        setTodayLockCount(count || 0);
+        if ((count || 0) >= 34) {
+          setShowCelebration(true);
+        }
       }
     } catch (error) {
       console.error('Error fetching today lock count:', error);
@@ -650,7 +659,12 @@ const LockPolicies = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => { setTodayLockCount(0); setShowCelebration(false); }}
+                        onClick={() => { 
+                          const today = new Date().toISOString().split('T')[0];
+                          localStorage.setItem('lockPoliciesResetDate', today);
+                          setTodayLockCount(0); 
+                          setShowCelebration(false); 
+                        }}
                         className="h-6 w-6 p-0 text-white hover:bg-blue-700"
                         title="Reset counter"
                       >
