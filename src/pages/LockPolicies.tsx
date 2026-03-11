@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ReactConfetti from 'react-confetti';
 import { NavigationHeader } from '@/components/NavigationHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -126,6 +127,7 @@ const LockPolicies = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [todayLockCount, setTodayLockCount] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [windowDimension, setWindowDimension] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [currentPolicies, setCurrentPolicies] = useState<Policy[]>([]);
   const [retroactivePolicies, setRetroactivePolicies] = useState<Policy[]>([]);
   const [leadInfoMap, setLeadInfoMap] = useState<Record<string, LeadInfo>>({});
@@ -328,7 +330,7 @@ const LockPolicies = () => {
       if (error) throw error;
       setTodayLockCount(count || 0);
       
-      if ((count || 0) >= 50) {
+      if ((count || 0) >= 34) {
         setShowCelebration(true);
       }
     } catch (error) {
@@ -346,6 +348,14 @@ const LockPolicies = () => {
     }
     fetchTodayLockCount();
   }, [user, navigate]);
+
+  useEffect(() => {
+    const detectSize = () => {
+      setWindowDimension({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', detectSize);
+    return () => window.removeEventListener('resize', detectSize);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('lockPolicyIndex', selectedPolicyIndex.toString());
@@ -627,11 +637,21 @@ const LockPolicies = () => {
             <span>Lock Policies Access</span>
           </div>
           <div className="flex items-center gap-4">
-            <Card className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-              <div className="flex items-center gap-2">
-                <Lock className="h-4 w-4" />
-                <span className="font-semibold">Today's Progress:</span>
-                <span className="text-xl font-bold">{todayLockCount} / 50</span>
+            <Card className="px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white w-80">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Lock className="h-4 w-4" />
+                    <span className="font-semibold">Today's Progress</span>
+                  </div>
+                  <span className="text-xl font-bold">{todayLockCount} / 34</span>
+                </div>
+                <div className="w-full bg-blue-800 rounded-full h-3">
+                  <div 
+                    className="bg-white h-3 rounded-full transition-all duration-500" 
+                    style={{ width: `${Math.min((todayLockCount / 34) * 100, 100)}%` }}
+                  ></div>
+                </div>
               </div>
             </Card>
             <Button variant="outline" size="sm" onClick={() => { fetchPolicies(); fetchTodayLockCount(); setTimeout(() => fetchLeadInfo(), 100); }}>
@@ -642,14 +662,17 @@ const LockPolicies = () => {
         </div>
 
         {showCelebration && (
-          <Card className="mb-6 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-none shadow-lg animate-pulse">
-            <CardContent className="p-6 text-center">
-              <PartyPopper className="h-12 w-12 mx-auto mb-2" />
-              <h2 className="text-2xl font-bold">Congratulations!</h2>
-              <p className="text-lg">You've reached 50 policies locked today!</p>
-              <p className="text-sm mt-2 opacity-90">Great job! Keep up the excellent work!</p>
-            </CardContent>
-          </Card>
+          <>
+            <ReactConfetti width={windowDimension.width} height={windowDimension.height} recycle={false} numberOfPieces={500} gravity={0.2} />
+            <Card className="mb-6 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-none shadow-lg animate-pulse">
+              <CardContent className="p-6 text-center">
+                <PartyPopper className="h-12 w-12 mx-auto mb-2" />
+                <h2 className="text-2xl font-bold">Congratulations!</h2>
+                <p className="text-lg">You've reached 34 policies locked today!</p>
+                <p className="text-sm mt-2 opacity-90">Great job! Keep up the excellent work!</p>
+              </CardContent>
+            </Card>
+          </>
         )}
 
         {loading ? (
