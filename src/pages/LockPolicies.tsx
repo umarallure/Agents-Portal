@@ -338,7 +338,7 @@ const LockPolicies = () => {
         setShowCelebration(false);
       } else {
         setTodayLockCount(count || 0);
-        if ((count || 0) >= 34) {
+        if ((count || 0) >= 50) {
           setShowCelebration(true);
         }
       }
@@ -654,8 +654,8 @@ const LockPolicies = () => {
                     <span className="font-semibold">Today's Progress</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xl font-bold">{todayLockCount} / 34</span>
-                    {todayLockCount >= 34 && (
+                    <span className="text-xl font-bold">{todayLockCount} / 50</span>
+                    {todayLockCount >= 50 && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -676,7 +676,7 @@ const LockPolicies = () => {
                 <div className="w-full bg-blue-800 rounded-full h-3">
                   <div 
                     className="bg-white h-3 rounded-full transition-all duration-500" 
-                    style={{ width: `${Math.min((todayLockCount / 34) * 100, 100)}%` }}
+                    style={{ width: `${Math.min((todayLockCount / 50) * 100, 100)}%` }}
                   ></div>
                 </div>
               </div>
@@ -695,7 +695,7 @@ const LockPolicies = () => {
               <CardContent className="p-6 text-center">
                 <PartyPopper className="h-12 w-12 mx-auto mb-2" />
                 <h2 className="text-2xl font-bold">Congratulations!</h2>
-                <p className="text-lg">You've reached 34 policies locked today!</p>
+                <p className="text-lg">You've reached 50 policies locked today!</p>
                 <p className="text-sm mt-2 opacity-90">Great job! Keep up the excellent work!</p>
               </CardContent>
             </Card>
