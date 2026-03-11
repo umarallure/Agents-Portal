@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, ChevronRight, ChevronLeft, MapPin, Phone, Eye, EyeOff, Copy, PartyPopper } from 'lucide-react';
+import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, ChevronRight, ChevronLeft, MapPin, Phone, Eye, EyeOff, Copy, PartyPopper, RotateCcw } from 'lucide-react';
 import { canAccessLockPolicies, LOCK_POLICIES_USER_ID } from '@/lib/userPermissions';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -644,7 +644,20 @@ const LockPolicies = () => {
                     <Lock className="h-4 w-4" />
                     <span className="font-semibold">Today's Progress</span>
                   </div>
-                  <span className="text-xl font-bold">{todayLockCount} / 34</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-bold">{todayLockCount} / 34</span>
+                    {todayLockCount >= 34 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { setTodayLockCount(0); setShowCelebration(false); }}
+                        className="h-6 w-6 p-0 text-white hover:bg-blue-700"
+                        title="Reset counter"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="w-full bg-blue-800 rounded-full h-3">
                   <div 
