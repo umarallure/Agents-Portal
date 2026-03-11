@@ -105,11 +105,16 @@ const extractFirstLastName = (fullName: string | null): { firstName: string; las
 };
 
 const generateLockPassword = (firstName: string, lastName: string, ssn: string | null): string => {
-  const cleanFirst = firstName.replace(/[^a-zA-Z]/g, '').toLowerCase();
-  const cleanLast = lastName.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  const cleanFirst = firstName.replace(/[^a-zA-Z]/g, '');
+  const cleanLast = lastName.replace(/[^a-zA-Z]/g, '');
   const cleanSsn = ssn ? ssn.replace(/[^0-9]/g, '') : '';
   const last4 = cleanSsn.length >= 4 ? cleanSsn.slice(-4) : '0000';
-  return `${cleanFirst}${cleanLast}${last4}`;
+  
+  const lowerFirst = cleanFirst.toLowerCase();
+  const upperFirst = cleanFirst.charAt(0).toUpperCase() + cleanFirst.slice(1).toLowerCase();
+  const upperLast = cleanLast.charAt(0).toUpperCase() + cleanLast.slice(1).toLowerCase();
+  
+  return `${lowerFirst}${upperLast}${last4}`;
 };
 
 const LockPolicies = () => {
