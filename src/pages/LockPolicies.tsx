@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ConfettiBoom from 'react-confetti-boom';
+import ReactConfetti from 'react-confetti';
 import { NavigationHeader } from '@/components/NavigationHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -127,6 +127,7 @@ const LockPolicies = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [todayLockCount, setTodayLockCount] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [windowDimension, setWindowDimension] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [currentPolicies, setCurrentPolicies] = useState<Policy[]>([]);
   const [retroactivePolicies, setRetroactivePolicies] = useState<Policy[]>([]);
   const [leadInfoMap, setLeadInfoMap] = useState<Record<string, LeadInfo>>({});
@@ -347,6 +348,14 @@ const LockPolicies = () => {
     }
     fetchTodayLockCount();
   }, [user, navigate]);
+
+  useEffect(() => {
+    const detectSize = () => {
+      setWindowDimension({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', detectSize);
+    return () => window.removeEventListener('resize', detectSize);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('lockPolicyIndex', selectedPolicyIndex.toString());
@@ -654,7 +663,7 @@ const LockPolicies = () => {
 
         {showCelebration && (
           <>
-            <ConfettiBoom colors={['#FFD700', '#FFA500', '#FF6347', '#FF4500']} />
+            <ReactConfetti width={windowDimension.width} height={windowDimension.height} recycle={false} numberOfPieces={500} gravity={0.2} />
             <Card className="mb-6 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-none shadow-lg animate-pulse">
               <CardContent className="p-6 text-center">
                 <PartyPopper className="h-12 w-12 mx-auto mb-2" />
