@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ReactConfetti from 'react-confetti';
 import { NavigationHeader } from '@/components/NavigationHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, ChevronRight, ChevronLeft, MapPin, Phone, Eye, EyeOff, Copy } from 'lucide-react';
+import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, ChevronRight, ChevronLeft, MapPin, Phone, Eye, EyeOff, Copy, PartyPopper, RotateCcw } from 'lucide-react';
 import { canAccessLockPolicies, LOCK_POLICIES_USER_ID } from '@/lib/userPermissions';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -105,11 +106,16 @@ const extractFirstLastName = (fullName: string | null): { firstName: string; las
 };
 
 const generateLockPassword = (firstName: string, lastName: string, ssn: string | null): string => {
-  const cleanFirst = firstName.replace(/[^a-zA-Z]/g, '').toLowerCase();
-  const cleanLast = lastName.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  const cleanFirst = firstName.replace(/[^a-zA-Z]/g, '');
+  const cleanLast = lastName.replace(/[^a-zA-Z]/g, '');
   const cleanSsn = ssn ? ssn.replace(/[^0-9]/g, '') : '';
   const last4 = cleanSsn.length >= 4 ? cleanSsn.slice(-4) : '0000';
-  return `${cleanFirst}${cleanLast}${last4}`;
+  
+  const lowerFirst = cleanFirst.toLowerCase();
+  const upperFirst = cleanFirst.charAt(0).toUpperCase() + cleanFirst.slice(1).toLowerCase();
+  const upperLast = cleanLast.charAt(0).toUpperCase() + cleanLast.slice(1).toLowerCase();
+  
+  return `${lowerFirst}${upperLast}${last4}`;
 };
 
 const LockPolicies = () => {
@@ -119,6 +125,9 @@ const LockPolicies = () => {
   
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+  const [todayLockCount, setTodayLockCount] = useState(0);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [windowDimension, setWindowDimension] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [currentPolicies, setCurrentPolicies] = useState<Policy[]>([]);
   const [retroactivePolicies, setRetroactivePolicies] = useState<Policy[]>([]);
   const [leadInfoMap, setLeadInfoMap] = useState<Record<string, LeadInfo>>({});
@@ -305,6 +314,39 @@ const LockPolicies = () => {
     }
   }, [activeTab, currentPolicies, retroactivePolicies, selectedPolicyIndex]);
 
+  const fetchTodayLockCount = useCallback(async () => {
+    try {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const lastResetDate = localStorage.getItem('lockPoliciesResetDate');
+      const wasReset = lastResetDate === todayStr;
+
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+
+      const { count, error } = await supabase
+        .from('monday_com_deals')
+        .select('*', { count: 'exact', head: true })
+        .eq('lock_status', 'locked_successfully')
+        .gte('locked_at', startOfDay)
+        .lt('locked_at', endOfDay);
+
+      if (error) throw error;
+      
+      if (wasReset) {
+        setTodayLockCount(0);
+        setShowCelebration(false);
+      } else {
+        setTodayLockCount(count || 0);
+        if ((count || 0) >= 34) {
+          setShowCelebration(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching today lock count:', error);
+    }
+  }, []);
+
   useEffect(() => {
     if (!canAccessLockPolicies(user?.id)) {
       navigate('/dashboard');
@@ -313,7 +355,16 @@ const LockPolicies = () => {
     if (currentPolicies.length === 0 && retroactivePolicies.length === 0) {
       fetchPolicies();
     }
+    fetchTodayLockCount();
   }, [user, navigate]);
+
+  useEffect(() => {
+    const detectSize = () => {
+      setWindowDimension({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', detectSize);
+    return () => window.removeEventListener('resize', detectSize);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('lockPolicyIndex', selectedPolicyIndex.toString());
@@ -399,6 +450,9 @@ const LockPolicies = () => {
       
       fetchPolicies();
       setTimeout(() => fetchLeadInfo(), 100);
+      if (dispositionType === 'locked_successfully') {
+        fetchTodayLockCount();
+      }
     } catch (error) {
       console.error('Error saving disposition:', error);
       toast({
@@ -591,11 +645,62 @@ const LockPolicies = () => {
             <ShieldCheck className="h-4 w-4 text-green-600" />
             <span>Lock Policies Access</span>
           </div>
-          <Button variant="outline" size="sm" onClick={() => { fetchPolicies(); setTimeout(() => fetchLeadInfo(), 100); }}>
-            <Loader2 className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-4">
+            <Card className="px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white w-80">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Lock className="h-4 w-4" />
+                    <span className="font-semibold">Today's Progress</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-bold">{todayLockCount} / 34</span>
+                    {todayLockCount >= 34 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { 
+                          const today = new Date().toISOString().split('T')[0];
+                          localStorage.setItem('lockPoliciesResetDate', today);
+                          setTodayLockCount(0); 
+                          setShowCelebration(false); 
+                        }}
+                        className="h-6 w-6 p-0 text-white hover:bg-blue-700"
+                        title="Reset counter"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="w-full bg-blue-800 rounded-full h-3">
+                  <div 
+                    className="bg-white h-3 rounded-full transition-all duration-500" 
+                    style={{ width: `${Math.min((todayLockCount / 34) * 100, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+            </Card>
+            <Button variant="outline" size="sm" onClick={() => { fetchPolicies(); fetchTodayLockCount(); setTimeout(() => fetchLeadInfo(), 100); }}>
+              <Loader2 className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
         </div>
+
+        {showCelebration && (
+          <>
+            <ReactConfetti width={windowDimension.width} height={windowDimension.height} recycle={false} numberOfPieces={500} gravity={0.2} />
+            <Card className="mb-6 bg-gradient-to-r from-blue-500 to-blue-700 text-white border-none shadow-lg animate-pulse">
+              <CardContent className="p-6 text-center">
+                <PartyPopper className="h-12 w-12 mx-auto mb-2" />
+                <h2 className="text-2xl font-bold">Congratulations!</h2>
+                <p className="text-lg">You've reached 34 policies locked today!</p>
+                <p className="text-sm mt-2 opacity-90">Great job! Keep up the excellent work!</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-12">
