@@ -70,6 +70,8 @@ const DailyDealFlowPage = () => {
   const [callResultFilter, setCallResultFilter] = useState(ALL_OPTION);
   const [retentionFilter, setRetentionFilter] = useState(ALL_OPTION);
   const [incompleteUpdatesFilter, setIncompleteUpdatesFilter] = useState(ALL_OPTION);
+  const [hourFromFilter, setHourFromFilter] = useState<string>(ALL_OPTION);
+  const [hourToFilter, setHourToFilter] = useState<string>(ALL_OPTION);
   
   const recordsPerPage = 100;
   
@@ -187,6 +189,27 @@ const DailyDealFlowPage = () => {
         }
       }
 
+      // Apply hour filter - filter by hour of created_at in New York timezone
+      // created_at is stored in UTC, we convert EST hour to UTC timestamp
+      if (hourFromFilter && hourFromFilter !== ALL_OPTION) {
+        const hourFrom = parseInt(hourFromFilter, 10);
+        const baseDate = dateFilter ? dateObjectToESTString(dateFilter) : new Date().toISOString().split('T')[0];
+        // Convert EST hour to UTC: add 5 hours (EST offset)
+        // Example: 9:00 EST = 14:00 UTC
+        const utcHour = (hourFrom + 5) % 24;
+        const utcTimestamp = `${baseDate}T${utcHour.toString().padStart(2, '0')}:00:00+00`;
+        query = query.gte('created_at', utcTimestamp);
+      }
+
+      if (hourToFilter && hourToFilter !== ALL_OPTION) {
+        const hourTo = parseInt(hourToFilter, 10);
+        const baseDate = dateFilter ? dateObjectToESTString(dateFilter) : new Date().toISOString().split('T')[0];
+        // End of hour in UTC (add 1 hour to hourTo, then add 5 for EST)
+        const utcHourEnd = (hourTo + 6) % 24;
+        const utcTimestampEnd = `${baseDate}T${utcHourEnd.toString().padStart(2, '0')}:00:00+00`;
+        query = query.lt('created_at', utcTimestampEnd);
+      }
+
       // Apply search filter if set
       if (searchTerm) {
         query = query.or(`insured_name.ilike.%${searchTerm}%,client_phone_number.ilike.%${searchTerm}%,submission_id.ilike.%${searchTerm}%,lead_vendor.ilike.%${searchTerm}%,agent.ilike.%${searchTerm}%,status.ilike.%${searchTerm}%,carrier.ilike.%${searchTerm}%,licensed_agent_account.ilike.%${searchTerm}%,buffer_agent.ilike.%${searchTerm}%,retention_agent.ilike.%${searchTerm}%`);
@@ -231,7 +254,7 @@ const DailyDealFlowPage = () => {
   useEffect(() => {
     setCurrentPage(1); // Reset to first page when filters change
     fetchData(1);
-  }, [dateFilter, dateFromFilter, dateToFilter, bufferAgentFilter, retentionAgentFilter, licensedAgentFilter, leadVendorFilter, statusFilter, carrierFilter, callResultFilter, retentionFilter, incompleteUpdatesFilter]);
+  }, [dateFilter, dateFromFilter, dateToFilter, bufferAgentFilter, retentionAgentFilter, licensedAgentFilter, leadVendorFilter, statusFilter, carrierFilter, callResultFilter, retentionFilter, incompleteUpdatesFilter, hourFromFilter, hourToFilter]);
 
   // Refetch when search term changes (debounced)
   useEffect(() => {
@@ -324,6 +347,23 @@ const DailyDealFlowPage = () => {
         } else if (incompleteUpdatesFilter === 'Complete') {
           query = query.not('status', 'is', null).not('status', 'eq', '');
         }
+      }
+
+      // Apply hour filter to export
+      if (hourFromFilter && hourFromFilter !== ALL_OPTION) {
+        const hourFrom = parseInt(hourFromFilter, 10);
+        const baseDate = dateFilter ? dateObjectToESTString(dateFilter) : new Date().toISOString().split('T')[0];
+        const utcHour = (hourFrom + 5) % 24;
+        const utcTimestamp = `${baseDate}T${utcHour.toString().padStart(2, '0')}:00:00+00`;
+        query = query.gte('created_at', utcTimestamp);
+      }
+
+      if (hourToFilter && hourToFilter !== ALL_OPTION) {
+        const hourTo = parseInt(hourToFilter, 10);
+        const baseDate = dateFilter ? dateObjectToESTString(dateFilter) : new Date().toISOString().split('T')[0];
+        const utcHourEnd = (hourTo + 6) % 24;
+        const utcTimestampEnd = `${baseDate}T${utcHourEnd.toString().padStart(2, '0')}:00:00+00`;
+        query = query.lt('created_at', utcTimestampEnd);
       }
 
       if (searchTerm) {
@@ -611,6 +651,10 @@ const DailyDealFlowPage = () => {
           onRetentionFilterChange={setRetentionFilter}
           incompleteUpdatesFilter={incompleteUpdatesFilter}
           onIncompleteUpdatesFilterChange={setIncompleteUpdatesFilter}
+          hourFromFilter={hourFromFilter}
+          onHourFromFilterChange={setHourFromFilter}
+          hourToFilter={hourToFilter}
+          onHourToFilterChange={setHourToFilter}
           totalRows={totalRecords}
         />
 

@@ -36,6 +36,10 @@ interface GridToolbarProps {
   onRetentionFilterChange: (value: string) => void;
   incompleteUpdatesFilter: string;
   onIncompleteUpdatesFilterChange: (value: string) => void;
+  hourFromFilter: string;
+  onHourFromFilterChange: (value: string) => void;
+  hourToFilter: string;
+  onHourToFilterChange: (value: string) => void;
   totalRows: number;
 }
 
@@ -66,6 +70,10 @@ export const GridToolbar = ({
   onRetentionFilterChange,
   incompleteUpdatesFilter,
   onIncompleteUpdatesFilterChange,
+  hourFromFilter,
+  onHourFromFilterChange,
+  hourToFilter,
+  onHourToFilterChange,
   totalRows
 }: GridToolbarProps) => {
   // Special constant to represent "All" selections (cannot use empty string with Radix UI)
@@ -169,6 +177,34 @@ export const GridToolbar = ({
     "Complete"
   ];
 
+  const hourOptions = [
+    "All Hours",
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23"
+  ];
+
   const clearDateFilter = () => {
     onDateFilterChange(undefined);
   };
@@ -185,6 +221,14 @@ export const GridToolbar = ({
     onDateFilterChange(undefined);
     onDateFromFilterChange(undefined);
     onDateToFilterChange(undefined);
+  };
+
+  const clearHourFromFilter = () => {
+    onHourFromFilterChange(ALL_OPTION);
+  };
+
+  const clearHourToFilter = () => {
+    onHourToFilterChange(ALL_OPTION);
   };
 
   const clearSearch = () => {
@@ -205,6 +249,8 @@ export const GridToolbar = ({
     onCallResultFilterChange(ALL_OPTION);
     onRetentionFilterChange(ALL_OPTION);
     onIncompleteUpdatesFilterChange(ALL_OPTION);
+    onHourFromFilterChange(ALL_OPTION);
+    onHourToFilterChange(ALL_OPTION);
   };
 
   const hasActiveFilters = searchTerm || dateFilter || dateFromFilter || dateToFilter ||
@@ -216,7 +262,9 @@ export const GridToolbar = ({
     (carrierFilter && carrierFilter !== ALL_OPTION) || 
     (callResultFilter && callResultFilter !== ALL_OPTION) ||
     (retentionFilter && retentionFilter !== ALL_OPTION) ||
-    (incompleteUpdatesFilter && incompleteUpdatesFilter !== ALL_OPTION);
+    (incompleteUpdatesFilter && incompleteUpdatesFilter !== ALL_OPTION) ||
+    (hourFromFilter && hourFromFilter !== ALL_OPTION) ||
+    (hourToFilter && hourToFilter !== ALL_OPTION);
 
   return (
     <div className="space-y-4 p-4 bg-card rounded-lg border">
@@ -344,6 +392,73 @@ export const GridToolbar = ({
             </Button>
           </div>
         )}
+
+        {/* Hour Range Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* From Hour Filter */}
+          <div>
+            <Label className="text-sm font-medium">
+              Hour From
+            </Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Select value={hourFromFilter || ALL_OPTION} onValueChange={onHourFromFilterChange}>
+                <SelectTrigger className={cn("min-w-[100px]", hourFromFilter && hourFromFilter !== ALL_OPTION && "ring-2 ring-blue-200")}>
+                  <SelectValue placeholder="All Hours" />
+                </SelectTrigger>
+                <SelectContent>
+                  {hourOptions.map((hour) => (
+                    <SelectItem key={hour} value={hour === "All Hours" ? ALL_OPTION : hour}>
+                      {hour === "All Hours" ? "All Hours" : `${hour}:00`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {hourFromFilter && hourFromFilter !== ALL_OPTION && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearHourFromFilter}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* To Hour Filter */}
+          <div>
+            <Label className="text-sm font-medium">
+              Hour To
+            </Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Select value={hourToFilter || ALL_OPTION} onValueChange={onHourToFilterChange}>
+                <SelectTrigger className={cn("min-w-[100px]", hourToFilter && hourToFilter !== ALL_OPTION && "ring-2 ring-blue-200")}>
+                  <SelectValue placeholder="All Hours" />
+                </SelectTrigger>
+                <SelectContent>
+                  {hourOptions.map((hour) => (
+                    <SelectItem key={hour} value={hour === "All Hours" ? ALL_OPTION : hour}>
+                      {hour === "All Hours" ? "All Hours" : `${hour}:00`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {hourToFilter && hourToFilter !== ALL_OPTION && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearHourToFilter}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Clear All Filters Button */}
         {hasActiveFilters && (
