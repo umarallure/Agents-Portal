@@ -193,13 +193,7 @@ const DailyDealFlowPage = () => {
 
       // Apply LA Callback filter
       if (laCallbackFilter && laCallbackFilter !== ALL_OPTION) {
-        if (laCallbackFilter === 'Has LA Callback') {
-          // Filter for entries where la_callback is not null and not empty
-          query = query.not('la_callback', 'is', null).neq('la_callback', '');
-        } else if (laCallbackFilter === 'No LA Callback') {
-          // Filter for entries where la_callback is null or empty
-          query = query.or('la_callback.is.null,la_callback.eq.');
-        }
+        query = query.eq('la_callback', laCallbackFilter);
       }
 
       // Apply hour filter - filter by hour of created_at in New York timezone
@@ -364,11 +358,7 @@ const DailyDealFlowPage = () => {
 
       // Apply LA Callback filter to export
       if (laCallbackFilter && laCallbackFilter !== ALL_OPTION) {
-        if (laCallbackFilter === 'Has LA Callback') {
-          query = query.not('la_callback', 'is', null).neq('la_callback', '');
-        } else if (laCallbackFilter === 'No LA Callback') {
-          query = query.or('la_callback.is.null,la_callback.eq.');
-        }
+        query = query.eq('la_callback', laCallbackFilter);
       }
 
       // Apply hour filter to export
