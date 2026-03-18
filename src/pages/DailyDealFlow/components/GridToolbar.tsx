@@ -118,7 +118,8 @@ export const GridToolbar = ({
     "Hussain Khan",
     "Raja Arbaz Nawaz",
     "Muhammad Ahmed",
-    "Justin"
+    "Justin",
+    "LA Callback"
   ];
 
   // Use dynamic lead vendors from database
@@ -177,8 +178,12 @@ export const GridToolbar = ({
 
   const laCallbackOptions = [
     "All LA Callback",
-    "Has LA Callback",
-    "No LA Callback"
+    "No",
+    "Yes - Initial",
+    "Yes - 2nd Call",
+    "Yes - 3rd Call",
+    "Yes - Final",
+    "N/A"
   ];
 
   const incompleteUpdatesOptions = [

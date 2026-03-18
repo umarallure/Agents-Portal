@@ -83,7 +83,8 @@ const retentionAgentOptions = [
   "Muhammad Ahmed",
   "Hammad Rafique",
   "Justin",
-  "N/A"
+  "N/A",
+  "LA Callback"
 ];
 
 const carrierOptions = [
@@ -110,6 +111,15 @@ const statusOptions = [
 
 const callResultOptions = [
   "Submitted", "Underwriting", "Not Submitted"
+];
+
+const laCallbackOptions = [
+  "No",
+  "Yes - Initial",
+  "Yes - 2nd Call",
+  "Yes - 3rd Call",
+  "Yes - Final",
+  "N/A"
 ];
 
 export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePermissions = true, isDuplicate = false }: EditableRowProps) => {
@@ -975,12 +985,19 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
             <div>
               <Label className="text-sm font-medium">LA Callback</Label>
               {isEditing ? (
-                <Input
+                <Select
                   value={editData.la_callback || ''}
-                  onChange={(e) => updateField('la_callback', e.target.value)}
-                  className="mt-1"
-                  placeholder="Enter LA callback"
-                />
+                  onValueChange={(value) => updateField('la_callback', value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select LA callback" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {laCallbackOptions.map((option) => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : (
                 <div className="mt-1 p-2 bg-muted rounded">{row.la_callback || 'N/A'}</div>
               )}
@@ -1311,12 +1328,19 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
 
           {/* LA Callback */}
           <td className="border border-border px-3 py-2">
-            <Input
+            <Select
               value={editData.la_callback || ''}
-              onChange={(e) => updateField('la_callback', e.target.value)}
-              className="h-8 text-xs"
-              placeholder="LA Callback"
-            />
+              onValueChange={(value) => updateField('la_callback', value)}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="LA Callback" />
+              </SelectTrigger>
+              <SelectContent>
+                {laCallbackOptions.map((option) => (
+                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </td>
 
           {/* Notes */}
