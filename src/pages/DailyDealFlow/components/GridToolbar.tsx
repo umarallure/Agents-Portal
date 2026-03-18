@@ -36,6 +36,8 @@ interface GridToolbarProps {
   onRetentionFilterChange: (value: string) => void;
   incompleteUpdatesFilter: string;
   onIncompleteUpdatesFilterChange: (value: string) => void;
+  laCallbackFilter: string;
+  onLaCallbackFilterChange: (value: string) => void;
   hourFromFilter: string;
   onHourFromFilterChange: (value: string) => void;
   hourToFilter: string;
@@ -70,6 +72,8 @@ export const GridToolbar = ({
   onRetentionFilterChange,
   incompleteUpdatesFilter,
   onIncompleteUpdatesFilterChange,
+  laCallbackFilter,
+  onLaCallbackFilterChange,
   hourFromFilter,
   onHourFromFilterChange,
   hourToFilter,
@@ -171,6 +175,12 @@ export const GridToolbar = ({
     "Regular"
   ];
 
+  const laCallbackOptions = [
+    "All LA Callback",
+    "Has LA Callback",
+    "No LA Callback"
+  ];
+
   const incompleteUpdatesOptions = [
     "All Updates",
     "Incomplete",
@@ -249,6 +259,7 @@ export const GridToolbar = ({
     onCallResultFilterChange(ALL_OPTION);
     onRetentionFilterChange(ALL_OPTION);
     onIncompleteUpdatesFilterChange(ALL_OPTION);
+    onLaCallbackFilterChange(ALL_OPTION);
     onHourFromFilterChange(ALL_OPTION);
     onHourToFilterChange(ALL_OPTION);
   };
@@ -263,6 +274,7 @@ export const GridToolbar = ({
     (callResultFilter && callResultFilter !== ALL_OPTION) ||
     (retentionFilter && retentionFilter !== ALL_OPTION) ||
     (incompleteUpdatesFilter && incompleteUpdatesFilter !== ALL_OPTION) ||
+    (laCallbackFilter && laCallbackFilter !== ALL_OPTION) ||
     (hourFromFilter && hourFromFilter !== ALL_OPTION) ||
     (hourToFilter && hourToFilter !== ALL_OPTION);
 
@@ -658,6 +670,26 @@ export const GridToolbar = ({
               {retentionOptions.map((type) => (
                 <SelectItem key={type} value={type === "All Types" ? ALL_OPTION : type}>
                   {type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* LA Callback Filter */}
+        <div>
+          <Label className="text-sm font-medium">
+            LA Callback
+            {laCallbackFilter && laCallbackFilter !== ALL_OPTION && <span className="text-blue-600 ml-1">●</span>}
+          </Label>
+          <Select value={laCallbackFilter || ALL_OPTION} onValueChange={onLaCallbackFilterChange}>
+            <SelectTrigger className={cn("mt-1", laCallbackFilter && laCallbackFilter !== ALL_OPTION && "ring-2 ring-blue-200")}>
+              <SelectValue placeholder="All LA Callback" />
+            </SelectTrigger>
+            <SelectContent>
+              {laCallbackOptions.map((option) => (
+                <SelectItem key={option} value={option === "All LA Callback" ? ALL_OPTION : option}>
+                  {option}
                 </SelectItem>
               ))}
             </SelectContent>

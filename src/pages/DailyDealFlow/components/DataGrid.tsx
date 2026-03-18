@@ -86,7 +86,7 @@ export const DataGrid = ({
 
   const columns = [
     "S.No", "Date", "Lead Vendor", "Insured Name", "Phone Number", "Buffer Agent", "Retention Agent", "Agent", "Licensed Account", "Status",
-    "Call Result", "Carrier", "Product Type", "Draft Date", "MP", "Face Amount", "Notes"
+    "Call Result", "Carrier", "Product Type",     "Draft Date", "MP", "Face Amount", "LA Callback", "Notes"
   ];
   
   // Add Actions column only for users with write permissions
@@ -377,6 +377,7 @@ export const DataGrid = ({
                   case 'Draft Date': return 'draft_date';
                   case 'MP': return 'monthly_premium';
                   case 'Face Amount': return 'face_amount';
+                  case 'LA Callback': return 'la_callback';
                   case 'Notes': return 'notes';
                   default: return null;
                 }
@@ -401,8 +402,9 @@ export const DataGrid = ({
                   column === 'Product Type' ? 'w-20' :
                   column === 'Draft Date' ? 'w-20' :
                   column === 'MP' ? 'w-16' :
-                  column === 'Face Amount' ? 'w-20' :
-column === 'Notes' ? 'w-32' :
+                   column === 'Face Amount' ? 'w-20' :
+                   column === 'LA Callback' ? 'w-20' :
+                   column === 'Notes' ? 'w-32' :
                   column === 'Actions' ? 'w-24' : ''
                 }>
                   {isSortable ? (

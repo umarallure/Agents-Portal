@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ShieldCheck, Search, Lock, Unlock, ChevronLeft, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { Loader2, ShieldCheck, Search, Lock, Unlock, ChevronLeft, ChevronRight, Eye, EyeOff, Calendar } from 'lucide-react';
 import { canAccessLockPoliciesManager } from '@/lib/userPermissions';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -64,6 +64,8 @@ const LockPoliciesManager = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [lockFilter, setLockFilter] = useState<string>('all');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<number>>(new Set());
 
@@ -130,7 +132,20 @@ const LockPoliciesManager = () => {
       (lockFilter === 'unable_to_lock' && policy.lock_status === 'unable_to_lock') ||
       (lockFilter === 'pending' && (!policy.lock_status || policy.lock_status === 'pending'));
     
-    return matchesSearch && matchesStatus && matchesLock;
+    let matchesDate = true;
+    if (startDate && policy.deal_creation_date) {
+      const policyDate = new Date(policy.deal_creation_date);
+      const start = new Date(startDate);
+      matchesDate = policyDate >= start;
+    }
+    if (matchesDate && endDate && policy.deal_creation_date) {
+      const policyDate = new Date(policy.deal_creation_date);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      matchesDate = policyDate <= end;
+    }
+    
+    return matchesSearch && matchesStatus && matchesLock && matchesDate;
   });
 
   const totalPages = Math.ceil(filteredPolicies.length / ITEMS_PER_PAGE);
@@ -139,7 +154,7 @@ const LockPoliciesManager = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, lockFilter]);
+  }, [searchTerm, statusFilter, lockFilter, startDate, endDate]);
 
   const getLockStatusBadge = (status: string | null) => {
     if (status === 'locked_successfully') {
@@ -244,7 +259,65 @@ const LockPoliciesManager = () => {
               </SelectContent>
             </Select>
           </div>
+          <div className="w-[150px]">
+            <Label htmlFor="startDate">Start Date</Label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                id="startDate"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+          <div className="w-[150px]">
+            <Label htmlFor="endDate">End Date</Label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                id="endDate"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
         </div>
+
+        {filteredPolicies.length > 0 && (
+          <div className="mb-6 p-4 bg-muted/50 rounded-lg">
+            <h3 className="text-sm font-semibold mb-3">Lock Status Summary (Filtered)</h3>
+            <div className="grid grid-cols-4 gap-4">
+              <div className="text-center p-3 bg-green-50 rounded-md">
+                <div className="text-2xl font-bold text-green-700">
+                  {filteredPolicies.filter(p => p.lock_status === 'locked_successfully').length}
+                </div>
+                <div className="text-xs text-green-600">Locked Successfully</div>
+              </div>
+              <div className="text-center p-3 bg-yellow-50 rounded-md">
+                <div className="text-2xl font-bold text-yellow-700">
+                  {filteredPolicies.filter(p => p.lock_status === 'already_locked').length}
+                </div>
+                <div className="text-xs text-yellow-600">Already Locked</div>
+              </div>
+              <div className="text-center p-3 bg-red-50 rounded-md">
+                <div className="text-2xl font-bold text-red-700">
+                  {filteredPolicies.filter(p => p.lock_status === 'unable_to_lock').length}
+                </div>
+                <div className="text-xs text-red-600">Unable to Lock</div>
+              </div>
+              <div className="text-center p-3 bg-gray-50 rounded-md">
+                <div className="text-2xl font-bold text-gray-700">
+                  {filteredPolicies.filter(p => !p.lock_status || p.lock_status === 'pending').length}
+                </div>
+                <div className="text-xs text-gray-600">Pending</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-12">
