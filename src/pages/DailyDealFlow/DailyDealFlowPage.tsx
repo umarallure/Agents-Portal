@@ -44,6 +44,7 @@ export interface DailyDealFlowRow {
   carrier_audit?: string;
   product_type_carrier?: string;
   level_or_gi?: string;
+  la_callback?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -70,6 +71,7 @@ const DailyDealFlowPage = () => {
   const [callResultFilter, setCallResultFilter] = useState(ALL_OPTION);
   const [retentionFilter, setRetentionFilter] = useState(ALL_OPTION);
   const [incompleteUpdatesFilter, setIncompleteUpdatesFilter] = useState(ALL_OPTION);
+  const [laCallbackFilter, setLaCallbackFilter] = useState(ALL_OPTION);
   const [hourFromFilter, setHourFromFilter] = useState<string>(ALL_OPTION);
   const [hourToFilter, setHourToFilter] = useState<string>(ALL_OPTION);
   
@@ -189,6 +191,17 @@ const DailyDealFlowPage = () => {
         }
       }
 
+      // Apply LA Callback filter
+      if (laCallbackFilter && laCallbackFilter !== ALL_OPTION) {
+        if (laCallbackFilter === 'Has LA Callback') {
+          // Filter for entries where la_callback is not null and not empty
+          query = query.not('la_callback', 'is', null).neq('la_callback', '');
+        } else if (laCallbackFilter === 'No LA Callback') {
+          // Filter for entries where la_callback is null or empty
+          query = query.or('la_callback.is.null,la_callback.eq.');
+        }
+      }
+
       // Apply hour filter - filter by hour of created_at in New York timezone
       // created_at is stored in UTC, we convert EST hour to UTC timestamp
       if (hourFromFilter && hourFromFilter !== ALL_OPTION) {
@@ -254,7 +267,7 @@ const DailyDealFlowPage = () => {
   useEffect(() => {
     setCurrentPage(1); // Reset to first page when filters change
     fetchData(1);
-  }, [dateFilter, dateFromFilter, dateToFilter, bufferAgentFilter, retentionAgentFilter, licensedAgentFilter, leadVendorFilter, statusFilter, carrierFilter, callResultFilter, retentionFilter, incompleteUpdatesFilter, hourFromFilter, hourToFilter]);
+  }, [dateFilter, dateFromFilter, dateToFilter, bufferAgentFilter, retentionAgentFilter, licensedAgentFilter, leadVendorFilter, statusFilter, carrierFilter, callResultFilter, retentionFilter, incompleteUpdatesFilter, laCallbackFilter, hourFromFilter, hourToFilter]);
 
   // Refetch when search term changes (debounced)
   useEffect(() => {
@@ -346,6 +359,15 @@ const DailyDealFlowPage = () => {
           query = query.or('status.is.null,status.eq.');
         } else if (incompleteUpdatesFilter === 'Complete') {
           query = query.not('status', 'is', null).not('status', 'eq', '');
+        }
+      }
+
+      // Apply LA Callback filter to export
+      if (laCallbackFilter && laCallbackFilter !== ALL_OPTION) {
+        if (laCallbackFilter === 'Has LA Callback') {
+          query = query.not('la_callback', 'is', null).neq('la_callback', '');
+        } else if (laCallbackFilter === 'No LA Callback') {
+          query = query.or('la_callback.is.null,la_callback.eq.');
         }
       }
 
@@ -454,6 +476,7 @@ const DailyDealFlowPage = () => {
         'Carrier Audit',
         'Product Type Carrier',
         'Level or GI',
+        'LA Callback',
         'Created At',
         'Updated At'
       ];
@@ -485,6 +508,7 @@ const DailyDealFlowPage = () => {
           row.carrier_audit || '',
           row.product_type_carrier || '',
           row.level_or_gi || '',
+          row.la_callback || '',
           row.created_at || '',
           row.updated_at || ''
         ].map(field => `"${field}"`).join(','))
@@ -651,6 +675,8 @@ const DailyDealFlowPage = () => {
           onRetentionFilterChange={setRetentionFilter}
           incompleteUpdatesFilter={incompleteUpdatesFilter}
           onIncompleteUpdatesFilterChange={setIncompleteUpdatesFilter}
+          laCallbackFilter={laCallbackFilter}
+          onLaCallbackFilterChange={setLaCallbackFilter}
           hourFromFilter={hourFromFilter}
           onHourFromFilterChange={setHourFromFilter}
           hourToFilter={hourToFilter}

@@ -973,6 +973,20 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
             </div>
 
             <div>
+              <Label className="text-sm font-medium">LA Callback</Label>
+              {isEditing ? (
+                <Input
+                  value={editData.la_callback || ''}
+                  onChange={(e) => updateField('la_callback', e.target.value)}
+                  className="mt-1"
+                  placeholder="Enter LA callback"
+                />
+              ) : (
+                <div className="mt-1 p-2 bg-muted rounded">{row.la_callback || 'N/A'}</div>
+              )}
+            </div>
+
+            <div>
               <Label className="text-sm font-medium">Created At</Label>
               <div className="mt-1 p-2 bg-muted rounded text-sm">
                 {row.created_at ? format(new Date(row.created_at), "PPP 'at' p") : 'N/A'}
@@ -1295,6 +1309,16 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
             />
           </td>
 
+          {/* LA Callback */}
+          <td className="border border-border px-3 py-2">
+            <Input
+              value={editData.la_callback || ''}
+              onChange={(e) => updateField('la_callback', e.target.value)}
+              className="h-8 text-xs"
+              placeholder="LA Callback"
+            />
+          </td>
+
           {/* Notes */}
           <td className="border border-border px-3 py-2 w-32 align-top">
             <Textarea
@@ -1458,6 +1482,11 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
         {/* Face Amount */}
         <td className="border border-border px-3 py-2 text-sm w-20 text-right">
           {row.face_amount ? `$${row.face_amount.toLocaleString()}` : ''}
+        </td>
+
+        {/* LA Callback */}
+        <td className="border border-border px-3 py-2 text-sm w-20">
+          {row.la_callback || ''}
         </td>
 
         {/* Notes */}
