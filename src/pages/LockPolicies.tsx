@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ReactConfetti from 'react-confetti';
 import { NavigationHeader } from '@/components/NavigationHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, ChevronRight, ChevronLeft, MapPin, Phone, Eye, EyeOff, Copy, PartyPopper, RotateCcw } from 'lucide-react';
+import { Loader2, Lock, Shield, ShieldCheck, AlertTriangle, User, FileText, Calendar, Hash, ChevronRight, ChevronLeft, MapPin, Phone, Eye, EyeOff, Copy, X } from 'lucide-react';
 import { canAccessLockPolicies, LOCK_POLICIES_USER_ID } from '@/lib/userPermissions';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -126,11 +125,14 @@ const LockPolicies = () => {
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [todayLockCount, setTodayLockCount] = useState(0);
-  const [showCelebration, setShowCelebration] = useState(false);
-  const [windowDimension, setWindowDimension] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [currentPolicies, setCurrentPolicies] = useState<Policy[]>([]);
   const [retroactivePolicies, setRetroactivePolicies] = useState<Policy[]>([]);
   const [leadInfoMap, setLeadInfoMap] = useState<Record<string, LeadInfo>>({});
+  const [statsDateFilter, setStatsDateFilter] = useState<string>('');
+  const [statsLockedSuccessfully, setStatsLockedSuccessfully] = useState(0);
+  const [statsAlreadyLocked, setStatsAlreadyLocked] = useState(0);
+  const [statsUnableToLock, setStatsUnableToLock] = useState(0);
+  const [statsPending, setStatsPending] = useState(0);
   const [selectedPolicyIndex, setSelectedPolicyIndex] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('lockPolicyIndex');
@@ -335,15 +337,45 @@ const LockPolicies = () => {
       
       if (wasReset) {
         setTodayLockCount(0);
-        setShowCelebration(false);
       } else {
         setTodayLockCount(count || 0);
-        if ((count || 0) >= 50) {
-          setShowCelebration(true);
-        }
       }
     } catch (error) {
       console.error('Error fetching today lock count:', error);
+    }
+  }, []);
+
+  const fetchStatsByDate = useCallback(async (date: string) => {
+    try {
+      if (!date) {
+        setStatsLockedSuccessfully(0);
+        setStatsAlreadyLocked(0);
+        setStatsUnableToLock(0);
+        setStatsPending(0);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('monday_com_deals')
+        .select('lock_status, locked_at')
+        .eq('carrier', 'ANAM')
+        .in('policy_status', ['Issued Paid', 'Issued Not Paid', 'Pending', 'Pending Lapse']);
+
+      if (error) throw error;
+
+      const policies = (data || []).filter((p: any) => {
+        if (!p.locked_at) return false;
+        const [datePart] = p.locked_at.split('T');
+        return datePart === date;
+      });
+
+      const lockedCount = policies.filter((p: any) => p.lock_status === 'locked_successfully').length;
+      setStatsLockedSuccessfully(lockedCount);
+      setStatsAlreadyLocked(policies.filter((p: any) => p.lock_status === 'already_locked').length);
+      setStatsUnableToLock(policies.filter((p: any) => p.lock_status === 'unable_to_lock').length);
+      setStatsPending(policies.filter((p: any) => !p.lock_status || p.lock_status === 'pending').length);
+    } catch (error) {
+      console.error('Error fetching stats by date:', error);
     }
   }, []);
 
@@ -359,12 +391,8 @@ const LockPolicies = () => {
   }, [user, navigate]);
 
   useEffect(() => {
-    const detectSize = () => {
-      setWindowDimension({ width: window.innerWidth, height: window.innerHeight });
-    };
-    window.addEventListener('resize', detectSize);
-    return () => window.removeEventListener('resize', detectSize);
-  }, []);
+    fetchStatsByDate(statsDateFilter);
+  }, [statsDateFilter, fetchStatsByDate]);
 
   useEffect(() => {
     localStorage.setItem('lockPolicyIndex', selectedPolicyIndex.toString());
@@ -645,62 +673,54 @@ const LockPolicies = () => {
             <ShieldCheck className="h-4 w-4 text-green-600" />
             <span>Lock Policies Access</span>
           </div>
-          <div className="flex items-center gap-4">
-            <Card className="px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white w-80">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Lock className="h-4 w-4" />
-                    <span className="font-semibold">Today's Progress</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl font-bold">{todayLockCount} / 50</span>
-                    {todayLockCount >= 50 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => { 
-                          const today = new Date().toISOString().split('T')[0];
-                          localStorage.setItem('lockPoliciesResetDate', today);
-                          setTodayLockCount(0); 
-                          setShowCelebration(false); 
-                        }}
-                        className="h-6 w-6 p-0 text-white hover:bg-blue-700"
-                        title="Reset counter"
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                <div className="w-full bg-blue-800 rounded-full h-3">
-                  <div 
-                    className="bg-white h-3 rounded-full transition-all duration-500" 
-                    style={{ width: `${Math.min((todayLockCount / 50) * 100, 100)}%` }}
-                  ></div>
-                </div>
-              </div>
-            </Card>
-            <Button variant="outline" size="sm" onClick={() => { fetchPolicies(); fetchTodayLockCount(); setTimeout(() => fetchLeadInfo(), 100); }}>
-              <Loader2 className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={() => { fetchPolicies(); fetchTodayLockCount(); setTimeout(() => fetchLeadInfo(), 100); }}>
+            <Loader2 className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
 
-        {showCelebration && (
-          <>
-            <ReactConfetti width={windowDimension.width} height={windowDimension.height} recycle={false} numberOfPieces={500} gravity={0.2} />
-            <Card className="mb-6 bg-gradient-to-r from-blue-500 to-blue-700 text-white border-none shadow-lg animate-pulse">
-              <CardContent className="p-6 text-center">
-                <PartyPopper className="h-12 w-12 mx-auto mb-2" />
-                <h2 className="text-2xl font-bold">Congratulations!</h2>
-                <p className="text-lg">You've reached 50 policies locked today!</p>
-                <p className="text-sm mt-2 opacity-90">Great job! Keep up the excellent work!</p>
-              </CardContent>
-            </Card>
-          </>
-        )}
+        <div className="mb-6 p-4 bg-muted/50 rounded-lg">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold">Lock Status Summary</h3>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <Input
+                type="date"
+                value={statsDateFilter}
+                onChange={(e) => setStatsDateFilter(e.target.value)}
+                className="w-[150px] h-8 text-sm"
+              />
+              {statsDateFilter && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setStatsDateFilter('')}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-4">
+            <div className="text-center p-3 bg-green-50 rounded-md">
+              <div className="text-2xl font-bold text-green-700">{statsLockedSuccessfully}</div>
+              <div className="text-xs text-green-600">Locked Successfully</div>
+            </div>
+            <div className="text-center p-3 bg-yellow-50 rounded-md">
+              <div className="text-2xl font-bold text-yellow-700">{statsAlreadyLocked}</div>
+              <div className="text-xs text-yellow-600">Already Locked</div>
+            </div>
+            <div className="text-center p-3 bg-red-50 rounded-md">
+              <div className="text-2xl font-bold text-red-700">{statsUnableToLock}</div>
+              <div className="text-xs text-red-600">Unable to Lock</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 rounded-md">
+              <div className="text-2xl font-bold text-gray-700">{statsPending}</div>
+              <div className="text-xs text-gray-600">Pending</div>
+            </div>
+          </div>
+        </div>
 
         {loading ? (
           <div className="flex justify-center py-12">

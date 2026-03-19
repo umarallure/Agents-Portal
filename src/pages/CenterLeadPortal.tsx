@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Filter, LogOut, Phone, User, DollarSign, Send, Plus, Shield } from 'lucide-react';
+import { Calendar, Filter, LogOut, Phone, User, DollarSign, Send, Plus, Shield, FileText } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCenterUser } from '@/hooks/useCenterUser';
 import { supabase } from '@/integrations/supabase/client';
@@ -323,6 +323,14 @@ const CenterLeadPortal = () => {
                   </Button>
                 </>
               )}
+              {/* FE Quote - available to all vendors */}
+              <Button 
+                onClick={() => navigate('/fe-quote')}
+                variant="outline"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                FE Quote
+              </Button>
             </div>
           </div>
 
