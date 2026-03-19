@@ -64,8 +64,7 @@ const LockPoliciesManager = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [lockFilter, setLockFilter] = useState<string>('all');
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [dateFilter, setDateFilter] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<number>>(new Set());
 
@@ -133,16 +132,12 @@ const LockPoliciesManager = () => {
       (lockFilter === 'pending' && (!policy.lock_status || policy.lock_status === 'pending'));
     
     let matchesDate = true;
-    if (startDate && policy.deal_creation_date) {
-      const policyDate = new Date(policy.deal_creation_date);
-      const start = new Date(startDate);
-      matchesDate = policyDate >= start;
-    }
-    if (matchesDate && endDate && policy.deal_creation_date) {
-      const policyDate = new Date(policy.deal_creation_date);
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      matchesDate = policyDate <= end;
+    if (dateFilter && policy.locked_at) {
+      const policyDateStr = policy.locked_at;
+      const [datePart] = policyDateStr.split('T');
+      matchesDate = datePart === dateFilter;
+    } else if (dateFilter && !policy.locked_at) {
+      matchesDate = false;
     }
     
     return matchesSearch && matchesStatus && matchesLock && matchesDate;
@@ -154,7 +149,7 @@ const LockPoliciesManager = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, lockFilter, startDate, endDate]);
+  }, [searchTerm, statusFilter, lockFilter, dateFilter]);
 
   const getLockStatusBadge = (status: string | null) => {
     if (status === 'locked_successfully') {
@@ -259,28 +254,15 @@ const LockPoliciesManager = () => {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[150px]">
-            <Label htmlFor="startDate">Start Date</Label>
+          <div className="w-[180px]">
+            <Label htmlFor="dateFilter">Locked Date</Label>
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
-                id="startDate"
+                id="dateFilter"
                 type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-          <div className="w-[150px]">
-            <Label htmlFor="endDate">End Date</Label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                id="endDate"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -340,7 +322,7 @@ const LockPoliciesManager = () => {
                     <TableHead>Lock Status</TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead>Password</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>Locked At</TableHead>
                     <TableHead>Agent</TableHead>
                     <TableHead>Locked By</TableHead>
                   </TableRow>
@@ -382,7 +364,7 @@ const LockPoliciesManager = () => {
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell>{formatDateToEST(policy.deal_creation_date)}</TableCell>
+                      <TableCell>{formatDateToEST(policy.locked_at)}</TableCell>
                       <TableCell>{policy.sales_agent || 'N/A'}</TableCell>
                       <TableCell>
                         {policy.locked_by_name ? (

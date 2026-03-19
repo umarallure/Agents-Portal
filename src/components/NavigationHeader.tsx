@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, Search, ArrowLeft, DollarSign, ShieldCheck, Zap, Users, Calendar, Inbox, Shield, Lock as LockIcon } from 'lucide-react';
+import { LogOut, User, Menu, ChevronDown, Grid3X3, Eye, CheckCircle, BarChart3, Search, ArrowLeft, DollarSign, ShieldCheck, Zap, Users, Calendar, Inbox, Shield, Lock as LockIcon, FileText } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLicensedAgent } from '@/hooks/useLicensedAgent';
 import { useCenterUser } from '@/hooks/useCenterUser';
@@ -211,6 +211,11 @@ const checkBufferStatus = async () => {
                         </DropdownMenuItem>
                       </>
                     )}
+                    {/* FE Quote - available to all vendors */}
+                    <DropdownMenuItem onClick={() => navigate('/fe-quote')}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      FE Quote
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate('/agent-licensing')}>
                       <ShieldCheck className="mr-2 h-4 w-4" />
                       Find Eligible Agents
