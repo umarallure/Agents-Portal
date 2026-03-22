@@ -261,17 +261,21 @@ const CallResultUpdateV2 = () => {
     try {
       const { data: session, error } = await supabase
         .from('verification_sessions')
-        .select('id, status')
+        .select('id, status, created_at, updated_at')
         .eq('submission_id', submissionId)
         .in('status', ['pending', 'in_progress', 'ready_for_transfer', 'transferred', 'completed'])
-        .single();
+        .order('created_at', { ascending: false })
+        .order('updated_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (session && !error) {
         setVerificationSessionId(session.id);
         setShowVerificationPanel(true);
       }
     } catch (error) {
-      // No existing session found, which is fine
+      console.error('Error checking existing verification session:', error);
     }
   };
 
