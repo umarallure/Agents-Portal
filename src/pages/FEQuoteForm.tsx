@@ -12,6 +12,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useCenterUser } from '@/hooks/useCenterUser';
 import { format } from 'date-fns';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { TagInput } from '@/components/ui/tag-input';
 
 const US_STATES = [
   'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -136,6 +138,104 @@ const FEQuoteForm = () => {
   const [transferCheckLoading, setTransferCheckLoading] = useState(false);
   const [transferCheckData, setTransferCheckData] = useState<any>(null);
   const [transferCheckError, setTransferCheckError] = useState<string | null>(null);
+  const [isCustomerBlocked, setIsCustomerBlocked] = useState(false);
+  const [blockReason, setBlockReason] = useState('');
+
+  // Underwriting modal states
+  const [showUnderwritingModal, setShowUnderwritingModal] = useState(false);
+  const [underwritingData, setUnderwritingData] = useState({
+    tobaccoLast12Months: '',
+    healthConditions: [] as string[],
+    medications: [] as string[],
+    height: '',
+    weight: '',
+    carrier: '',
+    productLevel: '',
+    coverageAmount: '',
+    monthlyPremium: ''
+  });
+
+  // Underwriting checkbox selections for conditions
+  const [underwritingCheckboxes, setUnderwritingCheckboxes] = useState<Record<string, boolean>>({});
+
+  // Conditions grouped by question
+  const question1Conditions = [
+    "Alzheimer's Dementia", 'Congestive Heart Failure', 'Organ Transplant', 'HIV', 'AIDS', 'ARC', 'Leukemia', 
+    'Tuberculosis', 'Chronic Respiratory Disease', 'Paralyzed', 'Amputation', 'Nursing Home', 'Wheelchair', 'Oxygen'
+  ];
+
+  const question2Conditions = [
+    'Heart Attack', 'Cancer', 'Stroke', 'Kidney Failure', 'Organ Removal', 'Kidney Disorder', 
+    'Lung Disorder', 'Brain Disorder', 'Circulatory System Disorder', 'Liver Disorder', 'Sickle Cell Anemia', 
+    'Aneurysm', 'Diabetic Coma', 'Cirrhosis of the Liver', 'Multiple Sclerosis', 'Chronic Pneumonia', 'Hepatitis',
+    'Stents', 'Pacemaker', 'Defibrillator', 'Valve Replacement', 'TIA'
+  ];
+
+  const question3Conditions = [
+    'Neuropathy', 'Retinopathy', 'Diabetic Amputation', 'COPD', 'Bipolar', 'Schizophrenia'
+  ];
+
+  // Toggle checkbox and add/remove from health conditions field
+  const handleUnderwritingCheckboxChange = (condition: string, checked: boolean) => {
+    setUnderwritingCheckboxes(prev => ({ ...prev, [condition]: checked }));
+    
+    if (checked) {
+      if (!underwritingData.healthConditions.includes(condition)) {
+        setUnderwritingData(prev => ({
+          ...prev,
+          healthConditions: [...prev.healthConditions, condition]
+        }));
+      }
+    } else {
+      setUnderwritingData(prev => ({
+        ...prev,
+        healthConditions: prev.healthConditions.filter(m => m !== condition)
+      }));
+    }
+  };
+
+  // Pre-fill underwriting data when modal opens
+  const handleOpenUnderwritingModal = () => {
+    setUnderwritingData({
+      tobaccoLast12Months: tobaccoUse === 'yes' ? 'yes' : tobaccoUse === 'no' ? 'no' : '',
+      healthConditions: healthConditions ? healthConditions.split(',').map(s => s.trim()) : [],
+      medications: medications ? medications.split(',').map(s => s.trim()) : [],
+      height: height,
+      weight: weight,
+      carrier: carrier,
+      productLevel: '',
+      coverageAmount: coverageAmount,
+      monthlyPremium: monthlyPremium
+    });
+
+    // Pre-fill checkboxes based on existing health conditions
+    const allConditions = [...question1Conditions, ...question2Conditions, ...question3Conditions];
+    const checkboxes: Record<string, boolean> = {};
+    const existingConditions = healthConditions ? healthConditions.split(',').map(s => s.trim()) : [];
+    allConditions.forEach(condition => {
+      checkboxes[condition] = existingConditions.some(m => m.toLowerCase().includes(condition.toLowerCase()));
+    });
+    setUnderwritingCheckboxes(checkboxes);
+    setShowUnderwritingModal(true);
+  };
+
+  // Save underwriting data back to form
+  const handleSaveUnderwriting = () => {
+    setTobaccoUse(underwritingData.tobaccoLast12Months);
+    setHealthConditions(underwritingData.healthConditions.join(', '));
+    setMedications(underwritingData.medications.join(', '));
+    setHeight(underwritingData.height);
+    setWeight(underwritingData.weight);
+    setCarrier(underwritingData.carrier);
+    setCoverageAmount(underwritingData.coverageAmount);
+    setMonthlyPremium(underwritingData.monthlyPremium);
+    
+    toast({
+      title: "Underwriting Complete",
+      description: "All fields have been saved."
+    });
+    setShowUnderwritingModal(false);
+  };
 
   // Calculate age from date of birth
   const calculateAge = (dob: string) => {
@@ -174,7 +274,7 @@ const FEQuoteForm = () => {
 
     try {
       const cleanPhone = phoneNumber.replace(/\D/g, '');
-      const response = await fetch('http://localhost:3000/api/transfer-check', {
+      const response = await fetch('https://livetransferchecker.vercel.app/api/transfer-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: cleanPhone }),
@@ -182,9 +282,41 @@ const FEQuoteForm = () => {
 
       const data = await response.json();
       
+      // Reset blocking state
+      setIsCustomerBlocked(false);
+      setBlockReason('');
+      
       if (response.ok) {
         setTransferCheckData(data);
-        if (data.warnings?.policy) {
+        
+        // Check for blocking conditions
+        const policyStatus = data.data?.['Policy Status'] || '';
+        const dncMessage = data.dnc?.message || '';
+        
+        const isDQ = policyStatus.toLowerCase().includes('dq') || 
+                     policyStatus.toLowerCase().includes('disqualified') ||
+                     policyStatus.toLowerCase().includes('already been dq');
+        
+        const isTCPA = dncMessage.toLowerCase().includes('tcpa litigator') ||
+                       dncMessage.toLowerCase().includes('no contact permitted');
+        
+        if (isDQ) {
+          setIsCustomerBlocked(true);
+          setBlockReason('Customer has already been DQ from our agency');
+          toast({
+            title: 'Customer Blocked',
+            description: 'We cannot accept this customer as they have been DQ from our agency',
+            variant: 'destructive',
+          });
+        } else if (isTCPA) {
+          setIsCustomerBlocked(true);
+          setBlockReason('TCPA Litigator Detected - No Contact Permitted');
+          toast({
+            title: 'Customer Blocked',
+            description: 'This number is flagged as a TCPA litigator. All transfers and contact attempts are strictly prohibited.',
+            variant: 'destructive',
+          });
+        } else if (data.warnings?.policy) {
           toast({
             title: 'Policy Warning',
             description: data.warningMessage || 'Customer has existing policies',
@@ -196,7 +328,7 @@ const FEQuoteForm = () => {
     } catch (error) {
       console.error('Transfer check error:', error);
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        setTransferCheckError('Cannot connect to transfer check service. Please ensure the backend server is running on localhost:3000 and has CORS configured.');
+        setTransferCheckError('Cannot connect to transfer check service. Please try again later.');
       } else {
         setTransferCheckError('Failed to connect to transfer check service');
       }
@@ -208,6 +340,9 @@ const FEQuoteForm = () => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
+    if (isCustomerBlocked) {
+      newErrors.blocked = blockReason;
+    }
     if (!firstName) newErrors.firstName = 'First name is required';
     if (!lastName) newErrors.lastName = 'Last name is required';
     if (!phoneNumber) newErrors.phoneNumber = 'Phone number is required';
@@ -542,7 +677,11 @@ const FEQuoteForm = () => {
                       type="tel"
                       placeholder="(000) 000-0000"
                       value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      onChange={(e) => {
+                        setPhoneNumber(e.target.value);
+                        setIsCustomerBlocked(false);
+                        setBlockReason('');
+                      }}
                       className={errors.phoneNumber ? 'border-red-500' : ''}
                     />
                     <Button
@@ -591,6 +730,18 @@ const FEQuoteForm = () => {
                   </div>
                 ) : transferCheckData ? (
                   <div className="space-y-4">
+                    {/* Blocked Message */}
+                    {isCustomerBlocked && (
+                      <div className="bg-red-600 border border-red-700 rounded-md p-4">
+                        <div className="flex items-center justify-center">
+                          <span className="text-white font-bold text-lg text-center">
+                            ⚠️ WE CANNOT ACCEPT THIS CUSTOMER
+                          </span>
+                        </div>
+                        <p className="text-white text-center mt-2 font-medium">{blockReason}</p>
+                      </div>
+                    )}
+
                     {/* DNC Status */}
                     <div className={`p-3 rounded-md border ${
                       transferCheckData.dnc?.allowed === false 
@@ -921,6 +1072,15 @@ const FEQuoteForm = () => {
                   rows={3}
                 />
               </div>
+
+              <Button
+                type="button"
+                onClick={handleOpenUnderwritingModal}
+                className="w-full bg-purple-600 hover:bg-purple-700"
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Underwrite
+              </Button>
             </CardContent>
           </Card>
 
@@ -998,59 +1158,6 @@ const FEQuoteForm = () => {
                   value={draftDate}
                   onChange={(e) => setDraftDate(e.target.value)}
                 />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Health Kit - Rate Quote Tool */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl">Health Kit - Rate Quote Tool</CardTitle>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open('https://insurancetoolkits.com/login', '_blank')}
-                >
-                  Open in New Tab ↗
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground">Log in below to access the rate quote tool. Your session will stay active in this panel.</p>
-            </CardHeader>
-            <CardContent>
-              <div className="border-2 border-blue-300 rounded-lg overflow-hidden bg-white" style={{ height: 'calc(100vh - 400px)', minHeight: '500px' }}>
-                <iframe
-                  style={{ border: 'none', height: '100%', width: '100%' }}
-                  src="https://insurancetoolkits.com/login"
-                  title="Health Kit Login"
-                  className="health-kit-frame"
-                  id="healthKitIframePage"
-                />
-              </div>
-              <div className="flex gap-2 mt-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    const iframe = document.getElementById('healthKitIframePage') as HTMLIFrameElement;
-                    if (iframe) iframe.src = 'https://insurancetoolkits.com/fex/quoter';
-                  }}
-                >
-                  Go to Quote Tool
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const iframe = document.getElementById('healthKitIframePage') as HTMLIFrameElement;
-                    if (iframe) iframe.src = 'https://insurancetoolkits.com/login';
-                  }}
-                >
-                  Back to Login
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -1240,7 +1347,7 @@ const FEQuoteForm = () => {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || isCustomerBlocked}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1252,6 +1359,235 @@ const FEQuoteForm = () => {
             </Button>
           </div>
         </form>
+
+        {/* Underwriting Modal */}
+        <Dialog open={showUnderwritingModal} onOpenChange={() => setShowUnderwritingModal(false)}>
+          <DialogContent 
+            className="max-w-[95vw] max-h-[95vh] overflow-y-auto w-full"
+            onInteractOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => e.preventDefault()}
+            hideCloseButton
+          >
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-purple-700">Underwriting</DialogTitle>
+              <DialogDescription className="text-base">
+                Please read the following script to the customer and verify all information.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6 py-4 text-xl">
+              {/* Two Column Layout: Questions (Left) and Toolkit (Right) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                {/* Left Column: Underwriting Script */}
+                <div className="bg-gray-50 p-4 rounded-lg border h-full overflow-y-auto">
+                  <h4 className="font-bold text-2xl mb-3">Underwriting Questions</h4>
+                  
+                  <div className="space-y-4 text-xl">
+                    <p className="font-medium">
+                      "I am going to ask you some medical questions and we expect your honesty that is going to save us a lot of time. And, this will help us evaluate which insurance carrier comes back with the maximum benefit at the lowest rates for you."
+                    </p>
+                    
+                    {/* Question 1 */}
+                    <div className="space-y-3 p-4 bg-white rounded-lg border">
+                      <p className="font-bold text-xl">Question 1:</p>
+                      <p className="text-lg">Have you ever been diagnosed or treated for Alzheimer's Dementia, Congestive heart failure, organ transplant, HIV, AIDS, ARC, Leukemia, Tuberculosis, chronic Respiratory disease, currently paralyzed, amputation due to a disease? Are you currently hospitalized in a nursing facility? Due to a disease are you currently confined to a wheelchair? Are you currently on oxygen?</p>
+                    </div>
+                    
+                    {/* Question 2 */}
+                    <div className="space-y-3 p-4 bg-white rounded-lg border">
+                      <p className="font-bold text-xl">Question 2:</p>
+                      <p className="text-lg">In the last 5 years, have you had any heart attacks, cancers, Alzheimer's, dementia, congestive heart failure, kidney failure or an organ removal? Have you ever had any disorders of the kidney, lung, brain, heart, circulatory system or liver? Or In the last 3 years have you been diagnosed and treated for leukemia, sickle cell anemia, brain disorder, Alzheimer's or dementia, aneurysm, diabetic coma, amputation due to any disease, cirrhosis of the liver, Multiple Sclerosis, chronic respiratory disease, tuberculosis, chronic pneumonia, hepatitis? Or In the last 2 years if you had any stents, pacemaker, defibrillator, valve replacement, stroke, TIA or paralysis?</p>
+                    </div>
+                    
+                    {/* Question 3 */}
+                    <div className="space-y-3 p-4 bg-white rounded-lg border">
+                      <p className="font-bold text-xl">Question 3:</p>
+                      <p className="text-lg">Or if you have any complications from diabetes? Like (Neuropathy, amputation due to diabetes, retinopathy, diabetic coma, etc) Have you been treated or diagnosed with COPD, Bipolar, or schizophrenia?</p>
+                    </div>
+
+                    {/* Tobacco Question */}
+                    <div className="mt-4 p-3 bg-yellow-50 rounded border border-yellow-200">
+                      <p className="font-bold mb-2 text-xl">Tobacco Usage:</p>
+                      <p className="text-lg">Have you consumed any tobacco or nicotine products in the last 12 months?</p>
+                      <div className="flex gap-4 mt-2">
+                        <label className="flex items-center gap-2 text-xl">
+                          <input 
+                            type="radio" 
+                            name="tobacco" 
+                            checked={underwritingData.tobaccoLast12Months === 'yes'}
+                            onChange={() => setUnderwritingData({...underwritingData, tobaccoLast12Months: 'yes'})}
+                          />
+                          Yes
+                        </label>
+                        <label className="flex items-center gap-2 text-xl">
+                          <input 
+                            type="radio" 
+                            name="tobacco" 
+                            checked={underwritingData.tobaccoLast12Months === 'no'}
+                            onChange={() => setUnderwritingData({...underwritingData, tobaccoLast12Months: 'no'})}
+                          />
+                          No
+                        </label>
+                      </div>
+                    </div>
+
+                    <p className="font-medium text-xl mt-4">Lastly, do you have any health conditions or take any prescribed medication on a regular basis?</p>
+                    
+                    {/* Follow Up Questions */}
+                    <div className="p-4 bg-white rounded-lg border">
+                      <p className="font-bold text-xl">Follow Up:</p>
+                      <ul className="list-disc ml-6 text-lg mt-2">
+                        <li>How many medications are you taking on a daily basis?</li>
+                        <li>Do you know what those medications are for?</li>
+                        <li>Do you have your medications, or a list of your medications nearby?</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Insurance Toolkit iframe */}
+                <div className="bg-white border-2 border-purple-200 rounded-lg overflow-hidden flex flex-col">
+                  <div className="bg-purple-600 text-white px-4 py-2 font-bold text-lg flex justify-between items-center flex-shrink-0">
+                    <span>Insurance Toolkit</span>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          const iframe = document.getElementById('healthKitIframeFE') as HTMLIFrameElement;
+                          if (iframe) iframe.src = 'https://insurancetoolkits.com/fex/quoter';
+                        }}
+                      >
+                        Quote Tool
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs text-white border-white hover:bg-purple-700"
+                        onClick={() => {
+                          const iframe = document.getElementById('healthKitIframeFE') as HTMLIFrameElement;
+                          if (iframe) iframe.src = 'https://insurancetoolkits.com/login';
+                        }}
+                      >
+                        Login
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="border-2 border-purple-300 rounded-lg overflow-hidden bg-white flex-1" style={{ minHeight: '600px' }}>
+                    <iframe
+                      style={{ border: 'none', height: '100%', width: '100%' }}
+                      src="https://insurancetoolkits.com/login"
+                      title="Insurance Toolkit"
+                      id="healthKitIframeFE"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Health Conditions */}
+              <div className="space-y-2">
+                <Label className="text-xl font-bold">Health Conditions:</Label>
+                <TagInput
+                  tags={underwritingData.healthConditions}
+                  onChange={(tags) => setUnderwritingData({...underwritingData, healthConditions: tags})}
+                  placeholder="Type and press Enter to add conditions..."
+                  className="text-xl"
+                />
+                <p className="text-sm text-gray-500">Click on conditions above to add them, or type custom conditions.</p>
+              </div>
+
+              {/* Medications */}
+              <div className="space-y-2">
+                <Label className="text-xl font-bold">Medications:</Label>
+                <TagInput
+                  tags={underwritingData.medications}
+                  onChange={(tags) => setUnderwritingData({...underwritingData, medications: tags})}
+                  placeholder="Type and press Enter to add medications..."
+                  className="text-xl"
+                />
+              </div>
+
+              {/* Application Details */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xl font-bold">Height:</Label>
+                  <Input
+                    value={underwritingData.height}
+                    onChange={(e) => setUnderwritingData({...underwritingData, height: e.target.value})}
+                    placeholder="e.g., 5'10&quot;"
+                    className="text-xl h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xl font-bold">Weight:</Label>
+                  <Input
+                    value={underwritingData.weight}
+                    onChange={(e) => setUnderwritingData({...underwritingData, weight: e.target.value})}
+                    placeholder="e.g., 180 lbs"
+                    className="text-xl h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xl font-bold">Carrier:</Label>
+                  <Input
+                    value={underwritingData.carrier}
+                    onChange={(e) => setUnderwritingData({...underwritingData, carrier: e.target.value})}
+                    placeholder="e.g., AMAM"
+                    className="text-xl h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xl font-bold">Product Level:</Label>
+                  <Input
+                    value={underwritingData.productLevel}
+                    onChange={(e) => setUnderwritingData({...underwritingData, productLevel: e.target.value})}
+                    placeholder="e.g., Preferred"
+                    className="text-xl h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xl font-bold">Coverage Amount:</Label>
+                  <Input
+                    value={underwritingData.coverageAmount}
+                    onChange={(e) => setUnderwritingData({...underwritingData, coverageAmount: e.target.value})}
+                    placeholder="e.g., $10,000"
+                    className="text-xl h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xl font-bold">Monthly Premium:</Label>
+                  <Input
+                    value={underwritingData.monthlyPremium}
+                    onChange={(e) => setUnderwritingData({...underwritingData, monthlyPremium: e.target.value})}
+                    placeholder="e.g., $50.00"
+                    className="text-xl h-12"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="mt-4 flex-col gap-2">
+              <div className="flex gap-2 w-full">
+                <Button 
+                  onClick={handleSaveUnderwriting} 
+                  className="text-lg px-6 bg-green-600 hover:bg-green-700 flex-1"
+                >
+                  Save & Close
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowUnderwritingModal(false)} 
+                  className="text-lg px-6"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
