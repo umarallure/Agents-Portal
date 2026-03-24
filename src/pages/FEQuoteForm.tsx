@@ -138,6 +138,8 @@ const FEQuoteForm = () => {
   const [transferCheckLoading, setTransferCheckLoading] = useState(false);
   const [transferCheckData, setTransferCheckData] = useState<any>(null);
   const [transferCheckError, setTransferCheckError] = useState<string | null>(null);
+  const [isCustomerBlocked, setIsCustomerBlocked] = useState(false);
+  const [blockReason, setBlockReason] = useState('');
 
   // Underwriting modal states
   const [showUnderwritingModal, setShowUnderwritingModal] = useState(false);
@@ -280,9 +282,41 @@ const FEQuoteForm = () => {
 
       const data = await response.json();
       
+      // Reset blocking state
+      setIsCustomerBlocked(false);
+      setBlockReason('');
+      
       if (response.ok) {
         setTransferCheckData(data);
-        if (data.warnings?.policy) {
+        
+        // Check for blocking conditions
+        const policyStatus = data.data?.['Policy Status'] || '';
+        const dncMessage = data.dnc?.message || '';
+        
+        const isDQ = policyStatus.toLowerCase().includes('dq') || 
+                     policyStatus.toLowerCase().includes('disqualified') ||
+                     policyStatus.toLowerCase().includes('already been dq');
+        
+        const isTCPA = dncMessage.toLowerCase().includes('tcpa litigator') ||
+                       dncMessage.toLowerCase().includes('no contact permitted');
+        
+        if (isDQ) {
+          setIsCustomerBlocked(true);
+          setBlockReason('Customer has already been DQ from our agency');
+          toast({
+            title: 'Customer Blocked',
+            description: 'We cannot accept this customer as they have been DQ from our agency',
+            variant: 'destructive',
+          });
+        } else if (isTCPA) {
+          setIsCustomerBlocked(true);
+          setBlockReason('TCPA Litigator Detected - No Contact Permitted');
+          toast({
+            title: 'Customer Blocked',
+            description: 'This number is flagged as a TCPA litigator. All transfers and contact attempts are strictly prohibited.',
+            variant: 'destructive',
+          });
+        } else if (data.warnings?.policy) {
           toast({
             title: 'Policy Warning',
             description: data.warningMessage || 'Customer has existing policies',
@@ -306,6 +340,9 @@ const FEQuoteForm = () => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
+    if (isCustomerBlocked) {
+      newErrors.blocked = blockReason;
+    }
     if (!firstName) newErrors.firstName = 'First name is required';
     if (!lastName) newErrors.lastName = 'Last name is required';
     if (!phoneNumber) newErrors.phoneNumber = 'Phone number is required';
@@ -640,7 +677,11 @@ const FEQuoteForm = () => {
                       type="tel"
                       placeholder="(000) 000-0000"
                       value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      onChange={(e) => {
+                        setPhoneNumber(e.target.value);
+                        setIsCustomerBlocked(false);
+                        setBlockReason('');
+                      }}
                       className={errors.phoneNumber ? 'border-red-500' : ''}
                     />
                     <Button
@@ -689,6 +730,18 @@ const FEQuoteForm = () => {
                   </div>
                 ) : transferCheckData ? (
                   <div className="space-y-4">
+                    {/* Blocked Message */}
+                    {isCustomerBlocked && (
+                      <div className="bg-red-600 border border-red-700 rounded-md p-4">
+                        <div className="flex items-center justify-center">
+                          <span className="text-white font-bold text-lg text-center">
+                            ⚠️ WE CANNOT ACCEPT THIS CUSTOMER
+                          </span>
+                        </div>
+                        <p className="text-white text-center mt-2 font-medium">{blockReason}</p>
+                      </div>
+                    )}
+
                     {/* DNC Status */}
                     <div className={`p-3 rounded-md border ${
                       transferCheckData.dnc?.allowed === false 
@@ -1294,7 +1347,7 @@ const FEQuoteForm = () => {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || isCustomerBlocked}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
