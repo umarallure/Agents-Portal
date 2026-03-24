@@ -274,7 +274,7 @@ const FEQuoteForm = () => {
 
     try {
       const cleanPhone = phoneNumber.replace(/\D/g, '');
-      const response = await fetch('http://localhost:3000/api/transfer-check', {
+      const response = await fetch('https://livetransferchecker.vercel.app/api/transfer-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: cleanPhone }),
@@ -328,7 +328,7 @@ const FEQuoteForm = () => {
     } catch (error) {
       console.error('Transfer check error:', error);
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        setTransferCheckError('Cannot connect to transfer check service. Please ensure the backend server is running on localhost:3000 and has CORS configured.');
+        setTransferCheckError('Cannot connect to transfer check service. Please try again later.');
       } else {
         setTransferCheckError('Failed to connect to transfer check service');
       }
