@@ -114,12 +114,11 @@ export const GridToolbar = ({
   ];
 
   const retentionAgentOptions = [
-    "Qasim Raja",
-    "Hussain Khan",
-    "Raja Arbaz Nawaz",
-    "Muhammad Ahmed",
-    "Justin",
-    "LA Callback"
+    "Vele Smilevski",
+    "Rinor Mehmeti",
+    "Suela Gashi",
+    "Vesa Ramadani",
+    "Justine",
   ];
 
   // Use dynamic lead vendors from database

@@ -9,7 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "import-csv": "tsx scripts/import-csv-to-daily-deal-flow.ts"
+    "import-csv": "tsx scripts/import-csv-to-daily-deal-flow.ts",
+    "import-scrub": "tsx scripts/import-scrubbed-csv.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

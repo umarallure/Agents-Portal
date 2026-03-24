@@ -77,14 +77,13 @@ const licensedAccountOptions = [
 // Retention agent options (explicit list so the Retention Agent dropdown can contain buffer/retention names)
 const retentionAgentOptions = [
   "All Retention Agents",
-  "Qasim Raja",
-  "Hussain Khan",
-  "Raja Arbaz Nawaz",
-  "Muhammad Ahmed",
-  "Hammad Rafique",
-  "Justin",
+  "Vele Smilevski",
+  "Rinor Mehmeti",
+  "Suela Gashi",
+  "Vesa Ramadani",
+  "Justine",
   "N/A",
-  "LA Callback"
+  "LA Callback",
 ];
 
 const carrierOptions = [
