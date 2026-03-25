@@ -42,7 +42,7 @@ interface EditableRowProps {
   onUpdate: () => void;
   hasWritePermissions?: boolean;
   isDuplicate?: boolean;
-  onDetailsClick?: (phoneNumber: string | null, notes: string | null) => void;
+  onDetailsClick?: (phoneNumber: string | null, notes: string | null, date: string | null) => void;
 }
 
 // Dropdown options (same as CallResultForm)
@@ -549,7 +549,7 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onDetailsClick(row.client_phone_number, row.notes)}
+                  onClick={() => onDetailsClick(row.client_phone_number, row.notes, row.date || null)}
                   className="ml-4"
                 >
                   <Phone className="h-4 w-4 mr-2" />
@@ -1396,6 +1396,16 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
                 >
                   <Eye className="h-3 w-3" />
                 </Button>
+                {onDetailsClick && row.client_phone_number && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onDetailsClick(row.client_phone_number, row.notes, row.date || null)}
+                    className="h-7 w-7 p-0 text-green-600"
+                  >
+                    <Phone className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
             </td>
           )}
@@ -1573,6 +1583,18 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
               >
                 <Eye className="h-3 w-3" />
               </Button>
+              
+              {onDetailsClick && row.client_phone_number && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onDetailsClick(row.client_phone_number, row.notes, row.date || null)}
+                  className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  title="View call recordings"
+                >
+                  <Phone className="h-3 w-3" />
+                </Button>
+              )}
               
               <AlertDialog>
                 <AlertDialogTrigger asChild>

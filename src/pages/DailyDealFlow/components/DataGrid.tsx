@@ -16,7 +16,7 @@ interface DataGridProps {
   totalRecords?: number;
   recordsPerPage?: number;
   onPageChange?: (page: number) => void;
-  onDetailsClick?: (phoneNumber: string | null, notes: string | null) => void;
+  onDetailsClick?: (phoneNumber: string | null, notes: string | null, date: string | null) => void;
 }
 
 export const DataGrid = ({ 

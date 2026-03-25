@@ -16,7 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { canPerformWriteOperations } from "@/lib/userPermissions";
 import { dateObjectToESTString } from "@/lib/dateUtils";
 import { useNavigate } from "react-router-dom";
-import { searchAircallCalls, formatDuration, formatTimestamp } from "@/lib/aircall";
+import { searchAircallCalls, formatDuration, formatTimestamp, fetchCallRecording } from "@/lib/aircall";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -93,6 +93,7 @@ const DailyDealFlowPage = () => {
   }>>([]);
   const [callsLoading, setCallsLoading] = useState(false);
   const [playingRecording, setPlayingRecording] = useState<number | null>(null);
+  const [loadingRecordingId, setLoadingRecordingId] = useState<number | null>(null);
   
   const recordsPerPage = 100;
   
@@ -298,7 +299,7 @@ const DailyDealFlowPage = () => {
   };
 
   // Handle Details click - fetch call recordings
-  const handleDetailsClick = async (phoneNumber: string | null, notes: string | null = null) => {
+  const handleDetailsClick = async (phoneNumber: string | null, notes: string | null = null, date: string | null = null) => {
     if (!phoneNumber) return;
     
     setSelectedNotes(notes);
@@ -307,11 +308,9 @@ const DailyDealFlowPage = () => {
     setCallRecordings([]);
 
     try {
-      // Get date range - last 180 days (6 months)
-      const toTimestamp = Math.floor(Date.now() / 1000);
-      const fromTimestamp = toTimestamp - (180 * 24 * 60 * 60);
+      console.log('[DailyDealFlow] Searching for phone:', phoneNumber);
 
-      const calls = await searchAircallCalls(phoneNumber, fromTimestamp, toTimestamp);
+      const calls = await searchAircallCalls(phoneNumber);
       setCallRecordings(calls.map(call => ({
         id: call.id,
         direction: call.direction,
@@ -801,28 +800,54 @@ const DailyDealFlowPage = () => {
                             {formatTimestamp(call.started_at)} • {call.user?.name || 'Unknown Agent'}
                           </div>
                         </div>
-                        {call.recording && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              if (playingRecording === call.id) {
-                                setPlayingRecording(null);
-                              } else {
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={loadingRecordingId === call.id}
+                          onClick={async () => {
+                            if (playingRecording === call.id) {
+                              setPlayingRecording(null);
+                            } else {
+                              let recordingUrl = call.recording;
+                              
+                              // Fetch recording if not present
+                              if (!recordingUrl) {
+                                setLoadingRecordingId(call.id);
+                                recordingUrl = await fetchCallRecording(call.id);
+                                setLoadingRecordingId(null);
+                                
+                                // Update the call recording in state
+                                if (recordingUrl) {
+                                  setCallRecordings(prev => 
+                                    prev.map(c => 
+                                      c.id === call.id ? { ...c, recording: recordingUrl } : c
+                                    )
+                                  );
+                                }
+                              }
+                              
+                              if (recordingUrl) {
                                 setPlayingRecording(call.id);
-                                const audio = new Audio(call.recording!);
+                                const audio = new Audio(recordingUrl);
                                 audio.play();
                                 audio.onended = () => setPlayingRecording(null);
+                              } else {
+                                toast({
+                                  title: "No Recording",
+                                  description: "This call does not have a recording available.",
+                                });
                               }
-                            }}
-                          >
-                            {playingRecording === call.id ? (
-                              <Pause className="h-4 w-4" />
-                            ) : (
-                              <Play className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
+                            }
+                          }}
+                        >
+                          {loadingRecordingId === call.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : playingRecording === call.id ? (
+                            <Pause className="h-4 w-4" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
+                        </Button>
                       </div>
                     ))}
                   </div>
