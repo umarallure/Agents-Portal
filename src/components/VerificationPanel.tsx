@@ -207,7 +207,9 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
     carrier: '',
     productLevel: '',
     coverageAmount: '',
-    monthlyPremium: ''
+    monthlyPremium: '',
+    state: '',
+    dateOfBirth: ''
   });
   
   // Underwriting checkbox selections for conditions from questions
@@ -555,6 +557,8 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
       const carrierItem = verificationItems.find(i => i.field_name === 'carrier');
       const coverageItem = verificationItems.find(i => i.field_name === 'coverage_amount');
       const premiumItem = verificationItems.find(i => i.field_name === 'monthly_premium');
+      const stateItem = verificationItems.find(i => i.field_name === 'state');
+      const dobItem = verificationItems.find(i => i.field_name === 'date_of_birth');
       
       const getValue = (item: any) => item ? (inputValues[item.id] || item.verified_value || item.original_value || '') : '';
       
@@ -570,7 +574,9 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
         carrier: getValue(carrierItem),
         productLevel: '',
         coverageAmount: getValue(coverageItem),
-        monthlyPremium: getValue(premiumItem)
+        monthlyPremium: getValue(premiumItem),
+        state: getValue(stateItem),
+        dateOfBirth: getValue(dobItem)
       });
       
       // Pre-fill checkboxes based on existing health conditions
@@ -1299,6 +1305,20 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
                 Please read the following script to the customer and verify all information.
               </DialogDescription>
             </DialogHeader>
+            
+            {/* Client Info */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex gap-8 text-lg">
+                <div>
+                  <span className="font-semibold">State:</span>
+                  <span className="ml-2">{underwritingData.state || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="font-semibold">Date of Birth:</span>
+                  <span className="ml-2">{underwritingData.dateOfBirth || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
             
             <div className="space-y-6 py-4 text-xl">
               {/* Two Column Layout: Questions (Left) and Toolkit (Right) */}
