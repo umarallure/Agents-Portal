@@ -384,9 +384,14 @@ const FEQuoteForm = () => {
     if (!state) newErrors.state = 'State is required';
     if (!zipCode) newErrors.zipCode = 'ZIP code is required';
     if (!dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
+    if (!birthState) newErrors.birthState = 'Birth state is required';
+    if (!age) newErrors.age = 'Age is required';
+    if (!socialSecurity) newErrors.socialSecurity = 'Social Security is required';
     if (!height) newErrors.height = 'Height is required';
     if (!weight) newErrors.weight = 'Weight is required';
     if (!tobaccoUse) newErrors.tobaccoUse = 'Tobacco use is required';
+    if (!healthConditions) newErrors.healthConditions = 'Health conditions is required';
+    if (!medications) newErrors.medications = 'Medications is required';
     if (!monthlyPremium) newErrors.monthlyPremium = 'Monthly premium is required';
     if (!coverageAmount) newErrors.coverageAmount = 'Coverage amount is required';
     if (!carrier) newErrors.carrier = 'Carrier is required';
@@ -954,9 +959,11 @@ const FEQuoteForm = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="birthState">Birth State</Label>
+                  <Label htmlFor="birthState">
+                    Birth State <span className="text-red-500">*</span>
+                  </Label>
                   <Select value={birthState} onValueChange={setBirthState}>
-                    <SelectTrigger>
+                    <SelectTrigger className={errors.birthState ? 'border-red-500' : ''}>
                       <SelectValue placeholder="Please Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -967,6 +974,7 @@ const FEQuoteForm = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  {errors.birthState && <p className="text-sm text-red-500">{errors.birthState}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="dateOfBirth">
@@ -985,23 +993,31 @@ const FEQuoteForm = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="age">Age</Label>
+                  <Label htmlFor="age">
+                    Age <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="age"
                     type="number"
                     placeholder="e.g., 23"
                     value={age}
                     onChange={(e) => setAge(e.target.value)}
+                    className={errors.age ? 'border-red-500' : ''}
                   />
+                  {errors.age && <p className="text-sm text-red-500">{errors.age}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="socialSecurity">Social</Label>
+                  <Label htmlFor="socialSecurity">
+                    Social <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="socialSecurity"
                     placeholder="XXX-XX-XXXX"
                     value={socialSecurity}
                     onChange={(e) => setSocialSecurity(e.target.value)}
+                    className={errors.socialSecurity ? 'border-red-500' : ''}
                   />
+                  {errors.socialSecurity && <p className="text-sm text-red-500">{errors.socialSecurity}</p>}
                 </div>
               </div>
 
@@ -1120,25 +1136,33 @@ const FEQuoteForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="healthConditions">Health Conditions</Label>
+                <Label htmlFor="healthConditions">
+                  Health Conditions <span className="text-red-500">*</span>
+                </Label>
                 <Textarea
                   id="healthConditions"
                   placeholder="Health Conditions"
                   value={healthConditions}
                   onChange={(e) => setHealthConditions(e.target.value)}
                   rows={3}
+                  className={errors.healthConditions ? 'border-red-500' : ''}
                 />
+                {errors.healthConditions && <p className="text-sm text-red-500">{errors.healthConditions}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="medications">Medications</Label>
+                <Label htmlFor="medications">
+                  Medications <span className="text-red-500">*</span>
+                </Label>
                 <Textarea
                   id="medications"
                   placeholder="Medications"
                   value={medications}
                   onChange={(e) => setMedications(e.target.value)}
                   rows={3}
+                  className={errors.medications ? 'border-red-500' : ''}
                 />
+                {errors.medications && <p className="text-sm text-red-500">{errors.medications}</p>}
               </div>
 
               <Button
