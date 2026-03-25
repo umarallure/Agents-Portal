@@ -44,29 +44,30 @@ const TOBACCO_OPTIONS = [
 ];
 
 const CARRIER_OPTIONS = [
-  'Liberty',
-  'SBLI',
-  'Corebridge',
-  'MOH',
-  'Transamerica',
-  'RNA',
   'AMAM',
-  'GTL',
   'Aetna',
-  'Americo',
-  'CICA',
+  'Pioneer',
   'American Home Life',
-  'Other'
+  'Occidental',
+  'MOA',
+  'Americo',
+  'TransAmerica',
+  'Aflac',
+  'SSL'
 ];
 
-const PRODUCT_TYPE_OPTIONS = [
-  'Final Expense',
-  'Term Life',
-  'Whole Life',
-  'Universal Life',
-  'Accidental Death',
-  'Other'
-];
+const CARRIER_PRODUCT_TYPES: Record<string, string[]> = {
+  'Aetna': ['Preferred', 'Standard', 'Modified'],
+  'MOA': ['Level', 'Graded'],
+  'AMAM': ['Immediate', 'Graded', 'ROP'],
+  'Pioneer': ['Immediate', 'Graded', 'ROP'],
+  'Occidental': ['Immediate', 'Graded', 'ROP'],
+  'Aflac': ['Preferred', 'Standard', 'Modified'],
+  'American Home Life': ['Preferred', 'Standard', 'Modified'],
+  'TransAmerica': ['Preferred', 'Standard', 'Graded'],
+  'SSL': ['New Vantage I', 'New Vantage II', 'New Vantage III'],
+  'Americo': ['Immediate', 'Graded', 'ROP']
+};
 
 const FEQuoteForm = () => {
   const navigate = useNavigate();
@@ -140,6 +141,10 @@ const FEQuoteForm = () => {
   const [transferCheckError, setTransferCheckError] = useState<string | null>(null);
   const [isCustomerBlocked, setIsCustomerBlocked] = useState(false);
   const [blockReason, setBlockReason] = useState('');
+
+  // SSL Confirmation
+  const [showSSLConfirmation, setShowSSLConfirmation] = useState(false);
+  const [sslConfirmed, setSslConfirmed] = useState(false);
 
   // Underwriting modal states
   const [showUnderwritingModal, setShowUnderwritingModal] = useState(false);
@@ -258,6 +263,28 @@ const FEQuoteForm = () => {
     }
   };
 
+  const handleCarrierChange = (value: string) => {
+    setCarrier(value);
+    setProductType('');
+    setSslConfirmed(false);
+    
+    if (value === 'SSL') {
+      setShowSSLConfirmation(true);
+    }
+  };
+
+  const handleSSLConfirm = () => {
+    setSslConfirmed(true);
+    setShowSSLConfirmation(false);
+  };
+
+  const handleSSLCancel = () => {
+    setCarrier('');
+    setProductType('');
+    setSslConfirmed(false);
+    setShowSSLConfirmation(false);
+  };
+
   const handleCheckPhoneNumber = async () => {
     if (!phoneNumber) {
       toast({
@@ -351,6 +378,9 @@ const FEQuoteForm = () => {
     if (!state) newErrors.state = 'State is required';
     if (!zipCode) newErrors.zipCode = 'ZIP code is required';
     if (!dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
+    if (carrier === 'SSL' && !sslConfirmed) {
+      newErrors.ssl = 'Please confirm SSL is for CHF customer';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -1120,7 +1150,7 @@ const FEQuoteForm = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="carrier">Carrier</Label>
-                  <Select value={carrier} onValueChange={setCarrier}>
+                  <Select value={carrier} onValueChange={handleCarrierChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="Please Select" />
                     </SelectTrigger>
@@ -1135,12 +1165,16 @@ const FEQuoteForm = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="productType">Product Type</Label>
-                  <Select value={productType} onValueChange={setProductType}>
+                  <Select 
+                    value={productType} 
+                    onValueChange={setProductType}
+                    disabled={!carrier || (carrier === 'SSL' && !sslConfirmed)}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Please Select" />
+                      <SelectValue placeholder={!carrier ? "Select carrier first" : "Please Select"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {PRODUCT_TYPE_OPTIONS.map((option) => (
+                      {(carrier && CARRIER_PRODUCT_TYPES[carrier] || []).map((option) => (
                         <SelectItem key={option} value={option}>
                           {option}
                         </SelectItem>
@@ -1585,6 +1619,40 @@ const FEQuoteForm = () => {
                   Cancel
                 </Button>
               </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* SSL Confirmation Dialog */}
+        <Dialog open={showSSLConfirmation} onOpenChange={() => {}}>
+          <DialogContent 
+            className="max-w-md"
+            onInteractOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => e.preventDefault()}
+            hideCloseButton
+          >
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-red-600">SSL Confirmation Required</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-lg font-medium">
+                SSL is only used for people with CHF. Please confirm this is a prospect that needs SSL due to being diagnosed with CHF.
+              </p>
+            </div>
+            <DialogFooter className="flex-col gap-2">
+              <Button 
+                onClick={handleSSLConfirm} 
+                className="w-full bg-green-600 hover:bg-green-700 text-lg"
+              >
+                Yes - Customer has CHF
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleSSLCancel}
+                className="w-full text-lg"
+              >
+                No - Cancel
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
