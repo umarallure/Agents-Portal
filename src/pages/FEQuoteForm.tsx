@@ -141,6 +141,7 @@ const FEQuoteForm = () => {
   const [transferCheckError, setTransferCheckError] = useState<string | null>(null);
   const [isCustomerBlocked, setIsCustomerBlocked] = useState(false);
   const [blockReason, setBlockReason] = useState('');
+  const [transferCheckCompleted, setTransferCheckCompleted] = useState(false);
 
   // SSL Confirmation
   const [showSSLConfirmation, setShowSSLConfirmation] = useState(false);
@@ -315,6 +316,7 @@ const FEQuoteForm = () => {
       
       if (response.ok) {
         setTransferCheckData(data);
+        setTransferCheckCompleted(true);
         
         // Check for blocking conditions
         const policyStatus = data.data?.['Policy Status'] || '';
@@ -367,17 +369,37 @@ const FEQuoteForm = () => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
+    if (!transferCheckCompleted && phoneNumber) {
+      newErrors.phoneNumber = 'Please click Check button to verify phone number';
+    }
     if (isCustomerBlocked) {
       newErrors.blocked = blockReason;
     }
     if (!firstName) newErrors.firstName = 'First name is required';
     if (!lastName) newErrors.lastName = 'Last name is required';
     if (!phoneNumber) newErrors.phoneNumber = 'Phone number is required';
+    if (!email) newErrors.email = 'Email is required';
     if (!streetAddress) newErrors.streetAddress = 'Street address is required';
     if (!city) newErrors.city = 'City is required';
     if (!state) newErrors.state = 'State is required';
     if (!zipCode) newErrors.zipCode = 'ZIP code is required';
     if (!dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
+    if (!height) newErrors.height = 'Height is required';
+    if (!weight) newErrors.weight = 'Weight is required';
+    if (!tobaccoUse) newErrors.tobaccoUse = 'Tobacco use is required';
+    if (!monthlyPremium) newErrors.monthlyPremium = 'Monthly premium is required';
+    if (!coverageAmount) newErrors.coverageAmount = 'Coverage amount is required';
+    if (!carrier) newErrors.carrier = 'Carrier is required';
+    if (!productType) newErrors.productType = 'Product type is required';
+    if (!draftDate) newErrors.draftDate = 'Draft date is required';
+    if (!beneficiaryName) newErrors.beneficiaryName = 'Beneficiary name is required';
+    if (!beneficiaryPhone) newErrors.beneficiaryPhone = 'Beneficiary phone is required';
+    if (!beneficiaryInformation) newErrors.beneficiaryInformation = 'Beneficiary information is required';
+    if (!accountType) newErrors.accountType = 'Account type is required';
+    if (!institutionName) newErrors.institutionName = 'Institution name is required';
+    if (!routingNumber) newErrors.routingNumber = 'Routing number is required';
+    if (!beneficiaryAccount) newErrors.beneficiaryAccount = 'Account number is required';
+    if (!futureDraftDate) newErrors.futureDraftDate = 'Future draft date is required';
     if (carrier === 'SSL' && !sslConfirmed) {
       newErrors.ssl = 'Please confirm SSL is for CHF customer';
     }
@@ -711,6 +733,7 @@ const FEQuoteForm = () => {
                         setPhoneNumber(e.target.value);
                         setIsCustomerBlocked(false);
                         setBlockReason('');
+                        setTransferCheckCompleted(false);
                       }}
                       className={errors.phoneNumber ? 'border-red-500' : ''}
                     />
@@ -731,14 +754,18 @@ const FEQuoteForm = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">
+                    Email <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="email"
                     type="email"
                     placeholder="email@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    className={errors.email ? 'border-red-500' : ''}
                   />
+                  {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
                 </div>
               </div>
             </CardContent>
@@ -1031,22 +1058,30 @@ const FEQuoteForm = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="height">Height</Label>
+                  <Label htmlFor="height">
+                    Height <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="height"
                     placeholder="Height"
                     value={height}
                     onChange={(e) => setHeight(e.target.value)}
+                    className={errors.height ? 'border-red-500' : ''}
                   />
+                  {errors.height && <p className="text-sm text-red-500">{errors.height}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="weight">Weight</Label>
+                  <Label htmlFor="weight">
+                    Weight <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="weight"
                     placeholder="Weight"
                     value={weight}
                     onChange={(e) => setWeight(e.target.value)}
+                    className={errors.weight ? 'border-red-500' : ''}
                   />
+                  {errors.weight && <p className="text-sm text-red-500">{errors.weight}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="doctorsName">Doctors Name</Label>
@@ -1060,7 +1095,9 @@ const FEQuoteForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Tabacco Use</Label>
+                <Label>
+                  Tobacco Use <span className="text-red-500">*</span>
+                </Label>
                 <div className="flex items-center gap-6">
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -1079,6 +1116,7 @@ const FEQuoteForm = () => {
                     <Label htmlFor="tobaccoNo" className="font-normal cursor-pointer">No</Label>
                   </div>
                 </div>
+                {errors.tobaccoUse && <p className="text-sm text-red-500">{errors.tobaccoUse}</p>}
               </div>
 
               <div className="space-y-2">
@@ -1125,7 +1163,9 @@ const FEQuoteForm = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="monthlyPremium">Monthly Premium</Label>
+                  <Label htmlFor="monthlyPremium">
+                    Monthly Premium <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="monthlyPremium"
                     type="number"
@@ -1133,25 +1173,33 @@ const FEQuoteForm = () => {
                     placeholder="e.g., 23"
                     value={monthlyPremium}
                     onChange={(e) => setMonthlyPremium(e.target.value)}
+                    className={errors.monthlyPremium ? 'border-red-500' : ''}
                   />
+                  {errors.monthlyPremium && <p className="text-sm text-red-500">{errors.monthlyPremium}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="coverageAmount">Coverage Amount</Label>
+                  <Label htmlFor="coverageAmount">
+                    Coverage Amount <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="coverageAmount"
                     type="number"
                     placeholder="e.g., 23"
                     value={coverageAmount}
                     onChange={(e) => setCoverageAmount(e.target.value)}
+                    className={errors.coverageAmount ? 'border-red-500' : ''}
                   />
+                  {errors.coverageAmount && <p className="text-sm text-red-500">{errors.coverageAmount}</p>}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="carrier">Carrier</Label>
+                  <Label htmlFor="carrier">
+                    Carrier <span className="text-red-500">*</span>
+                  </Label>
                   <Select value={carrier} onValueChange={handleCarrierChange}>
-                    <SelectTrigger>
+                    <SelectTrigger className={errors.carrier ? 'border-red-500' : ''}>
                       <SelectValue placeholder="Please Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1162,15 +1210,18 @@ const FEQuoteForm = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  {errors.carrier && <p className="text-sm text-red-500">{errors.carrier}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="productType">Product Type</Label>
+                  <Label htmlFor="productType">
+                    Product Type <span className="text-red-500">*</span>
+                  </Label>
                   <Select 
                     value={productType} 
                     onValueChange={setProductType}
                     disabled={!carrier || (carrier === 'SSL' && !sslConfirmed)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={errors.productType ? 'border-red-500' : ''}>
                       <SelectValue placeholder={!carrier ? "Select carrier first" : "Please Select"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -1185,13 +1236,17 @@ const FEQuoteForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="draftDate">Draft Date</Label>
+                <Label htmlFor="draftDate">
+                  Draft Date <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="draftDate"
                   type="date"
                   value={draftDate}
                   onChange={(e) => setDraftDate(e.target.value)}
+                  className={errors.draftDate ? 'border-red-500' : ''}
                 />
+                {errors.draftDate && <p className="text-sm text-red-500">{errors.draftDate}</p>}
               </div>
             </CardContent>
           </Card>
@@ -1204,35 +1259,47 @@ const FEQuoteForm = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="beneficiaryName">Beneficiary Name</Label>
+                  <Label htmlFor="beneficiaryName">
+                    Beneficiary Name <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="beneficiaryName"
                     placeholder="Beneficiary Name"
                     value={beneficiaryName}
                     onChange={(e) => setBeneficiaryName(e.target.value)}
+                    className={errors.beneficiaryName ? 'border-red-500' : ''}
                   />
+                  {errors.beneficiaryName && <p className="text-sm text-red-500">{errors.beneficiaryName}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="beneficiaryPhone">Beneficiary Phone</Label>
+                  <Label htmlFor="beneficiaryPhone">
+                    Beneficiary Phone <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="beneficiaryPhone"
                     type="tel"
                     placeholder="(000) 000-0000"
                     value={beneficiaryPhone}
                     onChange={(e) => setBeneficiaryPhone(e.target.value)}
+                    className={errors.beneficiaryPhone ? 'border-red-500' : ''}
                   />
+                  {errors.beneficiaryPhone && <p className="text-sm text-red-500">{errors.beneficiaryPhone}</p>}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="beneficiaryInformation">Beneficiary Information</Label>
+                <Label htmlFor="beneficiaryInformation">
+                  Beneficiary Information <span className="text-red-500">*</span>
+                </Label>
                 <Textarea
                   id="beneficiaryInformation"
                   placeholder="Beneficiary Information"
                   value={beneficiaryInformation}
                   onChange={(e) => setBeneficiaryInformation(e.target.value)}
                   rows={3}
+                  className={errors.beneficiaryInformation ? 'border-red-500' : ''}
                 />
+                {errors.beneficiaryInformation && <p className="text-sm text-red-500">{errors.beneficiaryInformation}</p>}
               </div>
             </CardContent>
           </Card>
@@ -1247,7 +1314,9 @@ const FEQuoteForm = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Bank Account Type</Label>
+                <Label>
+                  Bank Account Type <span className="text-red-500">*</span>
+                </Label>
                 <div className="flex items-center gap-6">
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -1266,47 +1335,64 @@ const FEQuoteForm = () => {
                     <Label htmlFor="accountSavings" className="font-normal cursor-pointer">Saving Account</Label>
                   </div>
                 </div>
+                {errors.accountType && <p className="text-sm text-red-500">{errors.accountType}</p>}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="institutionName">Institution Name</Label>
+                <Label htmlFor="institutionName">
+                  Institution Name <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="institutionName"
                   placeholder="Institution Name"
                   value={institutionName}
                   onChange={(e) => setInstitutionName(e.target.value)}
+                  className={errors.institutionName ? 'border-red-500' : ''}
                 />
+                {errors.institutionName && <p className="text-sm text-red-500">{errors.institutionName}</p>}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="routingNumber">Routing Number</Label>
+                  <Label htmlFor="routingNumber">
+                    Routing Number <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="routingNumber"
                     placeholder="Routing Number"
                     value={routingNumber}
                     onChange={(e) => setRoutingNumber(e.target.value)}
+                    className={errors.routingNumber ? 'border-red-500' : ''}
                   />
+                  {errors.routingNumber && <p className="text-sm text-red-500">{errors.routingNumber}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="beneficiaryAccount">Account Number</Label>
+                  <Label htmlFor="beneficiaryAccount">
+                    Account Number <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="beneficiaryAccount"
                     placeholder="Account Number"
                     value={beneficiaryAccount}
                     onChange={(e) => setBeneficiaryAccount(e.target.value)}
+                    className={errors.beneficiaryAccount ? 'border-red-500' : ''}
                   />
+                  {errors.beneficiaryAccount && <p className="text-sm text-red-500">{errors.beneficiaryAccount}</p>}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="futureDraftDate">Future Draft Date</Label>
+                <Label htmlFor="futureDraftDate">
+                  Future Draft Date <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="futureDraftDate"
                   type="date"
                   value={futureDraftDate}
                   onChange={(e) => setFutureDraftDate(e.target.value)}
+                  className={errors.futureDraftDate ? 'border-red-500' : ''}
                 />
+                {errors.futureDraftDate && <p className="text-sm text-red-500">{errors.futureDraftDate}</p>}
               </div>
             </CardContent>
           </Card>
