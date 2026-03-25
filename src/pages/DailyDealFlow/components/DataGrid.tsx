@@ -16,6 +16,7 @@ interface DataGridProps {
   totalRecords?: number;
   recordsPerPage?: number;
   onPageChange?: (page: number) => void;
+  onDetailsClick?: (phoneNumber: string | null, notes: string | null) => void;
 }
 
 export const DataGrid = ({ 
@@ -25,7 +26,8 @@ export const DataGrid = ({
   currentPage = 1,
   totalRecords = 0,
   recordsPerPage = 50,
-  onPageChange
+  onPageChange,
+  onDetailsClick
 }: DataGridProps) => {
   const [groupBy, setGroupBy] = useState<string>('none');
   const [groupBySecondary, setGroupBySecondary] = useState<string>('none');
@@ -450,6 +452,7 @@ export const DataGrid = ({
                 onUpdate={onDataUpdate}
                 hasWritePermissions={hasWritePermissions}
                 isDuplicate={isRowDuplicate(row)}
+                onDetailsClick={onDetailsClick}
               />
             ))
           ) : (
@@ -497,6 +500,7 @@ export const DataGrid = ({
                           onUpdate={onDataUpdate}
                           hasWritePermissions={hasWritePermissions}
                           isDuplicate={isRowDuplicate(row)}
+                          onDetailsClick={onDetailsClick}
                         />
                       );
                     })
@@ -548,6 +552,7 @@ export const DataGrid = ({
                               onUpdate={onDataUpdate}
                               hasWritePermissions={hasWritePermissions}
                               isDuplicate={isRowDuplicate(row)}
+                              onDetailsClick={onDetailsClick}
                             />
                           );
                         })}

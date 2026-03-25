@@ -11,11 +11,14 @@ import { CreateEntryForm } from "./components/CreateEntryForm";
 import { EODReports } from "@/components/EODReports";
 import { WeeklyReports } from "@/components/WeeklyReports";
 import { GHLExport } from "@/components/GHLExport";
-import { Loader2, RefreshCw, Download, FileSpreadsheet, ChevronDown, FileText, Calendar, BarChart3, UserCheck } from "lucide-react";
+import { Loader2, RefreshCw, Download, FileSpreadsheet, ChevronDown, FileText, Calendar, BarChart3, UserCheck, Phone, Play, Pause } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { canPerformWriteOperations } from "@/lib/userPermissions";
 import { dateObjectToESTString } from "@/lib/dateUtils";
 import { useNavigate } from "react-router-dom";
+import { searchAircallCalls, formatDuration, formatTimestamp } from "@/lib/aircall";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export interface DailyDealFlowRow {
   id: string;
@@ -74,6 +77,22 @@ const DailyDealFlowPage = () => {
   const [laCallbackFilter, setLaCallbackFilter] = useState(ALL_OPTION);
   const [hourFromFilter, setHourFromFilter] = useState<string>(ALL_OPTION);
   const [hourToFilter, setHourToFilter] = useState<string>(ALL_OPTION);
+  
+  // Call Recordings state
+  const [showCallDialog, setShowCallDialog] = useState(false);
+  const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
+  const [selectedNotes, setSelectedNotes] = useState<string | null>(null);
+  const [callRecordings, setCallRecordings] = useState<Array<{
+    id: number;
+    direction: string;
+    status: string;
+    duration: number;
+    started_at: number;
+    recording: string | null;
+    user: { name: string } | null;
+  }>>([]);
+  const [callsLoading, setCallsLoading] = useState(false);
+  const [playingRecording, setPlayingRecording] = useState<number | null>(null);
   
   const recordsPerPage = 100;
   
@@ -278,6 +297,41 @@ const DailyDealFlowPage = () => {
     fetchData(page);
   };
 
+  // Handle Details click - fetch call recordings
+  const handleDetailsClick = async (phoneNumber: string | null, notes: string | null = null) => {
+    if (!phoneNumber) return;
+    
+    setSelectedNotes(notes);
+    setShowCallDialog(true);
+    setCallsLoading(true);
+    setCallRecordings([]);
+
+    try {
+      // Get date range - last 180 days (6 months)
+      const toTimestamp = Math.floor(Date.now() / 1000);
+      const fromTimestamp = toTimestamp - (180 * 24 * 60 * 60);
+
+      const calls = await searchAircallCalls(phoneNumber, fromTimestamp, toTimestamp);
+      setCallRecordings(calls.map(call => ({
+        id: call.id,
+        direction: call.direction,
+        status: call.status,
+        duration: call.duration,
+        started_at: call.started_at,
+        recording: call.recording,
+        user: call.user,
+      })));
+    } catch (error) {
+      console.error('Error fetching calls:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load call recordings.",
+        variant: "destructive",
+      });
+    } finally {
+      setCallsLoading(false);
+    }
+  };
 
   // With server-side filtering, data is already filtered
   const filteredData = data;
@@ -693,9 +747,90 @@ const DailyDealFlowPage = () => {
               totalRecords={totalRecords}
               recordsPerPage={recordsPerPage}
               onPageChange={handlePageChange}
+              onDetailsClick={handleDetailsClick}
             />
           </CardContent>
         </Card>
+
+        {/* Call Recordings Dialog */}
+        <Dialog open={showCallDialog} onOpenChange={setShowCallDialog}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Details - {selectedPhone}</DialogTitle>
+            </DialogHeader>
+            <Tabs defaultValue="notes" className="w-full">
+              <TabsList className="w-full">
+                <TabsTrigger value="notes" className="flex-1 data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Notes</TabsTrigger>
+                <TabsTrigger value="recordings" className="flex-1 data-[state=active]:bg-green-100 data-[state=active]:text-green-700">Call Recordings</TabsTrigger>
+              </TabsList>
+              <TabsContent value="notes" className="mt-4">
+                <div className="whitespace-pre-wrap text-sm">
+                  {selectedNotes || 'No notes available for this record.'}
+                </div>
+              </TabsContent>
+              <TabsContent value="recordings" className="mt-4">
+                {callsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    <span>Loading call recordings...</span>
+                  </div>
+                ) : callRecordings.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No call recordings found for this phone number.
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {callRecordings.map((call) => (
+                      <div key={call.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <div className={`px-2 py-1 rounded text-xs font-medium ${
+                              call.direction === 'inbound' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {call.direction === 'inbound' ? 'In' : 'Out'}
+                            </div>
+                            <span className="text-sm font-medium">{formatDuration(call.duration)}</span>
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              call.status === 'completed' ? 'bg-green-100 text-green-700' : 
+                              call.status === 'no-answer' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {call.status}
+                            </span>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {formatTimestamp(call.started_at)} • {call.user?.name || 'Unknown Agent'}
+                          </div>
+                        </div>
+                        {call.recording && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              if (playingRecording === call.id) {
+                                setPlayingRecording(null);
+                              } else {
+                                setPlayingRecording(call.id);
+                                const audio = new Audio(call.recording!);
+                                audio.play();
+                                audio.onended = () => setPlayingRecording(null);
+                              }
+                            }}
+                          >
+                            {playingRecording === call.id ? (
+                              <Pause className="h-4 w-4" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </DialogContent>
+        </Dialog>
         </div>
       </div>
     </div>

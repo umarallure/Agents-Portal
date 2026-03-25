@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Save, X, Edit, CalendarIcon, Eye, Trash2, Zap } from "lucide-react";
+import { Save, X, Edit, CalendarIcon, Eye, Trash2, Zap, Phone } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DailyDealFlowRow } from "../DailyDealFlowPage";
@@ -42,6 +42,7 @@ interface EditableRowProps {
   onUpdate: () => void;
   hasWritePermissions?: boolean;
   isDuplicate?: boolean;
+  onDetailsClick?: (phoneNumber: string | null, notes: string | null) => void;
 }
 
 // Dropdown options (same as CallResultForm)
@@ -122,7 +123,7 @@ const laCallbackOptions = [
   "N/A"
 ];
 
-export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePermissions = true, isDuplicate = false }: EditableRowProps) => {
+export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePermissions = true, isDuplicate = false, onDetailsClick }: EditableRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<DailyDealFlowRow>(row);
   const [isSaving, setIsSaving] = useState(false);
@@ -543,17 +544,29 @@ export const EditableRow = ({ row, rowIndex, serialNumber, onUpdate, hasWritePer
         <DialogHeader>
           <div className="flex justify-between items-center">
             <DialogTitle>Lead Details - {row.insured_name}</DialogTitle>
-            {!isEditing && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEditing(true)}
-                className="ml-4"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {onDetailsClick && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onDetailsClick(row.client_phone_number, row.notes)}
+                  className="ml-4"
+                >
+                  <Phone className="h-4 w-4 mr-2" />
+                  Call Records
+                </Button>
+              )}
+              {!isEditing && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditing(true)}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              )}
+            </div>
           </div>
         </DialogHeader>
         
