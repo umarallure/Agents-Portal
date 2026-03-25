@@ -158,7 +158,9 @@ const FEQuoteForm = () => {
     carrier: '',
     productLevel: '',
     coverageAmount: '',
-    monthlyPremium: ''
+    monthlyPremium: '',
+    state: '',
+    dateOfBirth: ''
   });
 
   // Underwriting checkbox selections for conditions
@@ -211,7 +213,9 @@ const FEQuoteForm = () => {
       carrier: carrier,
       productLevel: '',
       coverageAmount: coverageAmount,
-      monthlyPremium: monthlyPremium
+      monthlyPremium: monthlyPremium,
+      state: state,
+      dateOfBirth: dateOfBirth
     });
 
     // Pre-fill checkboxes based on existing health conditions
@@ -1518,6 +1522,20 @@ const FEQuoteForm = () => {
                 Please read the following script to the customer and verify all information.
               </DialogDescription>
             </DialogHeader>
+            
+            {/* Client Info */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="flex gap-8 text-lg">
+                <div>
+                  <span className="font-semibold">State:</span>
+                  <span className="ml-2">{underwritingData.state || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="font-semibold">Date of Birth:</span>
+                  <span className="ml-2">{underwritingData.dateOfBirth || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
             
             <div className="space-y-6 py-4 text-xl">
               {/* Two Column Layout: Questions (Left) and Toolkit (Right) */}
