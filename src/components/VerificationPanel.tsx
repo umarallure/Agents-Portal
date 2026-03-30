@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { logCallUpdate, getLeadInfo } from "@/lib/callLogging";
@@ -195,6 +195,7 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
   const [showDncModal, setShowDncModal] = useState(false);
   const [pendingPhoneVerification, setPendingPhoneVerification] = useState<string | null>(null);
   const [phoneDncStatus, setPhoneDncStatus] = useState<{itemId: string; status: 'clear' | 'dnc' | 'tcpa'} | null>(null);
+  const autoDncCheckedItemIdsRef = useRef<Set<string>>(new Set());
   
   // Underwriting modal states
   const [showUnderwritingModal, setShowUnderwritingModal] = useState(false);
@@ -379,14 +380,31 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
     });
   };
 
-  // DNC Check Function
-  const checkDnc = async (phoneNumber: string, itemId: string) => {
-    if (!phoneNumber || phoneNumber.length < 10) {
-      toast({
-        title: "Invalid Phone Number",
-        description: "Please enter a valid phone number before checking DNC.",
-        variant: "destructive"
-      });
+  const getPhoneValueForDnc = (itemId: string, item?: VerificationItem) => {
+    if (inputValues[itemId] !== undefined) return inputValues[itemId];
+    return item?.verified_value || item?.original_value || "";
+  };
+
+  const normalizeTenDigitPhone = (value: string) => {
+    const clean = value.replace(/\D/g, "");
+    return clean.length > 10 ? clean.slice(-10) : clean;
+  };
+
+  // DNC Check Function (transfer-check only)
+  const checkDnc = async (itemId: string, options?: { autoTrigger?: boolean }) => {
+    const autoTrigger = options?.autoTrigger ?? false;
+    const item = verificationItems.find((i) => i.id === itemId);
+    const phoneValue = getPhoneValueForDnc(itemId, item);
+    const normalizedPhone = normalizeTenDigitPhone(phoneValue);
+
+    if (!normalizedPhone || normalizedPhone.length !== 10) {
+      if (!autoTrigger) {
+        toast({
+          title: "Invalid Phone Number",
+          description: "Please enter a valid 10-digit phone number before checking DNC.",
+          variant: "destructive",
+        });
+      }
       return null;
     }
 
@@ -394,94 +412,158 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
     setDncResult(null);
 
     try {
-      const cleanPhone = phoneNumber.replace(/\D/g, '');
-      
-      console.log(`[DNC Check] Checking number: ${cleanPhone}`);
-      
-      const response = await fetch('https://akdryqadcxhzqcqhssok.supabase.co/functions/v1/dnc-lookup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrZHJ5cWFkY3hoenFjcWhzc29rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3Mjg5MDQsImV4cCI6MjA2OTMwNDkwNH0.36poCyc_PGl2EnGM3283Hj5_yxRYQU2IetYl8aUA3r4',
-        },
-        body: JSON.stringify({ mobileNumber: cleanPhone }),
+      const transferResponse = await fetch("https://livetransferchecker.vercel.app/api/transfer-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: normalizedPhone }),
       });
 
-      if (!response.ok) {
-        throw new Error(`DNC check failed: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log('[DNC Check] API Response:', result);
-      
-      let isTcpa = false;
-      let isDnc = false;
-      
-      if (result && result.data) {
-        const data = result.data;
-        
-        if (data.federal_dnc && Array.isArray(data.federal_dnc)) {
-          isDnc = data.federal_dnc.includes(cleanPhone);
+      const transferJson = (await transferResponse.json()) as unknown;
+      const asRecord = (value: unknown): Record<string, unknown> | null => {
+        if (value && typeof value === "object") return value as Record<string, unknown>;
+        if (typeof value === "string") {
+          try {
+            const parsed = JSON.parse(value) as unknown;
+            if (parsed && typeof parsed === "object") return parsed as Record<string, unknown>;
+          } catch {
+            return null;
+          }
         }
-        
-        if (!isDnc && data.dnc && Array.isArray(data.dnc)) {
-          isDnc = data.dnc.includes(cleanPhone);
-        }
-        
-        if (data.tcpa_litigator && Array.isArray(data.tcpa_litigator)) {
-          isTcpa = data.tcpa_litigator.includes(cleanPhone);
-        }
-      }
-      
-      console.log(`[DNC Check] Parsed results - isTcpa: ${isTcpa}, isDnc: ${isDnc}`);
-      
-      const resultData = {
-        isDnc: isDnc,
-        isTcpa: isTcpa,
-        message: isTcpa 
-          ? 'WARNING: This number is flagged as TCPA/Litigator. Cannot proceed with submission.'
-          : isDnc 
-            ? 'This number is on the DNC list. Proceed with caution.'
-            : 'This number is clear. Safe to proceed.',
+        return null;
       };
 
-      setDncResult(resultData);
+      const parsedTransfer = asRecord(transferJson);
+      if (!transferResponse.ok) {
+        const errorMessage =
+          parsedTransfer && typeof parsedTransfer.message === "string"
+            ? parsedTransfer.message
+            : `status ${transferResponse.status}`;
+        throw new Error(`transfer-check: ${errorMessage}`);
+      }
+      if (!parsedTransfer) {
+        throw new Error("transfer-check: invalid response payload");
+      }
 
-      if (isTcpa) {
-        setPhoneDncStatus({ itemId, status: 'tcpa' });
-        setPendingPhoneVerification(itemId);
-        setShowDncModal(true);
-        toast({
-          title: "TCPA Warning",
-          description: "This phone number is flagged as TCPA/Litigator.",
-          variant: "destructive"
-        });
-      } else {
-        // Always show the DNC script modal - even for clear numbers
-        setPhoneDncStatus({ itemId, status: isDnc ? 'dnc' : 'clear' });
-        setPendingPhoneVerification(itemId);
-        setShowDncModal(true);
-        if (isDnc) {
-          toast({
-            title: "DNC Warning",
-            description: "This number is on the Do Not Call list.",
-          });
-        } else {
-          toast({
-            title: "Phone Check Complete",
-            description: "Please verify consent with the customer.",
-          });
+      const collectPayloadCandidates = (data: unknown): Array<Record<string, unknown>> => {
+        const root = asRecord(data);
+        if (!root) return [];
+
+        const candidates: Array<Record<string, unknown>> = [root];
+        const firstData = asRecord(root.data);
+        if (firstData) {
+          candidates.push(firstData);
+          const secondData = asRecord(firstData.data);
+          if (secondData) candidates.push(secondData);
         }
+        return candidates;
+      };
+
+      const payloads = collectPayloadCandidates(parsedTransfer);
+      if (payloads.length === 0) {
+        throw new Error("transfer-check: no payload candidates found");
+      }
+
+      const listIncludes = (value: unknown) =>
+        Array.isArray(value) &&
+        value.some((v) => {
+          const digits = typeof v === "string" ? v.replace(/\D/g, "") : "";
+          const candidate = digits.length > 10 ? digits.slice(-10) : digits;
+          return candidate === normalizedPhone;
+        });
+
+      const tcpaLitigatorIncludes = (value: unknown) => {
+        if (Array.isArray(value)) return listIncludes(value);
+        if (value && typeof value === "object") {
+          const map = value as Record<string, unknown>;
+          const exactValue = map[normalizedPhone];
+          if (typeof exactValue === "boolean") return exactValue;
+          if (typeof exactValue === "string") return exactValue.toLowerCase() === "true";
+          return Boolean(exactValue);
+        }
+        return false;
+      };
+
+      const hasTcpaPhrase = (value: unknown) => {
+        if (typeof value !== "string") return false;
+        const msg = value.toLowerCase();
+        return (
+          msg.includes("tcpa") ||
+          msg.includes("litigator") ||
+          msg.includes("no contact permitted") ||
+          msg.includes("do not proceed")
+        );
+      };
+
+      const transferDnc = asRecord(parsedTransfer.dnc);
+      const transferData = asRecord(parsedTransfer.data);
+      const transferPolicyStatus =
+        transferData && typeof transferData["Policy Status"] === "string"
+          ? transferData["Policy Status"].toLowerCase()
+          : "";
+      const isDQFromTransfer =
+        transferPolicyStatus.includes("dq") ||
+        transferPolicyStatus.includes("disqualified") ||
+        transferPolicyStatus.includes("already been dq");
+
+      const isTcpaFromNormalized = payloads.some((payload) => payload?.is_tcpa === true || payload?.is_blacklisted === true);
+      const isDncFromNormalized = payloads.some((payload) => payload?.is_dnc === true);
+      const isDncFromLists = payloads.some((payload) => listIncludes(payload?.federal_dnc) || listIncludes(payload?.dnc));
+      const isTcpaFromLists = payloads.some((payload) => tcpaLitigatorIncludes(payload?.tcpa_litigator));
+      const isTcpaFromMessage = payloads.some((payload) => {
+        const nestedDnc = asRecord(payload?.dnc);
+        return (
+          hasTcpaPhrase(payload?.message) ||
+          hasTcpaPhrase(payload?.upstream_message) ||
+          hasTcpaPhrase(payload?.warningMessage) ||
+          hasTcpaPhrase(payload?.dnc_message) ||
+          hasTcpaPhrase(nestedDnc?.message)
+        );
+      });
+      const isTcpaFromTransfer = hasTcpaPhrase(transferDnc?.message);
+
+      const isTcpa = isTcpaFromNormalized || isTcpaFromLists || isTcpaFromMessage || isTcpaFromTransfer;
+      const isDnc = isDncFromNormalized || isDncFromLists;
+      const status: "clear" | "dnc" | "tcpa" = isTcpa ? "tcpa" : isDnc ? "dnc" : "clear";
+
+      const firstMessagePayload = payloads.find((payload) => typeof payload?.message === "string");
+      const normalizedMessage = typeof firstMessagePayload?.message === "string" ? firstMessagePayload.message : null;
+      const message = normalizedMessage
+        ? normalizedMessage
+        : isTcpa
+          ? "WARNING: Do not proceed with this contact. This is TCPA."
+          : isDQFromTransfer
+            ? "Customer has already been disqualified from the agency."
+            : isDnc
+              ? "This number is on the DNC list. Proceed with verbal consent."
+              : "This number is clear. Please verify consent with the customer.";
+
+      const resultData = { isDnc, isTcpa, message };
+      setDncResult(resultData);
+      setPhoneDncStatus({ itemId, status });
+
+      if (!autoTrigger || status === "tcpa") {
+        setPendingPhoneVerification(itemId);
+        setShowDncModal(true);
+      }
+
+      if (!autoTrigger || status === "tcpa") {
+        toast({
+          title: status === "tcpa" ? "TCPA Warning" : status === "dnc" ? "DNC Warning" : "Phone Check Complete",
+          description: message,
+          variant: status === "tcpa" ? "destructive" : "default",
+        });
       }
 
       return resultData;
     } catch (error) {
-      console.error('[DNC Check] Error:', error);
-      toast({
-        title: "DNC Check Failed",
-        description: "Unable to check DNC status. Please try again.",
-        variant: "destructive"
-      });
+      const msg = error instanceof Error ? error.message : "Unable to check DNC status.";
+      if (!autoTrigger) {
+        toast({
+          title: "DNC Check Failed",
+          description: msg,
+          variant: "destructive",
+        });
+      }
       return null;
     } finally {
       setDncChecking(false);
@@ -545,6 +627,25 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
       setInputValues(prev => ({ ...prev, ...newInputValues }));
     }
   }, [verificationItems]);
+
+  // Auto-check saved phone values on load; auto-show modal only if TCPA is detected.
+  useEffect(() => {
+    if (!verificationItems || verificationItems.length === 0) return;
+
+    const phoneItems = verificationItems.filter(
+      (item) => item.field_name === "phone_number" || item.field_name === "call_phone_landline"
+    );
+
+    phoneItems.forEach((item) => {
+      if (autoDncCheckedItemIdsRef.current.has(item.id)) return;
+      const phoneValue = getPhoneValueForDnc(item.id, item);
+      const normalizedPhone = normalizeTenDigitPhone(phoneValue);
+      if (!normalizedPhone || normalizedPhone.length !== 10) return;
+
+      autoDncCheckedItemIdsRef.current.add(item.id);
+      void checkDnc(item.id, { autoTrigger: true });
+    });
+  }, [verificationItems, inputValues]);
 
   // Pre-fill underwriting data when modal opens
   useEffect(() => {
@@ -853,7 +954,7 @@ export const VerificationPanel = ({ sessionId, onTransferReady }: VerificationPa
                  <Button 
                    size="sm" 
                    className="h-6 text-xs px-3 bg-blue-600 hover:bg-blue-700 text-white ml-auto"
-                   onClick={() => checkDnc(inputValues[item.id] || item.original_value || item.verified_value || '', item.id)}
+                   onClick={() => checkDnc(item.id)}
                    disabled={dncChecking}
                  >
                    {dncChecking ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Phone className="h-3 w-3 mr-1" />}
