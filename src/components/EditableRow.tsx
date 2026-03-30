@@ -69,13 +69,13 @@ const BUFFER_AGENT_OPTIONS = [
 ];
 
 const AGENT_OPTIONS = [
-  "Claudia", "Lydia", "Juan", "Muhammad Ahmed","Angy","Benjamin", "N/A", "Isaac","Brandon Blake Flinchum",
+  "Claudia", "Lydia", "Juan", "Muhammad Ahmed","Angy","Benjamin", "Aubrey Nichols", "N/A", "Isaac","Brandon Blake Flinchum",
    "Tatumn",
    "Zack"
 ];
 
 const LICENSED_ACCOUNT_OPTIONS = [
-  "Claudia", "Lydia","Trinity", "Isaac","Brandon Blake Flinchum", "Noah", "Benjamin", "N/A","Tatumn"
+  "Claudia", "Lydia","Trinity", "Aubrey Nichols", "Isaac","Brandon Blake Flinchum", "Noah", "Benjamin", "N/A","Tatumn"
 ];
 
 const CARRIER_OPTIONS = [

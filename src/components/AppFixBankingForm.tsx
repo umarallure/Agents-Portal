@@ -30,6 +30,7 @@ interface AppFixBankingFormProps {
 
 const licensedAgentOptions = [
   "Lydia",
+  "Aubrey Nichols",
   "Isaac",
   "Benjamin",
   "Tatumn",

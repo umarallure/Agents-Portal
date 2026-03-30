@@ -22,6 +22,7 @@ interface AppFixCarrierFormProps {
 const licensedAgentOptions = [
   "Claudia",
   "Lydia",
+  "Aubrey Nichols",
   "Isaac",
   "Abdul",
   "Trinity",

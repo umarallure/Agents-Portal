@@ -93,6 +93,7 @@ const bufferAgentOptions = [
 
 const agentOptions = [
   "Lydia",
+  "Aubrey Nichols",
   "Muhammad Ahmed",
   "Zack",
   "Tatumn",
@@ -105,6 +106,7 @@ const agentOptions = [
 const licensedAccountOptions = [
   "Claudia",
   "Lydia",
+  "Aubrey Nichols",
   "Isaac",
   "Brandon Blake Flinchum",
   "Abdul",
