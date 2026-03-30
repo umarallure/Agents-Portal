@@ -89,7 +89,7 @@ export const isBufferAgent = async (userId: string | undefined): Promise<boolean
     // Buffer agent names list
     const bufferAgentNames = [
       'Ira', 'Kyla', 'Syed Kazmi',"Muhammad Ahmed", 'Justine',"Catarina", 'Kaye', 'Viez', 
-      'Lourd', 'Mary', 'Nicole Mejia', 'Angelica', 'Laiza Batain'
+      'Lourd', 'Mary', 'Nicole Mejia', 'Angelica', 'Laiza Batain',"Andrea Munoz"
     ];
 
     return bufferAgentNames.includes(data.display_name);

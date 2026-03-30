@@ -146,6 +146,7 @@ const BufferPerformanceReport = () => {
       // Predefined list of buffer agents
       const predefinedAgents = [
         "Justine",
+        "Andrea Munoz",
         "Maria",
         "Catarina",
         "Muhammad Ahmed",
