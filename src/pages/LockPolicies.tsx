@@ -104,6 +104,15 @@ const extractFirstLastName = (fullName: string | null): { firstName: string; las
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
 };
 
+const extractDealFirstLastName = (dealName: string | null): { firstName: string; lastName: string } => {
+  if (!dealName) return { firstName: 'N/A', lastName: 'N/A' };
+  const parts = dealName.split(',').map(part => part.trim());
+  if (parts.length >= 2) {
+    return { firstName: parts[1], lastName: parts[0] };
+  }
+  return { firstName: dealName, lastName: '' };
+};
+
 const generateLockPassword = (firstName: string, lastName: string, ssn: string | null): string => {
   const cleanFirst = firstName.replace(/[^a-zA-Z]/g, '');
   const cleanLast = lastName.replace(/[^a-zA-Z]/g, '');
@@ -545,6 +554,12 @@ const LockPolicies = () => {
                 <FileText className="h-5 w-5" />
                 <span className="font-semibold text-foreground">{selectedPolicy.policy_number || 'N/A'}</span>
               </CardDescription>
+              {selectedPolicy.deal_name && (
+                <CardDescription className="flex items-center gap-2 mt-1 text-base">
+                  <span className="text-muted-foreground">Deal:</span>
+                  <span className="font-medium text-foreground">{selectedPolicy.deal_name}</span>
+                </CardDescription>
+              )}
             </div>
             <Badge variant={selectedPolicy.policy_status === 'Issued Paid' ? 'default' : 'secondary'} className="text-lg px-4 py-1">
               {selectedPolicy.policy_status}
@@ -579,6 +594,12 @@ const LockPolicies = () => {
             </div>
             <div className="space-y-1">
               <span className="text-muted-foreground text-sm flex items-center gap-1">
+                <Phone className="h-3 w-3" /> Phone
+              </span>
+              <span className="font-medium text-lg">{leadInfo.phone_number || 'N/A'}</span>
+            </div>
+            <div className="space-y-1">
+              <span className="text-muted-foreground text-sm flex items-center gap-1">
                 <User className="h-3 w-3" /> First Name
               </span>
               <span className="font-medium text-lg">{firstName}</span>
@@ -589,12 +610,25 @@ const LockPolicies = () => {
               </span>
               <span className="font-medium text-lg">{lastName}</span>
             </div>
-            <div className="space-y-1">
-              <span className="text-muted-foreground text-sm flex items-center gap-1">
-                <Phone className="h-3 w-3" /> Phone
-              </span>
-              <span className="font-medium text-lg">{leadInfo.phone_number || 'N/A'}</span>
-            </div>
+            {(() => {
+              const { firstName: dealFirstName, lastName: dealLastName } = extractDealFirstLastName(selectedPolicy.deal_name);
+              return (
+                <>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-sm flex items-center gap-1">
+                      <FileText className="h-3 w-3" /> Deal First Name
+                    </span>
+                    <span className="font-medium text-lg">{dealFirstName}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-sm flex items-center gap-1">
+                      <FileText className="h-3 w-3" /> Deal Last Name
+                    </span>
+                    <span className="font-medium text-lg">{dealLastName}</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
           
           {(leadInfo.street_address || leadInfo.city || leadInfo.zip_code) && (
