@@ -119,6 +119,8 @@ export const GridToolbar = ({
     "Rinor Mehmeti",
     "Suela Gashi",
     "Vesa Ramadani",
+    "Roland Gashi",
+    "Era Mustafa",
     "Justine",
   ];
 

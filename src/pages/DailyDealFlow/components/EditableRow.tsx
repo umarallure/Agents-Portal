@@ -83,6 +83,8 @@ const retentionAgentOptions = [
   "Rinor Mehmeti",
   "Suela Gashi",
   "Vesa Ramadani",
+  "Roland Gashi",
+  "Era Mustafa",
   "Justine",
   "N/A",
   "LA Callback",
