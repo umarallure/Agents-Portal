@@ -120,6 +120,7 @@ export const GridToolbar = ({
     "Suela Gashi",
     "Vesa Ramadani",
     "Roland Gashi",
+    "Dion Hoti",
     "Era Mustafa",
     "Justine",
   ];

@@ -45,6 +45,7 @@ const retentionAgentOptions = [
   "Raja Arbaz Nawaz",
   "Muhammad Ahmed",
   "Roland Gashi",
+  "Dion Hoti",
   "Era Mustafa",
   "Justine",
   "Ayan Ali",
