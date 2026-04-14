@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -157,6 +158,10 @@ const LockPolicies = () => {
     return 'current';
   });
   const [showPolicyDialog, setShowPolicyDialog] = useState(false);
+  const [stateFilter, setStateFilter] = useState<string>('all');
+  const [availableStates, setAvailableStates] = useState<string[]>([]);
+  const [policyStateMap, setPolicyStateMap] = useState<Record<string, string>>({});
+  const [stateCounts, setStateCounts] = useState<Record<string, number>>({});
   
   const [dispositionType, setDispositionType] = useState<'locked_successfully' | 'already_locked' | 'unable_to_lock' | ''>('');
   const [lockReason, setLockReason] = useState<string[]>([]);
@@ -166,11 +171,29 @@ const LockPolicies = () => {
   
   const hasPassword = false;
 
-  const currentPoliciesList = activeTab === 'current' ? currentPolicies : retroactivePolicies;
+  const currentPoliciesList = (activeTab === 'current' ? currentPolicies : retroactivePolicies).filter(p => {
+    if (stateFilter === 'all') return true;
+    const lookupKey = p.ghl_name?.toLowerCase().trim() || '';
+    const policyState = policyStateMap[lookupKey] || '';
+    return policyState === stateFilter;
+  });
   const selectedPolicy = currentPoliciesList[selectedPolicyIndex] || null;
+  
+  const computedStateCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    const policies = activeTab === 'current' ? currentPolicies : retroactivePolicies;
+    policies.forEach(p => {
+      const lookupKey = p.ghl_name?.toLowerCase().trim() || '';
+      const state = policyStateMap[lookupKey] || '';
+      if (state) {
+        counts[state] = (counts[state] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [currentPolicies, retroactivePolicies, policyStateMap, activeTab]);
   const selectedLeadInfo = selectedPolicy ? (leadInfoMap[selectedPolicy.ghl_name?.toLowerCase().trim() || ''] || null) : null;
 
-  const fetchPolicies = useCallback(async () => {
+  const fetchPolicies = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     try {
       const fiveBusinessDaysAgo = getBusinessDateDaysAgo(5);
@@ -223,6 +246,106 @@ const LockPolicies = () => {
       
       setCurrentPolicies(current);
       setRetroactivePolicies(retroactive);
+
+      const ghlNames = (policies || [])
+        .map((p: any) => p.ghl_name?.trim())
+        .filter(Boolean) as string[];
+
+      const uniqueGhlNames = [...new Set(ghlNames)];
+      
+      const cacheKey = 'lockPoliciesStateCache';
+      const cacheExpiry = 60 * 60 * 1000;
+      
+      const cachedData = localStorage.getItem(cacheKey);
+      const now = Date.now();
+      
+      if (!forceRefresh && cachedData) {
+        try {
+          const { stateMap, availableStates, timestamp, ghlNamesHash } = JSON.parse(cachedData);
+          const ghlNamesHashCurrent = JSON.stringify(uniqueGhlNames.sort());
+          
+          if (now - timestamp < cacheExpiry && ghlNamesHashCurrent === ghlNamesHash) {
+            console.log('Using cached state data');
+            setPolicyStateMap(stateMap);
+            setAvailableStates(availableStates);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.error('Cache parse error:', e);
+        }
+      }
+      
+      if (uniqueGhlNames.length > 0) {
+        console.log('Fetching fresh state data for:', uniqueGhlNames.length, 'names');
+        
+        const stateMap: Record<string, string> = {};
+        const states = new Set<string>();
+        
+        const fetchLeadWithState = async (ghlName: string) => {
+          const { data: leads } = await supabase
+            .from('leads')
+            .select('customer_full_name, state, submission_id')
+            .ilike('customer_full_name', ghlName)
+            .limit(1);
+          
+          if (leads && leads.length > 0) {
+            const lead = leads[0];
+            let leadState = lead.state || '';
+            
+            if (lead.submission_id) {
+              const { data: sessions } = await supabase
+                .from('verification_sessions')
+                .select('id')
+                .eq('submission_id', lead.submission_id)
+                .limit(1);
+              
+              if (sessions && sessions.length > 0) {
+                const { data: verificationItems } = await supabase
+                  .from('verification_items')
+                  .select('original_value')
+                  .eq('session_id', sessions[0].id)
+                  .eq('field_name', 'state')
+                  .limit(1);
+                
+                if (verificationItems && verificationItems.length > 0 && verificationItems[0].original_value) {
+                  leadState = verificationItems[0].original_value;
+                }
+              }
+            }
+            
+            return { ghlName, leadState };
+          }
+          return null;
+        };
+        
+        const batchSize = 20;
+        for (let i = 0; i < uniqueGhlNames.length; i += batchSize) {
+          const chunk = uniqueGhlNames.slice(i, i + batchSize);
+          const results = await Promise.all(chunk.map(name => fetchLeadWithState(name)));
+          
+          results.forEach(result => {
+            if (result) {
+              stateMap[result.ghlName.toLowerCase()] = result.leadState;
+              if (result.leadState) states.add(result.leadState);
+            }
+          });
+          
+          console.log(`State fetch: ${Math.min(i + batchSize, uniqueGhlNames.length)}/${uniqueGhlNames.length}`);
+        }
+        
+        const sortedStates = [...states].sort();
+        setPolicyStateMap(stateMap);
+        setAvailableStates(sortedStates);
+        
+        localStorage.setItem(cacheKey, JSON.stringify({
+          stateMap,
+          availableStates: sortedStates,
+          timestamp: now,
+          ghlNamesHash: JSON.stringify(uniqueGhlNames.sort())
+        }));
+        console.log('State data cached');
+      }
     } catch (error) {
       console.error('Error fetching policies:', error);
       toast({
@@ -236,8 +359,7 @@ const LockPolicies = () => {
   }, [toast]);
 
   const fetchLeadInfo = useCallback(async () => {
-    const policiesToLookup = activeTab === 'current' ? currentPolicies : retroactivePolicies;
-    const policyToLookup = policiesToLookup[selectedPolicyIndex];
+    const policyToLookup = selectedPolicy;
     
     if (policyToLookup && policyToLookup.ghl_name) {
       const normalizedGhlName = policyToLookup.ghl_name.toLowerCase().trim();
@@ -707,10 +829,15 @@ const LockPolicies = () => {
             <ShieldCheck className="h-4 w-4 text-green-600" />
             <span>Lock Policies Access</span>
           </div>
-          <Button variant="outline" size="sm" onClick={() => { fetchPolicies(); fetchTodayLockCount(); setTimeout(() => fetchLeadInfo(), 100); }}>
-            <Loader2 className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              {Object.keys(policyStateMap).length > 0 ? `${Object.keys(policyStateMap).length} states cached` : 'Loading states...'}
+            </span>
+            <Button variant="outline" size="sm" onClick={() => { fetchPolicies(true); fetchTodayLockCount(); setTimeout(() => fetchLeadInfo(), 100); }}>
+              <Loader2 className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         <div className="mb-6 p-4 bg-muted/50 rounded-lg">
@@ -785,6 +912,31 @@ const LockPolicies = () => {
                   <Badge variant="outline" className="ml-1">{retroactivePolicies.length}</Badge>
                 </TabsTrigger>
               </TabsList>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="state-filter" className="text-sm whitespace-nowrap">Filter by State:</Label>
+                  <Select value={stateFilter} onValueChange={(val) => { setStateFilter(val); setSelectedPolicyIndex(0); }}>
+                    <SelectTrigger id="state-filter" className="w-[180px]">
+                      <SelectValue placeholder="All States" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All States ({currentPoliciesList.length})</SelectItem>
+                      {availableStates.map(state => (
+                        <SelectItem key={state} value={state}>{state} ({computedStateCounts[state] || 0})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {stateFilter !== 'all' && (
+                  <Button variant="ghost" size="sm" onClick={() => { setStateFilter('all'); setSelectedPolicyIndex(0); }} className="h-8 px-2">
+                    <X className="h-3 w-3 mr-1" />
+                    Clear Filter
+                  </Button>
+                )}
+                <span className="text-sm text-muted-foreground">
+                  Showing {currentPoliciesList.length} of {(activeTab === 'current' ? currentPolicies : retroactivePolicies).length} policies
+                </span>
+              </div>
             </Tabs>
             
             {renderPolicyCard()}
