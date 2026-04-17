@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+// Main FE Quote Form Component
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -524,14 +525,14 @@ const FEQuoteForm = () => {
           // Send notification to center's slack channel if configured
           if (centerSlackChannel) {
             const agentPortalUrl = `https://agents-portal-zeta.vercel.app/call-result-update?submissionId=${submissionId}&center=${encodeURIComponent(centerName)}`;
-            const centerMessage = `New Application Submission:\n\nCall Center Name: ${centerName}\nCustomer Name: ${fullName}\nCustomer State: ${state}\nQuoted Carrier: ${carrier || 'N/A'}\nDate & Time (EST): ${format(new Date(estDateTime), 'yyyy-MM-dd HH:mm:ss')}`;
+            const centerMessage = `New Application Submission:\n\nSubmission ID: ${submissionId}\nCall Center Name: ${centerName}\nCustomer Name: ${fullName}\nCustomer State: ${state}\nQuoted Carrier: ${carrier || 'N/A'}\nDate & Time (EST): ${format(new Date(estDateTime), 'yyyy-MM-dd HH:mm:ss')}`;
 
             const centerBlocks = [
               {
                 type: "section",
                 text: {
                   type: "mrkdwn",
-                  text: `*New Application Submission:*\n\n*Call Center Name:* ${centerName}\n*Customer Name:* ${fullName}\n*Customer State:* ${state}\n*Quoted Carrier:* ${carrier || 'N/A'}\n*Date & Time (EST):* ${format(new Date(estDateTime), 'yyyy-MM-dd HH:mm:ss')}`
+                  text: `*New Application Submission:*\n\n*Submission ID:* ${submissionId}\n*Call Center Name:* ${centerName}\n*Customer Name:* ${fullName}\n*Customer State:* ${state}\n*Quoted Carrier:* ${carrier || 'N/A'}\n*Date & Time (EST):* ${format(new Date(estDateTime), 'yyyy-MM-dd HH:mm:ss')}`
                 }
               },
               {
@@ -541,7 +542,7 @@ const FEQuoteForm = () => {
                     type: "button",
                     text: {
                       type: "plain_text",
-                      text: "View Application"
+                      text: "Update Call Result"
                     },
                     url: agentPortalUrl,
                     style: "primary"
