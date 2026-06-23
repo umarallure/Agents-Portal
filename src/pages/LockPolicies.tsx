@@ -387,9 +387,16 @@ const LockPolicies = () => {
           });
           const result = await response.json();
           if (result.lead) {
-            leadData = leadData
-              ? { ...result.lead, ...leadData }
-              : result.lead;
+            if (leadData) {
+              leadData = {
+                ...result.lead,
+                ...Object.fromEntries(
+                  Object.entries(leadData).filter(([_, v]) => v != null && v !== '')
+                ),
+              };
+            } else {
+              leadData = result.lead;
+            }
           }
         } catch (e) {
           console.error('Source lead fetch failed:', e);
