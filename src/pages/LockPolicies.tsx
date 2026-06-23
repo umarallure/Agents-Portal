@@ -380,7 +380,7 @@ const LockPolicies = () => {
       
       if (!leadData || !leadData.date_of_birth || !leadData.social_security) {
         try {
-          const response = await fetch('https://bdmgrmzsaacjguatnogm.supabase.co/functions/v1/fetch-source-lead', {
+          const response = await fetch('https://agnefzuxoimnmfarqaxz.supabase.co/functions/v1/fetch-source-lead', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ghlName: normalizedGhlName }),
