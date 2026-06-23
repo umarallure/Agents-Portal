@@ -74,7 +74,7 @@ const LockPoliciesManager = () => {
       const { data, error } = await supabase
         .from('monday_com_deals')
         .select('*')
-        .eq('carrier', 'ANAM')
+        .eq('carrier', 'AMAM (American Amicable)')
         .in('policy_status', ['Issued Paid', 'Issued Not Paid', 'Pending', 'Pending Lapse'])
         .order('deal_creation_date', { ascending: false });
 
@@ -199,7 +199,7 @@ const LockPoliciesManager = () => {
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <ShieldCheck className="h-4 w-4 text-blue-600" />
-            <span>Manager View - All ANAM Policies</span>
+            <span>Manager View - All AMAM Policies</span>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-sm text-muted-foreground">

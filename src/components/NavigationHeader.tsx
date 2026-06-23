@@ -37,13 +37,14 @@ const [isAdmin, setIsAdmin] = useState(false);
   const [canAccessLockPoliciesManagerPage, setCanAccessLockPoliciesManagerPage] = useState(false);
   
   const isBen = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79';
+  const isAgentEligibilityUser = user?.id === '9d7d26ce-f840-420b-ad27-dea3747cccbd';
   const isAuthorizedUser = user?.id === '424f4ea8-1b8c-4c0f-bc13-3ea699900c79' || user?.id === '9c004d97-b5fb-4ed6-805e-e2c383fe8b6f' || user?.id === 'c2f07638-d3d2-4fe9-9a65-f57395745695' || user?.id === '30b23a3f-df6b-40af-85d1-84d3e6f0b8b4'|| user?.id === 'd68d18e4-9deb-4282-b4d0-1e6e6a0789e9';
   const hasNavigationAccess = canAccessNavigation(user?.id);
   const isLockOnlyUser = isLockPoliciesOnlyUser(user?.id);
   
   // Licensed agents, center users, buffer agents, and Ben should see navigation menu
   // Lock policies only users should NOT see navigation
-  const shouldShowNavigation = ((isAuthorizedUser && hasNavigationAccess) || (isLicensedAgent && !licensedLoading) || (isCenterUser && !centerLoading) || (isBufferAgent && !bufferLoading)) && !isLockOnlyUser;
+  const shouldShowNavigation = ((isAuthorizedUser && hasNavigationAccess) || (isLicensedAgent && !licensedLoading) || (isCenterUser && !centerLoading) || (isBufferAgent && !bufferLoading) || isAgentEligibilityUser) && !isLockOnlyUser;
   
   // Find Eligible Agents should be visible to Ben, licensed agents, and center users
   const canAccessAgentFinder = isBen || (isLicensedAgent && !licensedLoading) || (isCenterUser && !centerLoading);
@@ -304,12 +305,6 @@ const checkBufferStatus = async () => {
                         Find Eligible Agents
                       </DropdownMenuItem>
                     )}
-                    {isBen && (
-                      <DropdownMenuItem onClick={() => navigate('/agent-eligibility')}>
-                        <ShieldCheck className="mr-2 h-4 w-4" />
-                        Agent Eligibility Management
-                      </DropdownMenuItem>
-                    )}
                     {isAdmin && (
                       <DropdownMenuItem onClick={() => navigate('/user-management')}>
                         <Users className="mr-2 h-4 w-4" />
@@ -319,6 +314,18 @@ const checkBufferStatus = async () => {
                     <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                       <User className="mr-2 h-4 w-4" />
                       Dashboard
+                    </DropdownMenuItem>
+                  </>
+                )}
+                
+                {/* Agent Eligibility Management */}
+                {(isBen || isAgentEligibilityUser) && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Eligibility</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => navigate('/agent-eligibility')}>
+                      <ShieldCheck className="mr-2 h-4 w-4" />
+                      Agent Eligibility Management
                     </DropdownMenuItem>
                   </>
                 )}

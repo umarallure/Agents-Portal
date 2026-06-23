@@ -168,6 +168,7 @@ const LockPolicies = () => {
   const [password, setPassword] = useState('');
   const [savingDisposition, setSavingDisposition] = useState(false);
   const [showStoredPassword, setShowStoredPassword] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
   
   const hasPassword = false;
 
@@ -202,7 +203,7 @@ const LockPolicies = () => {
       const { data: policies, error, count } = await supabase
         .from('monday_com_deals')
         .select('*', { count: 'exact' })
-        .eq('carrier', 'ANAM')
+        .eq('carrier', 'AMAM (American Amicable)')
         .in('policy_status', ['Issued Paid', 'Issued Not Paid', 'Pending', 'Pending Lapse'])
         .eq('is_active', true)
         .order('deal_creation_date', { ascending: false });
@@ -476,6 +477,30 @@ const LockPolicies = () => {
     }
   }, []);
 
+  const handleSyncFromAMAM = async () => {
+    setSyncLoading(true);
+    try {
+      const response = await fetch('https://bdmgrmzsaacjguatnogm.supabase.co/functions/v1/sync-monday-deals', {
+        method: 'POST',
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Sync failed');
+      toast({
+        title: 'Sync Complete',
+        description: result.message,
+      });
+      await fetchPolicies(true);
+    } catch (error: any) {
+      toast({
+        title: 'Sync Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
   const fetchStatsByDate = useCallback(async (date: string) => {
     try {
       if (!date) {
@@ -489,7 +514,7 @@ const LockPolicies = () => {
       const { data, error } = await supabase
         .from('monday_com_deals')
         .select('lock_status, locked_at')
-        .eq('carrier', 'ANAM')
+        .eq('carrier', 'AMAM (American Amicable)')
         .in('policy_status', ['Issued Paid', 'Issued Not Paid', 'Pending', 'Pending Lapse']);
 
       if (error) throw error;
@@ -833,6 +858,10 @@ const LockPolicies = () => {
             <span className="text-xs text-muted-foreground">
               {Object.keys(policyStateMap).length > 0 ? `${Object.keys(policyStateMap).length} states cached` : 'Loading states...'}
             </span>
+            <Button variant="outline" size="sm" onClick={handleSyncFromAMAM} disabled={syncLoading}>
+              <Loader2 className={`h-4 w-4 mr-2 ${syncLoading ? 'animate-spin' : ''}`} />
+              Sync from AMAM
+            </Button>
             <Button variant="outline" size="sm" onClick={() => { fetchPolicies(true); fetchTodayLockCount(); setTimeout(() => fetchLeadInfo(), 100); }}>
               <Loader2 className="h-4 w-4 mr-2" />
               Refresh

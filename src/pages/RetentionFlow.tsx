@@ -17,7 +17,7 @@ import { AppFixTaskTypeSelector } from '@/components/AppFixTaskTypeSelector';
 import { CallResultForm } from '@/components/CallResultForm';
 
 // Agent Mappings
-const ANAM_WRITING_NUMBERS: Record<string, string> = {
+const AMAM_WRITING_NUMBERS: Record<string, string> = {
   "Lydia Sutton": "1127061",
   "Claudia Tradardi": "1127270",
   "Benjamin Wunder": "1126348",
@@ -411,9 +411,9 @@ The bad news is that I cannot offer you any insurance coverage. Based on the med
     // Lookup details or fallback
     let writingNumber = policy.writing_number || 'N/A';
 
-    // Apply ANAM specific writing numbers if carrier matches
-    if (carrier.toUpperCase().includes('ANAM') && ANAM_WRITING_NUMBERS[agentName]) {
-      writingNumber = ANAM_WRITING_NUMBERS[agentName];
+    // Apply AMAM specific writing numbers if carrier matches
+    if (carrier.toUpperCase().includes('AMAM') && AMAM_WRITING_NUMBERS[agentName]) {
+      writingNumber = AMAM_WRITING_NUMBERS[agentName];
     }
 
     const ssnLast4 = AGENT_SSN_MAPPING[agentName] || 'N/A';
@@ -772,7 +772,7 @@ The bad news is that I cannot offer you any insurance coverage. Based on the med
     const isRoyalNeighbors = selectedPolicy?.carrier?.toLowerCase().includes('royal neighbors');
     const isAetna = selectedPolicy?.carrier?.toLowerCase().includes('aetna');
     const isMOH = selectedPolicy?.carrier?.toUpperCase().includes('MOH') || selectedPolicy?.carrier?.toUpperCase().includes('MUTUAL OF OMAHA');
-    const isAMAM = selectedPolicy?.carrier?.toUpperCase().includes('ANAM') || selectedPolicy?.carrier?.toUpperCase().includes('AMERICO');
+    const isAMAM = selectedPolicy?.carrier?.toUpperCase().includes('AMAM') || selectedPolicy?.carrier?.toUpperCase().includes('AMERICO');
     
     // Check time for RNA (After 6 PM EST) and Aetna (After 5 PM EST)
     const now = new Date();
