@@ -376,18 +376,37 @@ const LockPolicies = () => {
       console.log('Leads error:', leadsError);
       
       const infoMap: Record<string, LeadInfo> = {};
-      if (leads && leads.length > 0) {
-        const lead = leads[0];
-        console.log('Lead submission_id:', lead.submission_id);
+      let leadData = leads && leads.length > 0 ? leads[0] : null;
+      
+      if (!leadData || !leadData.date_of_birth || !leadData.social_security) {
+        try {
+          const response = await fetch('https://bdmgrmzsaacjguatnogm.supabase.co/functions/v1/fetch-source-lead', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ghlName: normalizedGhlName }),
+          });
+          const result = await response.json();
+          if (result.lead) {
+            leadData = leadData
+              ? { ...result.lead, ...leadData }
+              : result.lead;
+          }
+        } catch (e) {
+          console.error('Source lead fetch failed:', e);
+        }
+      }
+      
+      if (leadData) {
+        console.log('Lead submission_id:', leadData.submission_id);
         
         let verified_ssn: string | null = null;
         let verified_dob: string | null = null;
         
-        if (lead.submission_id) {
+        if (leadData.submission_id) {
           const { data: sessions, error: sessionsError } = await supabase
             .from('verification_sessions')
             .select('id')
-            .eq('submission_id', lead.submission_id)
+            .eq('submission_id', leadData.submission_id)
             .limit(1);
           
           console.log('Sessions found:', sessions);
@@ -430,14 +449,14 @@ const LockPolicies = () => {
         }
         
         infoMap[normalizedGhlName] = {
-          date_of_birth: lead.date_of_birth,
-          social_security: lead.social_security,
-          state: lead.state,
-          customer_full_name: lead.customer_full_name,
-          street_address: lead.street_address,
-          city: lead.city,
-          zip_code: lead.zip_code,
-          phone_number: lead.phone_number,
+          date_of_birth: leadData.date_of_birth,
+          social_security: leadData.social_security,
+          state: leadData.state,
+          customer_full_name: leadData.customer_full_name,
+          street_address: leadData.street_address,
+          city: leadData.city,
+          zip_code: leadData.zip_code,
+          phone_number: leadData.phone_number,
           verified_ssn,
           verified_dob
         };

@@ -41,6 +41,9 @@ verify_jwt = false
 [functions.process-lead]
 verify_jwt = false
 
+[functions.fetch-source-lead]
+verify_jwt = false
+
 [functions.sync-monday-deals]
 verify_jwt = false
 
